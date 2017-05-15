@@ -1,0 +1,42 @@
+{
+  "name": "clay-cli",
+  "version": "0.0.1",
+  "description": "A command-line interface for Clay",
+  "main": "index.js",
+  "preferGlobal": true,
+  "bin": {
+    "clay": "cli.js"
+  },
+  "scripts": {
+    "lint": "./node_modules/mocha/bin/eslint --max-warnings 0 lib index.js",
+    "test-with-coverage": "./node_modules/istanbul/lib/cli.js cover ./node_modules/mocha/bin/_mocha",
+    "test": "npm run lint && npm run test-with-coverage"
+  },
+  "pre-push": [
+    "lint"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nymag/clay-cli.git"
+  },
+  "keywords": [
+    "clay",
+    "cli"
+  ],
+  "author": "New York Media",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/nymag/clay-cli/issues"
+  },
+  "homepage": "https://github.com/nymag/clay-cli#readme",
+  "devDependencies": {
+    "chai": "^3.5.0",
+    "coveralls": "^2.13.1",
+    "eslint": "^3.19.0",
+    "istanbul": "^0.4.5",
+    "mocha": "^3.4.1",
+    "mocha-lcov-reporter": "^1.3.0",
+    "sinon": "^2.2.0",
+    "sinon-chai": "^2.10.0"
+  }
+}
