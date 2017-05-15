@@ -72,7 +72,7 @@ clay config key bar s8df7sd8 # sets apikey 'bar = s8df7sd8'
 ## Touch
 
 ```
-clay touch <component> [--site, --key, --preview, --force]
+clay touch <component> [--site] [--preview, --force]
 ```
 
 Do GET requests against every instance of a specific component to trigger component upgrades.
@@ -89,10 +89,18 @@ clay touch article -s my-site # GET all instances of 'article' on my site
 ## Import
 
 ```
-clay import [--site, --file, --preview, --force, --key, --users] <site>
+clay import [--site, --file, --page, --component] [--preview, --force, --key] [--users] <site>
 ```
 
-Imports data into Clay. You can import from a Clay site (with `--site`), a YAML/JSON file (or directory of files) with `--file`, or `stdin` (useful for importing to Clay from non-Clay systems). You can specify the site to import into the same way you use the `--site` option, e.g. alias, url, or uri. If you don't specify a site to import into, it'll use the `CLAY_DEFAULT_SITE` environment variable.
+Imports data into Clay. You can import from:
+
+* `stdin` (pipe to `clay import` from another cli tool, such as a 3rd party importer)
+* `-s, --site` a Clay site
+* `-f, --file` a YAML/JSON file (or directory of files)
+* `-c, --component` a specific component instance url
+* `--page` a specific page url
+
+If you specify a specific component instance or page url, `clay-cli` will import that item _and its children_. You can specify the site to import into with the same syntax as the `--site` option, e.g. alias, url, or uri. If you don't specify a site to import into, it'll use the `CLAY_DEFAULT_SITE` environment variable.
 
 * `-p, --preview` will tell you the total number of components, pages, uris, and lists that will be imported
 * normally, it will warn you when it encounters things that already exist (components, pages, uris, and lists)
@@ -104,21 +112,43 @@ my-wordpress-to-clay-exporter | clay import # pipe from an importer to your CLAY
 
 clay import -s my-prod-site my-local-site # import from production to a local dev environment
 
+clay import -s stg.domain.com qa.domain.com -k qa # import from staging server to qa, providing the apikey for the qa server
+
 clay import -f path/to/bootstraps/ my-local-site # import from a directory of yaml files
+
+clay import -f ~/users.yaml qa.domain.com/my-site -u -k qa # import users from a file into a qa server
+
+clay import -c domain.com/components/article/instances/a8d6s # only import this specific article into your CLAY_DEFAULT_SITE
+
+clay import --page domain.com/2017-some-slug.html # import a specific page (via public url) into your CLAY_DEFAULT_SITE
+
+clay import --page domain.com/pages/g7d6f8 qa -k qa # import a specific page (via page uri) into a qa server
 ```
 
 ## Export
 
 ```
-clay export <site> [--file, --preview, --force, --users]
+clay export (<site>|[--page, --component]) [--file] [--preview, --force] [--users]
 ```
 
-Exports data from Clay. You can export to a YAML/JSON file with `--file` (it'll default to YAML if no extension is specified), or `stdout` (useful for exporting Clay data into non-Clay systems, and for linting). You can specify the site to export from the same way you use the `--site` option, e.g. alias, url, or uri. If you don't specify a site to export from, it'll use the `CLAY_DEFAULT_SITE` environment variable.
+Exports data from Clay. You can export to a YAML/JSON file with `--file` (it'll default to YAML if no extension is specified), or `stdout` (useful for exporting Clay data into non-Clay systems, and for linting). You can specify the site to export from _or a specific page/component_. If you specify site, use the same syntax as the `--site` option. If you specify page or component, use the same syntax as the you use for importing pages and components. If you don't specify a site, page, or component to export from, it'll use the `CLAY_DEFAULT_SITE` environment variable. Exporting pages and components will also export their children.
 
 * `--preview` will tell you the total number of components, pages, uris, and lists that will be exported
 * normally, if you export to a file, it'll warn you if the file already exists
 * `--force` will suppress that warnings and overwrite the file
 * `-u, --users` will export users as well as other site data
+
+```
+clay export # export CLAY_DEFAULT_SITE to stdout
+
+clay export -s my-prod-site path/to/backup.json # export site data to json file
+
+clay export -c domain.com/components/article/instances/g76s8d path/to/article-backup.yml # export specific article to yaml
+
+clay export --page https://domain.com/2017-some-slug.html path/to/page-backup.yaml # export specific page (via public url) to yaml
+
+clay export --page domain.com/pages/df6sf8 # export specific page (via page uri) to stdout
+```
 
 ## Lint
 
