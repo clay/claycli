@@ -127,16 +127,18 @@ clay import --page domain.com/2017-some-slug.html # import a specific page (via 
 
 clay import --page domain.com/pages/g7d6f8 qa -k qa # import a specific page (via page uri) into a qa server
 
+clay import -s my-site -l 10 my-local-site # import the latest 10 pages into a local dev environment
+
 clay import # if no stdin or input specified, it'll prompt for interactive importing
 ```
 
 ## Export
 
 ```
-clay export (<site>|[--page, --component]) [--file] [--preview, --force] [--users, --limit]
+clay export [--site, --page, --component] [file] [--preview, --force] [--users, --limit]
 ```
 
-Exports data from Clay. You can export to a YAML/JSON file with `--file` (it'll default to YAML if no extension is specified), or `stdout` (useful for exporting Clay data into non-Clay systems, and for linting). You can specify the site to export from _or a specific page/component_. If you specify site, use the same syntax as the `--site` option. If you specify page or component, use the same syntax as the you use for importing pages and components. If you don't specify a site, page, or component to export from, it'll use the `CLAY_DEFAULT_SITE` environment variable. Exporting pages and components will also export their children.
+Exports data from Clay. You can export to a YAML/JSON file by specifying a file path (it'll default to YAML if no extension is specified), or `stdout` (useful for exporting Clay data into non-Clay systems, and for linting). You can specify the site to export from _or a specific page/component_. If you don't specify a site, page, or component to export from, it'll use the `CLAY_DEFAULT_SITE` environment variable. Exporting pages and components will also export their children.
 
 * `-p, --preview` will tell you the total number of components, pages, uris, and lists (but not users) that will be exported
 * normally, if you export to a file, it'll warn you if the file already exists
@@ -154,6 +156,8 @@ clay export -c domain.com/components/article/instances/g76s8d path/to/article-ba
 clay export --page https://domain.com/2017-some-slug.html path/to/page-backup.yaml # export specific page (via public url) to yaml
 
 clay export --page domain.com/pages/df6sf8 # export specific page (via page uri) to stdout
+
+clay export -s my-site -l 10 path/to/cool-ten-articles.json # export latest ten pages to json
 
 clay export # if no CLAY_DEFAULT_SITE is set, it'll interactively prompt for exporting
 ```
