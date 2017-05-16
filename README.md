@@ -133,7 +133,7 @@ clay export (<site>|[--page, --component]) [--file] [--preview, --force] [--user
 
 Exports data from Clay. You can export to a YAML/JSON file with `--file` (it'll default to YAML if no extension is specified), or `stdout` (useful for exporting Clay data into non-Clay systems, and for linting). You can specify the site to export from _or a specific page/component_. If you specify site, use the same syntax as the `--site` option. If you specify page or component, use the same syntax as the you use for importing pages and components. If you don't specify a site, page, or component to export from, it'll use the `CLAY_DEFAULT_SITE` environment variable. Exporting pages and components will also export their children.
 
-* `--preview` will tell you the total number of components, pages, uris, and lists that will be exported
+* `-p, --preview` will tell you the total number of components, pages, uris, and lists that will be exported
 * normally, if you export to a file, it'll warn you if the file already exists
 * `--force` will suppress that warnings and overwrite the file
 * `-u, --users` will export users as well as other site data
@@ -179,6 +179,41 @@ clay lint -f components/foo # lint the template, schema, and bootstrap
 
 ## Create
 
+```
+clay create component <component> [--preview, --force] [--description, --tag, --client, --model]
+```
 
+```
+clay create site <site> [--preview, --force] [--name, --host, --path]
+```
+
+Interactively create components and sites. Most interactive options (`description`, `tag`, etc) can be passed in as cli options.
+
+* `-p, --preview` will give info about the component or site that will be generated
+* normally, it will warn you if the component or site already exists
+* `--force` will suppress that warning and override the existing thing
+
+For components, it will ask for description (which goes in the schema), html tag (defaults to `div`), and whether or not it should generate `client.js` and `model.js` files. Note: [Until `server.js` is fully removed from Amphora](https://github.com/nymag/amphora/tree/master/lib/routes#legacy-server-logic), it will generate passthrough `model.js` files regardless of what you specify.
+
+* `-d, --description` is a human-readable description for the component, which should be wrapped in quotes
+* `-t, --tag` is the tag a component should use, or "layout" (for creating a layout) or "comment" (for creating head components)
+* `-c, --client` will create a `client.js` file in the component
+* `-m, --model` will create a `model.js` file in a component
+
+For sites, it will ask for a display name, host, and path. Specify an empty path (or `/`) for sites at the root of the specified domain/host. It will generate a site with `config.yml`, `bootstrap.yml`, and `index.js` files.
+
+* `-n, --name` is the human-readable display name of your site
+* `-h, --host` is the domain/host it should run on
+* `--path` is the path it should run on, if any
 
 ## Clone
+
+```
+clay clone component <component> [--preview, --force] [--description]
+```
+
+```
+clay clone site <site> [--preview, --force] [--name, --host, --path]
+```
+
+Cloning components and sites works similarly to creating them, though the `component` subcommand only allows `description`. It will copy _all_ files from the original component/site into the cloned one, and update references in the `template.hbs`, `schema.yml`, `bootstrap.yml`, and `styles.scss` if they exist. Note that you may need to manually update your `client.js` or `model.js` to re-enable component logic.
