@@ -56,17 +56,17 @@ For smaller Clay installations (or, ironically, for very large teams where devs 
 ## Config
 
 ```
-clay config (key|site) <alias> <value>
+clay config (key|site).<alias> <value>
 ```
 
 Show or set configuration options, specifying either `key` or `site` with an alias and value. As noted above, sites can be specified as urls or uris (with no protocol or port, it'll assume `http` and port `80`).
 
 ```
-clay config # prints full config
+clay config # interactively edit the config
 
-clay config site foo # prints url for site 'foo'
+clay config site.foo # prints url for site 'foo'
 
-clay config key bar s8df7sd8 # sets apikey 'bar = s8df7sd8'
+clay config key.bar s8df7sd8 # sets apikey 'bar = s8df7sd8'
 ```
 
 ## Touch
@@ -82,6 +82,8 @@ Do GET requests against every instance of a specific component to trigger compon
 * `--force` will request those instances without asking for confirmation
 
 ```
+clay touch # interactively specify component and site to touch
+
 clay touch article -s my-site # GET all instances of 'article' on my site
 # it will print 'This will affect 203 instances of article. Continue [Y/n]?'
 ```
@@ -89,23 +91,24 @@ clay touch article -s my-site # GET all instances of 'article' on my site
 ## Import
 
 ```
-clay import [--site, --file, --page, --component] [--preview, --force, --key] [--users] <site>
+clay import [--site, --file, --page, --component] [--preview, --force, --key] [--users, --limit] <site>
 ```
 
 Imports data into Clay. You can import from:
 
 * `stdin` (pipe to `clay import` from another cli tool, such as a 3rd party importer)
-* `-s, --site` a Clay site
-* `-f, --file` a YAML/JSON file (or directory of files)
-* `-c, --component` a specific component instance url
-* `--page` a specific page url
+* `-s, --site <site>` a Clay site
+* `-f, --file <path>` a YAML/JSON file (or directory of files)
+* `-c, --component <uri>` a specific component instance url
+* `--page <uri or url>` a specific page url
 
 If you specify a specific component instance or page url, `clay-cli` will import that item _and its children_. You can specify the site to import into with the same syntax as the `--site` option, e.g. alias, url, or uri. If you don't specify a site to import into, it'll use the `CLAY_DEFAULT_SITE` environment variable.
 
 * `-p, --preview` will tell you the total number of components, pages, uris, and lists that will be imported
-* normally, it will warn you when it encounters things that already exist (components, pages, uris, and lists)
+* normally, it will warn you when it encounters things that already exist (components, pages, uris, and lists, but not users)
 * `--force` will suppress those warnings and overwrite data without pausing
 * `-u, --users` will import users as well as other site data. If you're importing from a "users" bootstrap file, make sure to specify this!
+* `-l, --limit <number>` will limit a site import to the specified number of most recent pages
 
 ```
 my-wordpress-to-clay-exporter | clay import # pipe from an importer to your CLAY_DEFAULT_SITE
@@ -123,20 +126,23 @@ clay import -c domain.com/components/article/instances/a8d6s # only import this 
 clay import --page domain.com/2017-some-slug.html # import a specific page (via public url) into your CLAY_DEFAULT_SITE
 
 clay import --page domain.com/pages/g7d6f8 qa -k qa # import a specific page (via page uri) into a qa server
+
+clay import # if no stdin or input specified, it'll prompt for interactive importing
 ```
 
 ## Export
 
 ```
-clay export (<site>|[--page, --component]) [--file] [--preview, --force] [--users]
+clay export (<site>|[--page, --component]) [--file] [--preview, --force] [--users, --limit]
 ```
 
 Exports data from Clay. You can export to a YAML/JSON file with `--file` (it'll default to YAML if no extension is specified), or `stdout` (useful for exporting Clay data into non-Clay systems, and for linting). You can specify the site to export from _or a specific page/component_. If you specify site, use the same syntax as the `--site` option. If you specify page or component, use the same syntax as the you use for importing pages and components. If you don't specify a site, page, or component to export from, it'll use the `CLAY_DEFAULT_SITE` environment variable. Exporting pages and components will also export their children.
 
-* `-p, --preview` will tell you the total number of components, pages, uris, and lists that will be exported
+* `-p, --preview` will tell you the total number of components, pages, uris, and lists (but not users) that will be exported
 * normally, if you export to a file, it'll warn you if the file already exists
 * `--force` will suppress that warnings and overwrite the file
 * `-u, --users` will export users as well as other site data
+* `-l, --limit <number>` will limit a site export to the specified number of most recent pages
 
 ```
 clay export # export CLAY_DEFAULT_SITE to stdout
@@ -148,6 +154,8 @@ clay export -c domain.com/components/article/instances/g76s8d path/to/article-ba
 clay export --page https://domain.com/2017-some-slug.html path/to/page-backup.yaml # export specific page (via public url) to yaml
 
 clay export --page domain.com/pages/df6sf8 # export specific page (via page uri) to stdout
+
+clay export # if no CLAY_DEFAULT_SITE is set, it'll interactively prompt for exporting
 ```
 
 ## Lint
@@ -175,6 +183,8 @@ clay lint domain.com/components/layout/instances/article # lint an instance of t
 clay lint domain.com/components/image/instances/a8d7s # lint an image, checking its data against the schema
 
 clay lint -f components/foo # lint the template, schema, and bootstrap
+
+clay lint # if no arguments, it'll prompt for interactive linting
 ```
 
 ## Create
@@ -195,16 +205,16 @@ Interactively create components and sites. Most interactive options (`descriptio
 
 For components, it will ask for description (which goes in the schema), html tag (defaults to `div`), and whether or not it should generate `client.js` and `model.js` files. Note: [Until `server.js` is fully removed from Amphora](https://github.com/nymag/amphora/tree/master/lib/routes#legacy-server-logic), it will generate passthrough `model.js` files regardless of what you specify.
 
-* `-d, --description` is a human-readable description for the component, which should be wrapped in quotes
-* `-t, --tag` is the tag a component should use, or "layout" (for creating a layout) or "comment" (for creating head components)
+* `-d, --description, "<text>"` is a human-readable description for the component, which should be wrapped in quotes
+* `-t, --tag <tagname>` is the tag a component should use, or "layout" (for creating a layout) or "comment" (for creating head components)
 * `-c, --client` will create a `client.js` file in the component
 * `-m, --model` will create a `model.js` file in a component
 
 For sites, it will ask for a display name, host, and path. Specify an empty path (or `/`) for sites at the root of the specified domain/host. It will generate a site with `config.yml`, `bootstrap.yml`, and `index.js` files.
 
-* `-n, --name` is the human-readable display name of your site
-* `-h, --host` is the domain/host it should run on
-* `--path` is the path it should run on, if any
+* `-n, --name "<site name>"` is the human-readable display name of your site
+* `-h, --host <hostname>` is the domain/host it should run on
+* `--path <path>` is the path it should run on, if any
 
 ## Clone
 
