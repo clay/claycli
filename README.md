@@ -1,4 +1,4 @@
-# clay-cli
+--dry-run# clay-cli
 A CLI For Clay!
 
 [![CircleCI](https://circleci.com/gh/nymag/clay-cli.svg?style=svg)](https://circleci.com/gh/nymag/clay-cli) [![Coverage Status](https://coveralls.io/repos/github/nymag/clay-cli/badge.svg?branch=master)](https://coveralls.io/github/nymag/clay-cli?branch=master)
@@ -12,10 +12,10 @@ npm install -g clay-cli
 # Usage
 
 ```
-clay <command> <argument> [options]
+clay <command> [options]
 ```
 
-If installed locally, you can simply call `clay` from the command line. Arguments and options can be used in any order. Much like `git`, `clay-cli` can be configured using a `.clayconfig` file in your home folder. Keys and sites can be called anything, as you'll reference them with the `--key` and `--site` options when using `clay-cli`. For sites, it'll assume `http://` and port `80` unless you specify otherwise.
+If installed globally, you can simply call `clay` from the command line. Much like `git`, `clay-cli` can be configured using a `.clayconfig` file in your home folder. Keys and sites can be called anything, as you'll reference them with the `--key` and `--site` options when using `clay-cli`. For sites, it'll assume `http://` and port `80` unless you specify otherwise.
 
 ```
 [keys]
@@ -47,10 +47,11 @@ For smaller Clay installations (or, ironically, for very large teams where devs 
 
 * `-v, --version` will print the `clay-cli` version and exit.
 * `-h, --help` will print helpful info about `clay-cli` and various commands.
+* `-V, --verbose` will print out helpful debugging messages as it runs commands.
 * `-s, --site` allows a site url, uri (no protocol or port), or alias to a site specified in your `.clayconfig`. If this argument is not provided, `clay-cli` will use the value of the `CLAY_DEFAULT_SITE` environment variable.
 * `-k, --key` allows an api key or an alias to a key specified in your `.clayconfig`. If this argument is not provided, `clay-cli` will use the value of the `CLAY_DEFAULT_KEY` environment variable.
 * `-f, --file` imports or exports from a JSON or YAML file, and will recursively parse a folder of said files. Note that this may be slow when run against large folders.
-* `-p, --preview` allows you to preview the results of a command without executing it for real. The output will depend on the specific command.
+* `-n, --dry-run` allows you to preview the results of a command without executing it for real. The output will depend on the specific command.
 * `--force` allows you to silence confirmations and warnings. Use at your own risk!
 
 ## Config
@@ -72,12 +73,12 @@ clay config key.bar s8df7sd8 # sets apikey 'bar = s8df7sd8'
 ## Touch
 
 ```
-clay touch <component> [--site] [--preview, --force]
+clay touch <component> [--site] [--dry-run, --force]
 ```
 
 Do GET requests against every instance of a specific component to trigger component upgrades.
 
-* `-p, --preview` will print the number of instances that'll be requested
+* `-n, --dry-run` will print the number of instances that'll be requested
 * normally, it will print the number of instances and ask for confirmation before requesting each instance
 * `--force` will request those instances without asking for confirmation
 
@@ -91,7 +92,7 @@ clay touch article -s my-site # GET all instances of 'article' on my site
 ## Import
 
 ```
-clay import [--site, --file, --page, --component] [--preview, --force, --key] [--users, --limit] <site>
+clay import [--site, --file, --page, --component] [--dry-run, --force, --key] [--users, --limit] <site>
 ```
 
 Imports data into Clay. You can import from:
@@ -104,7 +105,7 @@ Imports data into Clay. You can import from:
 
 If you specify a specific component instance or page url, `clay-cli` will import that item _and its children_. You can specify the site to import into with the same syntax as the `--site` option, e.g. alias, url, or uri. If you don't specify a site to import into, it'll use the `CLAY_DEFAULT_SITE` environment variable.
 
-* `-p, --preview` will tell you the total number of components, pages, uris, and lists that will be imported
+* `-n, --dry-run` will tell you the total number of components, pages, uris, and lists that will be imported
 * normally, it will warn you when it encounters things that already exist (components, pages, uris, and lists, but not users)
 * `--force` will suppress those warnings and overwrite data without pausing
 * `-u, --users` will import users as well as other site data. If you're importing from a "users" bootstrap file, make sure to specify this!
@@ -135,12 +136,12 @@ clay import # if no stdin or input specified, it'll prompt for interactive impor
 ## Export
 
 ```
-clay export [--site, --page, --component] [file] [--preview, --force] [--users, --limit]
+clay export [--site, --page, --component] [file] [--dry-run, --force] [--users, --limit]
 ```
 
 Exports data from Clay. You can export to a YAML/JSON file by specifying a file path (it'll default to YAML if no extension is specified), or `stdout` (useful for exporting Clay data into non-Clay systems, and for linting). You can specify the site to export from _or a specific page/component_. If you don't specify a site, page, or component to export from, it'll use the `CLAY_DEFAULT_SITE` environment variable. Exporting pages and components will also export their children.
 
-* `-p, --preview` will tell you the total number of components, pages, uris, and lists (but not users) that will be exported
+* `-n, --dry-run` will tell you the total number of components, pages, uris, and lists (but not users) that will be exported
 * normally, if you export to a file, it'll warn you if the file already exists
 * `--force` will suppress that warnings and overwrite the file
 * `-u, --users` will export users as well as other site data
@@ -194,16 +195,16 @@ clay lint # if no arguments, it'll prompt for interactive linting
 ## Create
 
 ```
-clay create component <component> [--preview, --force] [--description, --tag, --client, --model]
+clay create component <component> [--dry-run, --force] [--description, --tag, --client, --model]
 ```
 
 ```
-clay create site <site> [--preview, --force] [--name, --host, --path]
+clay create site <site> [--dry-run, --force] [--name, --host, --path]
 ```
 
 Interactively create components and sites. Most interactive options (`description`, `tag`, etc) can be passed in as cli options.
 
-* `-p, --preview` will give info about the component or site that will be generated
+* `-n, --dry-run` will give info about the component or site that will be generated
 * normally, it will warn you if the component or site already exists
 * `--force` will suppress that warning and override the existing thing
 
@@ -223,11 +224,11 @@ For sites, it will ask for a display name, host, and path. Specify an empty path
 ## Clone
 
 ```
-clay clone component <component> [--preview, --force] [--description]
+clay clone component <component> [--dry-run, --force] [--description]
 ```
 
 ```
-clay clone site <site> [--preview, --force] [--name, --host, --path]
+clay clone site <site> [--dry-run, --force] [--name, --host, --path]
 ```
 
 Cloning components and sites works similarly to creating them, though the `component` subcommand only allows `description`. It will copy _all_ files from the original component/site into the cloned one, and update references in the `template.hbs`, `schema.yml`, `bootstrap.yml`, and `styles.scss` if they exist. Note that you may need to manually update your `client.js` or `model.js` to re-enable component logic.

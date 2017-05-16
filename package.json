@@ -5,7 +5,7 @@
   "main": "index.js",
   "preferGlobal": true,
   "bin": {
-    "clay": "cli.js"
+    "clay": "index.js"
   },
   "scripts": {
     "lint": "./node_modules/.bin/eslint --max-warnings 0 lib index.js",
@@ -41,7 +41,9 @@
   },
   "dependencies": {
     "bluebird": "^3.5.0",
+    "inquirer": "^3.0.6",
     "lodash": "^4.17.4",
-    "node-fetch": "^1.6.3"
+    "node-fetch": "^1.6.3",
+    "yargs": "^8.0.1"
   }
 }
