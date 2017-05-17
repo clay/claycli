@@ -60,17 +60,17 @@ For smaller Clay installations (or, ironically, for very large teams where devs 
 ## Config
 
 ```
-clay config (key|site).<alias> <value>
+clay config (keys|sites|files).<alias> <value>
 ```
 
-Show or set configuration options, specifying either `key` or `site` with an alias and value. As noted above, sites can be specified as urls or uris (with no protocol or port, it'll assume `http` and port `80`).
+Show or set configuration options, specifying either `keys`, `sites`, or `files` with an alias and value. As noted above, sites can be specified as urls or uris (with no protocol or port, it'll assume `http` and port `80`).
 
 ```
-clay config # interactively edit the config
+clay config sites.foo # prints url for site 'foo'
 
-clay config site.foo # prints url for site 'foo'
+clay config keys.bar s8df7sd8 # sets apikey 'bar = s8df7sd8'
 
-clay config key.bar s8df7sd8 # sets apikey 'bar = s8df7sd8'
+clay config files.foo bar.yaml # sets file shortcut 'foo = <current directory>/bar.yaml'
 ```
 
 ## Touch
@@ -86,7 +86,7 @@ Do GET requests against every instance of a specific component to trigger compon
 * `--force` will request those instances without asking for confirmation
 
 ```
-clay touch # interactively specify component and site to touch
+clay touch domain.com/components/article # GET all instances of 'article' on domain.com
 
 clay touch article -s my-site # GET all instances of 'article' on my site
 # it will print 'This will affect 203 instances of article. Continue [Y/n]?'

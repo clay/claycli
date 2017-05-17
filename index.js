@@ -2,7 +2,8 @@
 'use strict'; // eslint-disable-line
 const yargs = require('yargs'),
   path = require('path'),
-  logger = require('./lib/utils/logger');
+  logger = require('./lib/utils/logger'),
+  options = require('./lib/utils/shared-options');
 
 let argv = yargs.usage('Usage: clay <command> [options]')
   .wrap(yargs.terminalWidth())
@@ -15,8 +16,9 @@ let argv = yargs.usage('Usage: clay <command> [options]')
     h: 'help',
     v: 'version'
   })
+  .option('V', options.verbose)
   .demandCommand(1, 'What would you like to do today?')
   .argv;
 
-// set log level
+// set log level (note: this has to be set in your command handlers if you want to debug stuff there)
 logger.setLogLevel(argv.verbose);

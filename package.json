@@ -42,6 +42,7 @@
   "dependencies": {
     "bluebird": "^3.5.0",
     "chalk": "^1.1.3",
+    "clay-utils": "^1.1.1",
     "davlog": "^1.1.0",
     "expand-home-dir": "0.0.3",
     "home-config": "^0.1.0",
