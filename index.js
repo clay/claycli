@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 'use strict'; // eslint-disable-line
 const yargs = require('yargs'),
+  path = require('path'),
   logger = require('./lib/utils/logger');
 
 let argv = yargs.usage('Usage: clay <command> [options]')
   .wrap(yargs.terminalWidth())
   // commands
-  .commandDir('cmd')
+  .commandDir(path.join('lib', 'cmd'))
   // common options
   .help()
   .version()

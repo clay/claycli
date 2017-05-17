@@ -15,7 +15,7 @@ npm install -g clay-cli
 clay <command> [options]
 ```
 
-If installed globally, you can simply call `clay` from the command line. Much like `git`, `clay-cli` can be configured using a `.clayconfig` file in your home folder. Keys and sites can be called anything, as you'll reference them with the `--key` and `--site` options when using `clay-cli`. For sites, it'll assume `http://` and port `80` unless you specify otherwise.
+If installed globally, you can simply call `clay` from the command line. Much like `git`, `clay-cli` can be configured using a `.clayconfig` file in your home folder. In it you can specify references to api keys, site prefixes, and files (or directories) that you use frequently. You'll reference them with the `--key`, `--site`, and `--file` options when using applicable `clay-cli` commands. For sites, it'll assume `http://` and port `80` unless you specify otherwise.
 
 ```
 [keys]
@@ -25,6 +25,9 @@ If installed globally, you can simply call `clay` from the command line. Much li
 [sites]
   local-site1 = https://localhost.site1.com:3001
   local-site2 = localhost.site1.com/site-2 # http and port 80
+[files]
+  site1-bootstraps = ~/projects/clay/bootstraps
+  users = ~/Desktop/users.json
 ```
 
 For smaller Clay installations (or, ironically, for very large teams where devs spend most of their time on individual sites), you can specify a default api key and site by using the `CLAY_DEFAULT_KEY` and `CLAY_DEFAULT_SITE` environment variables.
