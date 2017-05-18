@@ -5,10 +5,15 @@ const yargs = require('yargs'),
   logger = require('./lib/utils/logger'),
   options = require('./lib/utils/shared-options');
 
-let argv = yargs.usage('Usage: clay <command> [options]')
+let argv = yargs
+  .usage('Usage: clay <command> [options]')
   .wrap(yargs.terminalWidth())
-  // commands
-  .commandDir(path.join('lib', 'cmd'))
+  .option('V', options.verbose).argv;
+
+// set log level before instantiating commands
+logger.init(argv.verbose);
+
+yargs.commandDir(path.join('lib', 'cmd'))
   // common options
   .help()
   .version()
@@ -16,9 +21,5 @@ let argv = yargs.usage('Usage: clay <command> [options]')
     h: 'help',
     v: 'version'
   })
-  .option('V', options.verbose)
   .demandCommand(1, 'What would you like to do today?')
   .argv;
-
-// set log level (note: this has to be set in your command handlers if you want to debug stuff there)
-logger.setLogLevel(argv.verbose);
