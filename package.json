@@ -46,6 +46,7 @@
     "console-log-level": "^1.4.0",
     "expand-home-dir": "0.0.3",
     "figures": "^2.0.0",
+    "get-stdin": "^5.0.1",
     "home-config": "^0.1.0",
     "inquirer": "^3.0.6",
     "lodash": "^4.17.4",

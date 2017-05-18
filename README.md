@@ -186,9 +186,7 @@ Linting against a file or directory will do different things, depending on what 
 ```
 clay export domain.com | clay lint # export to stdout and lint all components in a site
 
-clay lint domain.com/components/layout/instances/article # lint an instance of the layout, looking for undefined components that this layout references
-
-clay lint domain.com/components/image/instances/a8d7s # lint an image, checking its data against the schema
+clay lint domain.com/components/layout/instances/article # lint an instance of the layout, looking for undefined components that this layout references (and checking data against the schema)
 
 clay lint -f components/foo # lint the template, schema, and bootstrap
 
