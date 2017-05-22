@@ -178,20 +178,21 @@ Linting against a component url (e.g. `domain.com/components/article/instances/s
 
 Linting against a file or directory will do different things, depending on what path you specify:
 
-* `clay lint -f path/to/template.hbs` (or `.handlebars`) will lint the component template against the Clay coding conventions and print an error if it doesn't match our template rules
-* `clay lint -f path/to/schema.yml` (or `schema.yaml`) will lint the schema, checking for `_description` or `_version` and printing a warning if they are not defined
+* `clay lint -f path/to/schema.yml` (or `schema.yaml`) will lint the schema, checking for `_description` and printing a warning if it is not defined (once component versioning is added to Clay, it will check for `_version` as well)
 * `clay lint -f path/to/some/other.yml` (or `*.yaml`, or `*.json`) will lint bootstrap data, checking to see if component references exist (similar to linting against a component url, above)
-* `clay lint path/to/directory` will do all three of these actions
-* `-r, --recursive` will lint directories recursively
+* `clay lint path/to/directory` will do both of these actions
+* `-r, --recursive` will lint directories (or component uris) recursively
 
 ```
 clay export domain.com | clay lint # export to stdout and lint all components in a site
 
 clay lint domain.com/components/layout/instances/article # lint an instance of the layout, looking for undefined components that this layout references (and checking data against the schema)
 
-clay lint -f components/foo # lint the template, schema, and bootstrap
+clay lint -f components/foo # lint the schema and bootstrap
 
 clay lint -f www/my-project -r # lint everything recursively
+
+clay lint domain.com/components/layout/instances/article -r # lint everything in the layout AND its children
 ```
 
 ## Create
