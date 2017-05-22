@@ -50,6 +50,7 @@
     "fs-extra": "^3.0.1",
     "get-stdin": "^5.0.1",
     "glob": "^7.1.1",
+    "highland": "^2.10.5",
     "home-config": "^0.1.0",
     "inquirer": "^3.0.6",
     "is-directory": "^0.3.1",
