@@ -172,25 +172,23 @@ clay export # if no CLAY_DEFAULT_SITE is set, it'll interactively prompt for exp
 clay lint [<url> or --file] [--recursive]
 ```
 
-Lints Clay data, templates, and schemas against standardized conventions. If you specify neither a url nor a `--file` option, it will lint all components it can find in `stdin`.
+Lints Clay data and schemas against standardized conventions. Specify either a url or a `--file` option.
 
-Linting against a component url (e.g. `domain.com/components/article/instances/s8d7h`) will check to see if that component references other components which don't exist, and will check the data against that component's schema. It will print warnings if it sees either issue.
+Linting against a component url (e.g. `domain.com/components/article/instances/s8d7h`) will check to see if that component references other components which don't exist on that clay instance, and will check the data against that component's schema. It will print warnings if it sees either issue.
 
 Linting against a file or directory will do different things, depending on what path you specify:
 
 * `clay lint -f path/to/schema.yml` (or `schema.yaml`) will lint the schema, checking for `_description` and printing a warning if it is not defined (once component versioning is added to Clay, it will check for `_version` as well)
-* `clay lint -f path/to/some/other.yml` (or `*.yaml`, or `*.json`) will lint bootstrap data, checking to see if component references exist (similar to linting against a component url, above)
-* `clay lint path/to/directory` will do both of these actions
-* `-r, --recursive` will lint directories (or component uris) recursively
+* `clay lint -f path/to/some/other.yml` (or `*.yaml`, or `*.json`) will lint bootstrap data, checking to see if component references exist (similar to linting against a component url, but only looking at data in that bootstrap file)
+* `clay lint path/to/directory` will do both of these actions, checking for component references in _any_ of the bootstrap files
+* `-r, --recursive` will lint directories (or component urls) recursively
 
 ```
-clay export domain.com | clay lint # export to stdout and lint all components in a site
+clay lint domain.com/components/layout/instances/article # lint a component
 
-clay lint domain.com/components/layout/instances/article # lint an instance of the layout, looking for undefined components that this layout references (and checking data against the schema)
+clay lint -f components/foo # lint the schema and bootstrap in a directory
 
-clay lint -f components/foo # lint the schema and bootstrap
-
-clay lint -f www/my-project -r # lint everything recursively
+clay lint -f www/my-project -r # lint schemas and bootstraps recursively
 
 clay lint domain.com/components/layout/instances/article -r # lint everything in the layout AND its children
 ```
