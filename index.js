@@ -22,4 +22,5 @@ yargs.commandDir(path.join('lib', 'cmd'))
     v: 'version'
   })
   .demandCommand(1, 'What would you like to do today?')
+  .completion()
   .argv;
