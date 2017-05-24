@@ -132,8 +132,6 @@ clay import --page domain.com/2017-some-slug.html # import a specific page (via 
 clay import --page domain.com/pages/g7d6f8 qa -k qa # import a specific page (via page uri) into a qa server
 
 clay import -s my-site -l 10 my-local-site # import the latest 10 pages into a local dev environment
-
-clay import # if no stdin or input specified, it'll prompt for interactive importing
 ```
 
 ## Export
