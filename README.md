@@ -1,12 +1,12 @@
-# clay-cli
+# claycli
 A CLI For Clay!
 
-[![CircleCI](https://circleci.com/gh/nymag/clay-cli.svg?style=svg)](https://circleci.com/gh/nymag/clay-cli) [![Coverage Status](https://coveralls.io/repos/github/nymag/clay-cli/badge.svg?branch=master)](https://coveralls.io/github/nymag/clay-cli?branch=master)
+[![CircleCI](https://circleci.com/gh/nymag/claycli.svg?style=svg)](https://circleci.com/gh/nymag/claycli) [![Coverage Status](https://coveralls.io/repos/github/nymag/claycli/badge.svg?branch=master)](https://coveralls.io/github/nymag/claycli?branch=master)
 
 # Installation
 
 ```
-npm install -g clay-cli
+npm install -g claycli
 ```
 
 # Usage
@@ -15,7 +15,7 @@ npm install -g clay-cli
 clay <command> [options]
 ```
 
-If installed globally, you can simply call `clay` from the command line. Much like `git`, `clay-cli` can be configured using a `.clayconfig` file in your home folder. In it you can specify references to api keys, site prefixes, and files (or directories) that you use frequently. You'll reference them with the `--key`, `--site`, and `--file` options when using applicable `clay-cli` commands. For sites, it'll assume `http://` and port `80` unless you specify otherwise.
+If installed globally, you can simply call `clay` from the command line. Much like `git`, `claycli` can be configured using a `.clayconfig` file in your home folder. In it you can specify references to api keys, site prefixes, and files (or directories) that you use frequently. You'll reference them with the `--key`, `--site`, and `--file` options when using applicable `claycli` commands. For sites, it'll assume `http://` and port `80` unless you specify otherwise.
 
 ```
 [keys]
@@ -34,28 +34,29 @@ For smaller Clay installations (or, ironically, for very large teams where devs 
 
 ## Commands
 
-* [`config`](https://github.com/nymag/clay-cli#config)
-* [`touch`](https://github.com/nymag/clay-cli#touch)
-* [`import`](https://github.com/nymag/clay-cli#import)
-* [`export`](https://github.com/nymag/clay-cli#export)
-* [`lint`](https://github.com/nymag/clay-cli#lint)
-* [`create`](https://github.com/nymag/clay-cli#create)
-* [`clone`](https://github.com/nymag/clay-cli#clone)
+* [`config`](https://github.com/nymag/claycli#config)
+* [`touch`](https://github.com/nymag/claycli#touch)
+* [`import`](https://github.com/nymag/claycli#import)
+* [`export`](https://github.com/nymag/claycli#export)
+* [`lint`](https://github.com/nymag/claycli#lint)
+* [`create`](https://github.com/nymag/claycli#create)
+* [`clone`](https://github.com/nymag/claycli#clone)
 * `users` _(Coming Soon!)_
 * `log` _(Coming Soon!)_
 
 ## Common Options
 
-`clay-cli` uses some common options across many commands.
+`claycli` uses some common options across many commands.
 
-* `-v, --version` will print the `clay-cli` version and exit.
-* `-h, --help` will print helpful info about `clay-cli` and various commands.
+* `-v, --version` will print the `claycli` version and exit.
+* `-h, --help` will print helpful info about `claycli` and various commands.
 * `-V, --verbose` will print out helpful debugging messages as it runs commands.
-* `-s, --site` allows a site url, uri (no protocol or port), or alias to a site specified in your `.clayconfig`. If this argument is not provided, `clay-cli` will use the value of the `CLAY_DEFAULT_SITE` environment variable.
-* `-k, --key` allows an api key or an alias to a key specified in your `.clayconfig`. If this argument is not provided, `clay-cli` will use the value of the `CLAY_DEFAULT_KEY` environment variable.
+* `-s, --site` allows a site url, uri (no protocol or port), or alias to a site specified in your `.clayconfig`. If this argument is not provided, `claycli` will use the value of the `CLAY_DEFAULT_SITE` environment variable.
+* `-k, --key` allows an api key or an alias to a key specified in your `.clayconfig`. If this argument is not provided, `claycli` will use the value of the `CLAY_DEFAULT_KEY` environment variable.
 * `-f, --file` imports or exports from a JSON or YAML file, and will recursively parse a folder of said files. Note that this may be slow when run against large folders.
 * `-n, --dry-run` allows you to preview the results of a command without executing it for real. The output will depend on the specific command.
-* `--force` allows you to silence confirmations and warnings. Use at your own risk!
+* by default, `claycli` will skip over things that would be overwritten, warning you about them.
+* `--force` allows you to run commands that would overwrite things.
 
 ## Config
 
@@ -76,20 +77,18 @@ clay config files.foo bar.yaml # sets file shortcut 'foo = <current directory>/b
 ## Touch
 
 ```
-clay touch <component> [--site] [--dry-run, --force]
+clay touch <component> [--site] [--dry-run]
 ```
 
 Do GET requests against every instance of a specific component to trigger component upgrades.
 
 * `-n, --dry-run` will print the number of instances that'll be requested
-* normally, it will print the number of instances and ask for confirmation before requesting each instance
-* `--force` will request those instances without asking for confirmation
+* otherwise, it will run GET requests against all instances of the specified component
 
 ```
 clay touch domain.com/components/article # GET all instances of 'article' on domain.com
 
 clay touch article -s my-site # GET all instances of 'article' on my site
-# it will print 'This will affect 203 instances of article. Continue [Y/n]?'
 ```
 
 ## Import
@@ -106,7 +105,7 @@ Imports data into Clay. You can import from:
 * `-c, --component <uri>` a specific component instance url
 * `--page <uri or url>` a specific page url
 
-If you specify a specific component instance or page url, `clay-cli` will import that item _and its children_. You can specify the site to import into with the same syntax as the `--site` option, e.g. alias, url, or uri. If you don't specify a site to import into, it'll use the `CLAY_DEFAULT_SITE` environment variable.
+If you specify a specific component instance or page url, `claycli` will import that item _and its children_. You can specify the site to import into with the same syntax as the `--site` option, e.g. alias, url, or uri. If you don't specify a site to import into, it'll use the `CLAY_DEFAULT_SITE` environment variable.
 
 * `-n, --dry-run` will tell you the total number of components, pages, uris, and lists that will be imported
 * normally, it will warn you when it encounters things that already exist (components, pages, uris, and lists, but not users)
