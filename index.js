@@ -20,7 +20,9 @@ if (notifier.update) {
 let argv = yargs
   .usage('Usage: clay <command> [options]')
   .wrap(yargs.terminalWidth())
-  .option('V', options.verbose).argv;
+  .option('V', options.verbose)
+  .option('concurrency', options.concurrency)
+  .argv;
 
 // set log level before instantiating commands
 logger.init(argv.verbose);
