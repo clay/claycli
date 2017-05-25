@@ -1,7 +1,7 @@
 # claycli
 A CLI For Clay!
 
-[![CircleCI](https://circleci.com/gh/nymag/claycli.svg?style=svg)](https://circleci.com/gh/nymag/claycli) [![Coverage Status](https://coveralls.io/repos/github/nymag/claycli/badge.svg?branch=master)](https://coveralls.io/github/nymag/claycli?branch=master)
+[![CircleCI](https://circleci.com/gh/clay/claycli.svg?style=svg)](https://circleci.com/gh/clay/claycli) [![Coverage Status](https://coveralls.io/repos/github/clay/claycli/badge.svg?branch=master)](https://coveralls.io/github/clay/claycli?branch=master)
 
 # Installation
 
