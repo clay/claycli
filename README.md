@@ -166,12 +166,14 @@ clay export # if no CLAY_DEFAULT_SITE is set, it'll interactively prompt for exp
 ## Lint
 
 ```
-clay lint [<url> or --file] [--recursive]
+clay lint [<url> or --file] [--site] [--recursive]
 ```
 
 Lints Clay data and schemas against standardized conventions. Specify either a url or a `--file` option.
 
-Linting against a component url (e.g. `domain.com/components/article/instances/s8d7h`) will check to see if that component references other components which don't exist on that clay instance, and will check the data against that component's schema. It will print warnings if it sees either issue.
+Linting against a component or page url (e.g. `domain.com/components/article/instances/s8d7h`) will check to see if that component references other components which don't exist on that clay instance, and will check the data against that component's schema. It will print warnings if it sees either issue.
+
+Linting against a public url (if you specify the `--site` option) will check to see if that url exists in that site's `/uris/`. You can recursively (`--recursive`) lint _all_ components in a component, page, or public url.
 
 Linting against a file or directory will do different things, depending on what path you specify:
 
