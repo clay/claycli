@@ -8,11 +8,11 @@ const yargs = require('yargs'),
   logger = require('./lib/utils/logger'),
   options = require('./lib/utils/shared-options'),
   notifier = updateNotifier({
-    pkg,
-    // updateCheckInterval: 1000 * 60 * 60 * 24 * 7 // 1 week
+    pkg
   });
 
 if (notifier.update) {
+  // note: this will only check for updates once per day
   notifier.notify();
   process.exit(0);
 }
