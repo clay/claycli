@@ -58,6 +58,7 @@
     "node-fetch": "^1.6.3",
     "ora": "^1.2.0",
     "pluralize": "^5.0.0",
+    "replace-async": "^1.1.1",
     "update-notifier": "^2.1.0",
     "yargs": "^8.0.1"
   }
