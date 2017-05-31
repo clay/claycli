@@ -54,9 +54,6 @@ For smaller Clay installations (or, ironically, for very large teams where devs 
 * `-s, --site` allows a site url, uri (no protocol or port), or alias to a site specified in your `.clayconfig`. If this argument is not provided, `claycli` will use the value of the `CLAY_DEFAULT_SITE` environment variable.
 * `-k, --key` allows an api key or an alias to a key specified in your `.clayconfig`. If this argument is not provided, `claycli` will use the value of the `CLAY_DEFAULT_KEY` environment variable.
 * `-f, --file` imports or exports from a JSON or YAML file, and will recursively parse a folder of said files. Note that this may be slow when run against large folders.
-* `-n, --dry-run` allows you to preview the results of a command without executing it for real. The output will depend on the specific command.
-* by default, `claycli` will skip over things that would be overwritten, warning you about them.
-* `--force` allows you to run commands that would overwrite things.
 
 ## Config
 
@@ -132,7 +129,7 @@ clay import -f ~/users.yaml qa.domain.com/my-site -k qa # import users from a fi
 
 clay import -c domain.com/components/article/instances/a8d6s # only import this specific article into your CLAY_DEFAULT_SITE
 
-clay import --page domain.com/pages/g7d6f8 qa -k qa # import a specific page (via page uri) into a qa server
+clay import --page domain.com/pages/g7d6f8 qa -k qa # import a specific page into a qa server
 
 clay import -s my-site -l 10 -o 100 my-local-site # import the latest 10 pages (offset by 100) into a local dev environment
 
@@ -142,8 +139,64 @@ clay import -s my-site -l 0 -u other-site # import only users (no pages, compone
 ## Export
 
 ```
-clay export [--site, --page, --component] [file] [--dry-run, --force] [--users, --limit]
+clay export [--site, --page, --component] [--users, --lists] [--limit, --offset, --query] [file]
 ```
+
+Exports data from Clay. You can export from:
+
+* `-s, --site <site>` a Clay site
+* `-c, --component <uri>` a specific component url
+* `--page <uri or url>` a specific page url
+
+You can specify either a YAML or JSON file to export to (by typing e.g. `path/to/file.json`), or export to `stdout` (in the same format that importing from `stdin` uses). If you specify a file path but no extension, it will default to `.yml`.
+
+When exporting a `--site`, it will iterate through the most recently updated pages, exporting each one. You can specify a `--limit` (defaults to 100) and `--offset` to export older or newer pages, or specity a `--query` pointing to a JSON/YAML file with an elasticsearch query. This query will be run against the built-in `pages` index in amphora.
+
+By default, exporting a site will export the latest pages. If you add the `--lists` option, it will export the `new-pages` list (and the pages specified therein) and any other lists on the origin site. If you add the `--users` option, it will export users.
+
+If you specify a specific component or page url, `claycli` will export that item _and its child components_.
+
+_Note that exporting data may overwrite files!_
+
+```
+clay export -s my-site | my-clay-to-wordpress-importer  # pipe from a site into an external importer
+
+clay export -s my-prod-site # export 100 latest pages to stdout (good for sampling data)
+
+clay export -s my-site backup.json # export site to json
+
+clay export -s my-site ~/backups/my-site # export site to yaml
+
+clay export -s my-site -l 0 -u users.yaml # export only users
+
+clay export -c domain.com/components/article/instances/a8d6s article.json # export specific article
+
+clay export --page domain.com/pages/g7d6f8 | clay import local-site # roundabout way to import from Clay to Clay
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 Exports data from Clay. You can export to a YAML/JSON file by specifying a file path (it'll default to YAML if no extension is specified), or `stdout` (useful for exporting Clay data into non-Clay systems, and for linting). You can specify the site to export from _or a specific page/component_. If you don't specify a site, page, or component to export from, it'll use the `CLAY_DEFAULT_SITE` environment variable. Exporting pages and components will also export their children.
 
