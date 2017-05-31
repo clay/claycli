@@ -94,7 +94,7 @@ clay touch article -s my-site # GET all instances of 'article' on my site
 ## Import
 
 ```
-clay import [--site, --file, --page, --component] [--dry-run, --force, --key] [--users, --limit] <site>
+clay import [--site, --file, --page, --component] [--key] [--users, --lists] [--limit, --offset, --query] <site>
 ```
 
 Imports data into Clay. You can import from:
@@ -102,35 +102,39 @@ Imports data into Clay. You can import from:
 * `stdin` (pipe to `clay import` from another cli tool, such as a 3rd party importer)
 * `-s, --site <site>` a Clay site
 * `-f, --file <path>` a YAML/JSON file (or directory of files)
-* `-c, --component <uri>` a specific component instance url
+* `-c, --component <uri>` a specific component url
 * `--page <uri or url>` a specific page url
 
-If you specify a specific component instance or page url, `claycli` will import that item _and its children_. You can specify the site to import into with the same syntax as the `--site` option, e.g. alias, url, or uri. If you don't specify a site to import into, it'll use the `CLAY_DEFAULT_SITE` environment variable.
+You can specify the site to import into with the same syntax as the `--site` option, e.g. alias or url. If you don't specify a site to import into, it'll use the `CLAY_DEFAULT_SITE` environment variable. If you don't specify a `--key` to use, it'll use the `CLAY_DEFAULT_KEY` environment variable.
 
-* `-n, --dry-run` will tell you the total number of components, pages, uris, and lists that will be imported
-* normally, it will warn you when it encounters things that already exist (components, pages, uris, and lists, but not users)
-* `--force` will suppress those warnings and overwrite data without pausing
-* `-u, --users` will import users as well as other site data. If you're importing from a "users" bootstrap file, make sure to specify this!
-* `-l, --limit <number>` will limit a site import to the specified number of most recent pages
+When importing a `--site`, it will iterate through the most recently updated pages, importing each one. You can specify a `--limit` (defaults to 100) and `--offset` to import older or newer pages, or specity a `--query` pointing to a JSON/YAML file with an elasticsearch query. This query will be run against the built-in `pages` index in amphora.
+
+By default, importing a site will import the latest pages and publish them if necessary. If you add the `--lists` option, it will import the `new-pages` list (and the pages specified therein) and any other lists on the origin site. If you add the `--users` option, it will import users.
+
+If you specify a specific component or page url, `claycli` will import that item _and its child components_. It will not automatically publish an individually-imported page.
+
+Importing from file(s) will import everything in those files, including lists, uris, users, components, and pages.
+
+_Note that importing data may overwrite data on the site you're importing into!_
 
 ```
 my-wordpress-to-clay-exporter | clay import # pipe from an importer to your CLAY_DEFAULT_SITE
 
-clay import -s my-prod-site my-local-site # import from production to a local dev environment
+clay import -s my-prod-site my-local-site # import 100 latest pages from production to a local dev environment
 
 clay import -s stg.domain.com qa.domain.com -k qa # import from staging server to qa, providing the apikey for the qa server
 
 clay import -f path/to/bootstraps/ my-local-site # import from a directory of yaml files
 
-clay import -f ~/users.yaml qa.domain.com/my-site -u -k qa # import users from a file into a qa server
+clay import -f ~/users.yaml qa.domain.com/my-site -k qa # import users from a file into a qa server
 
 clay import -c domain.com/components/article/instances/a8d6s # only import this specific article into your CLAY_DEFAULT_SITE
 
-clay import --page domain.com/2017-some-slug.html # import a specific page (via public url) into your CLAY_DEFAULT_SITE
-
 clay import --page domain.com/pages/g7d6f8 qa -k qa # import a specific page (via page uri) into a qa server
 
-clay import -s my-site -l 10 my-local-site # import the latest 10 pages into a local dev environment
+clay import -s my-site -l 10 -o 100 my-local-site # import the latest 10 pages (offset by 100) into a local dev environment
+
+clay import -s my-site -l 0 -u other-site # import only users (no pages, components, or lists)
 ```
 
 ## Export
