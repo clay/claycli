@@ -115,6 +115,8 @@ If you specify a specific component or page url, `claycli` will import that item
 
 Importing from file(s) will import everything in those files, including lists, uris, users, components, and pages.
 
+When writing importers that pipe to `claycli`, make sure you export your data in the form of `{ <uri minus site prefix>: data }`, e.g. `{ '/components/foo': { a: 'b' }}`. Importing from `stdin` will parse newline/EOF-delineated streams of those objects.
+
 _Note that importing data may overwrite data on the site you're importing into!_
 
 ```
