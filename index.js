@@ -22,6 +22,7 @@ let argv = yargs
   .wrap(yargs.terminalWidth())
   .option('V', options.verbose)
   .option('concurrency', options.concurrency)
+  .option('headers', options.headers)
   .argv;
 
 // set log level before instantiating commands
