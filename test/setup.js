@@ -1,4 +1,3 @@
-'use strict';
 const sinonChai = require('sinon-chai');
 
 global.chai = require('chai');
