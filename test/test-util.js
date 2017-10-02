@@ -57,6 +57,18 @@ function mockReq(method, url, body) {
   }));
 }
 
+/**
+* Assert that the specified array has all and only the specified items,
+* in any order
+* @param {Array} results
+* @param {Array} expected
+*/
+function assertItems(results, expected) {
+  expect(results.length).to.equal(expected.length);
+  expected.forEach(expectedResult => expect(results).to.include(expectedResult));
+}
+
 module.exports.assertReq = assertReq;
 module.exports.matchReq = matchReq;
 module.exports.mockReq = mockReq;
+module.exports.assertItems = assertItems;
