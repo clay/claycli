@@ -68,6 +68,11 @@ function assertItems(results, expected) {
   expected.forEach(expectedResult => expect(results).to.include(expectedResult));
 }
 
+/**
+ * Assert that the specified stream completes with the specified items.
+ * @param {Stream} stream
+ * @param {Array} expected
+ */
 function assertStream(stream, expected) {
   return stream.collect().toPromise(Promise).then((results) => {
     expect(results).to.eql(expected);
