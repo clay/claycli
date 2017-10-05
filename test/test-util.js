@@ -68,7 +68,14 @@ function assertItems(results, expected) {
   expected.forEach(expectedResult => expect(results).to.include(expectedResult));
 }
 
+function assertStream(stream, expected) {
+  return stream.collect().toPromise(Promise).then((results) => {
+    expect(results).to.eql(expected);
+  });
+}
+
 module.exports.assertReq = assertReq;
 module.exports.matchReq = matchReq;
 module.exports.mockReq = mockReq;
 module.exports.assertItems = assertItems;
+module.exports.assertStream = assertStream;
