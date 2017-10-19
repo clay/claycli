@@ -91,7 +91,7 @@ clay touch article -s my-site # GET all instances of 'article' on my site
 ## Import
 
 ```
-clay import [--site, --file, --page, --component] [--key] [--users, --lists] [--limit, --offset, --query] <site>
+clay import [--site, --file, --url] [--key] [--users, --lists] [--limit, --offset, --query] <site>
 ```
 
 Imports data into Clay. You can import from:
@@ -138,7 +138,7 @@ clay import -s my-site -l 0 -u other-site # import only users (no pages, compone
 ## Export
 
 ```
-clay export [--site, --page, --component] [--users, --lists] [--limit, --offset, --query] [file]
+clay export [--site, --url] [--users, --lists] [--limit, --offset, --query] [file]
 ```
 
 Exports data from Clay. You can export from:
@@ -211,9 +211,9 @@ clay export -s my-prod-site path/to/backup.json # export site data to json file
 
 clay export -c domain.com/components/article/instances/g76s8d path/to/article-backup.yml # export specific article to yaml
 
-clay export --page https://domain.com/2017-some-slug.html path/to/page-backup.yaml # export specific page (via public url) to yaml
+clay export -u https://domain.com/2017-some-slug.html path/to/page-backup.yaml # export specific page (via public url) to yaml
 
-clay export --page domain.com/pages/df6sf8 # export specific page (via page uri) to stdout
+clay export -u domain.com/pages/df6sf8 # export specific page (via page uri) to stdout
 
 clay export -s my-site -l 10 path/to/cool-ten-articles.json # export latest ten pages to json
 
