@@ -126,9 +126,9 @@ clay import -f path/to/bootstraps/ my-local-site # import from a directory of ya
 
 clay import -f ~/users.yaml qa.domain.com/my-site -k qa # import users from a file into a qa server
 
-clay import -c domain.com/components/article/instances/a8d6s # only import this specific article into your CLAY_DEFAULT_SITE
+clay import -u domain.com/components/article/instances/a8d6s # only import this specific article into your CLAY_DEFAULT_SITE
 
-clay import --page domain.com/pages/g7d6f8 qa -k qa # import a specific page into a qa server
+clay import -u domain.com/pages/g7d6f8 qa -k qa # import a specific page into a qa server
 
 clay import -s my-site -l 10 -o 100 my-local-site # import the latest 10 pages (offset by 100) into a local dev environment
 
@@ -144,8 +144,7 @@ clay export [--site, --page, --component] [--users, --lists] [--limit, --offset,
 Exports data from Clay. You can export from:
 
 * `-s, --site <site>` a Clay site
-* `-c, --component <uri>` a specific component url
-* `--page <uri or url>` a specific page url
+* `-u, --url <uri>` a specific component or page url
 
 You can specify either a YAML or JSON file to export to (by typing e.g. `path/to/file.json`), or export to `stdout` (in the same format that importing from `stdin` uses). If you specify a file path but no extension, it will default to `.yml`.
 
@@ -168,9 +167,9 @@ clay export -s my-site ~/backups/my-site # export site to yaml
 
 clay export -s my-site -l 0 -u users.yaml # export only users
 
-clay export -c domain.com/components/article/instances/a8d6s article.json # export specific article
+clay export -u domain.com/components/article/instances/a8d6s article.json # export specific article
 
-clay export --page domain.com/pages/g7d6f8 | clay import local-site # roundabout way to import from Clay to Clay
+clay export -u domain.com/pages/g7d6f8 | clay import local-site # roundabout way to import from Clay to Clay
 ```
 
 
