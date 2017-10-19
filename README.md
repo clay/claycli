@@ -99,8 +99,7 @@ Imports data into Clay. You can import from:
 * `stdin` (pipe to `clay import` from another cli tool, such as a 3rd party importer)
 * `-s, --site <site>` a Clay site
 * `-f, --file <path>` a YAML/JSON file (or directory of files)
-* `-c, --component <uri>` a specific component url
-* `--page <uri or url>` a specific page url
+* `-u, --url <uri>` a URL to a specific component, page, list, user, or uri
 
 You can specify the site to import into with the same syntax as the `--site` option, e.g. alias or url. If you don't specify a site to import into, it'll use the `CLAY_DEFAULT_SITE` environment variable. If you don't specify a `--key` to use, it'll use the `CLAY_DEFAULT_KEY` environment variable.
 
