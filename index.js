@@ -7,6 +7,7 @@ const yargs = require('yargs'),
   pkg = require('./package.json'),
   logger = require('./lib/utils/logger'),
   options = require('./lib/utils/shared-options'),
+  isRunAsCommand = require.main === module,
   notifier = updateNotifier({
     pkg
   });
@@ -17,24 +18,30 @@ if (notifier.update) {
   process.exit(0);
 }
 
-let argv = yargs
-  .usage('Usage: clay <command> [options]')
-  .wrap(yargs.terminalWidth())
-  .option('V', options.verbose)
-  .option('concurrency', options.concurrency)
-  .argv;
+if (isRunAsCommand) {
+  let argv = yargs
+    .usage('Usage: clay <command> [options]')
+    .wrap(yargs.terminalWidth())
+    .option('V', options.verbose)
+    .option('concurrency', options.concurrency)
+    .argv;
 
-// set log level before instantiating commands
-logger.init(argv.verbose);
+  // set log level before instantiating commands
+  logger.init(argv.verbose);
 
-yargs.commandDir(path.join('lib', 'cmd'))
-  // common options
-  .help()
-  .version()
-  .alias({
-    h: 'help',
-    v: 'version'
-  })
-  .demandCommand(1, 'What would you like to do today?')
-  .completion()
-  .argv;
+  yargs.commandDir(path.join('lib', 'cmd'))
+    // common options
+    .help()
+    .version()
+    .alias({
+      h: 'help',
+      v: 'version'
+    })
+    .demandCommand(1, 'What would you like to do today?')
+    .completion()
+    .argv;
+}
+
+module.exports = {
+  import: require('./lib/api/import')
+};
