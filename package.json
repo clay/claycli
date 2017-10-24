@@ -60,6 +60,7 @@
     "ora": "^1.2.0",
     "pluralize": "^5.0.0",
     "replace-async": "^1.1.1",
+    "single-line-log": "^1.1.2",
     "update-notifier": "^2.1.0",
     "yargs": "^8.0.1"
   }
