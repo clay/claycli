@@ -34,13 +34,13 @@ For smaller Clay installations (or, ironically, for very large teams where devs 
 
 ## Commands
 
-* [`config`](https://github.com/nymag/claycli#config)
-* [`touch`](https://github.com/nymag/claycli#touch)
-* [`import`](https://github.com/nymag/claycli#import)
-* [`export`](https://github.com/nymag/claycli#export)
-* [`lint`](https://github.com/nymag/claycli#lint)
-* [`create`](https://github.com/nymag/claycli#create)
-* [`clone`](https://github.com/nymag/claycli#clone)
+* [`config`](https://github.com/clay/claycli#config)
+* [`touch`](https://github.com/clay/claycli#touch)
+* [`import`](https://github.com/clay/claycli#import)
+* [`export`](https://github.com/clay/claycli#export)
+* [`lint`](https://github.com/clay/claycli#lint)
+* [`create`](https://github.com/clay/claycli#create)
+* [`clone`](https://github.com/clay/claycli#clone)
 * `users` _(Coming Soon!)_
 * `log` _(Coming Soon!)_
 
