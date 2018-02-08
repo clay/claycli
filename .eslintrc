@@ -1,6 +1,5 @@
 {
   "parserOptions": {
-    "sourceType": "module",
     "ecmaVersion": 6
   },
   "env": {
@@ -14,20 +13,6 @@
     "expect": false,
     "chai": false,
     "sinon": false
-  },
-  // enable the es6 features supported by node 6+
-  "ecmaFeatures": {
-    "arrowFunctions": true,
-    "blockBindings": true,
-    "forOf": true,
-    "objectLiteralDuplicateProperties": true,
-    "objectLiteralShorthandProperties": true,
-    "objectLiteralShorthandMethods": true,
-    "octalLiterals": true,
-    "binaryLiterals": true,
-    "templateStrings": true,
-    "generators": true,
-    "modules": true
   },
   "rules": {
     // possible errors
@@ -50,7 +35,7 @@
     "vars-on-top": 2,
     "wrap-iife": 2,
     // strict mode
-    "strict": [2, "never"],
+    "strict": [2, "safe"],
     // variables
     "no-unused-vars": 2,
     // node.js
