@@ -27,7 +27,7 @@ If installed globally, you can simply call `clay` from the command line. Much li
   local-site2 = localhost.site1.com/site-2 # http and port 80
 [files]
   site1-bootstraps = ~/projects/clay/bootstraps
-  users = ~/Desktop/users.json
+  users = ~/Desktop/_users.json
 ```
 
 For smaller Clay installations (or, ironically, for very large teams where devs spend most of their time on individual sites), you can specify a default api key and site by using the `CLAY_DEFAULT_KEY` and `CLAY_DEFAULT_SITE` environment variables.
@@ -83,7 +83,7 @@ Do GET requests against every instance of a specific component to trigger compon
 * otherwise, it will run GET requests against all instances of the specified component
 
 ```
-clay touch domain.com/components/article # GET all instances of 'article' on domain.com
+clay touch domain.com/_components/article # GET all instances of 'article' on domain.com
 
 clay touch article -s my-site # GET all instances of 'article' on my site
 ```
@@ -112,7 +112,7 @@ If you specify a specific component or page url, `claycli` will import that item
 
 Importing from file(s) will import everything in those files, including lists, uris, users, components, and pages.
 
-When writing importers that pipe to `claycli`, make sure you export your data in the form of `{ <uri minus site prefix>: data }`, e.g. `{ '/components/foo': { a: 'b' }}`. Importing from `stdin` will parse newline/EOF-delineated streams of those objects.
+When writing importers that pipe to `claycli`, make sure you export your data in the form of `{ <uri minus site prefix>: data }`, e.g. `{ '/_components/foo': { a: 'b' }}`. Importing from `stdin` will parse newline/EOF-delineated streams of those objects.
 
 _Note that importing data may overwrite data on the site you're importing into!_
 
@@ -125,11 +125,11 @@ clay import -s stg.domain.com qa.domain.com -k qa # import from staging server t
 
 clay import -f path/to/bootstraps/ my-local-site # import from a directory of yaml files
 
-clay import -f ~/users.yaml qa.domain.com/my-site -k qa # import users from a file into a qa server
+clay import -f ~/_users.yaml qa.domain.com/my-site -k qa # import users from a file into a qa server
 
-clay import -c domain.com/components/article/instances/a8d6s # only import this specific article into your CLAY_DEFAULT_SITE
+clay import -c domain.com/_components/article/instances/a8d6s # only import this specific article into your CLAY_DEFAULT_SITE
 
-clay import --page domain.com/pages/g7d6f8 qa -k qa # import a specific page into a qa server
+clay import --page domain.com/_pages/g7d6f8 qa -k qa # import a specific page into a qa server
 
 clay import -s my-site -l 10 -o 100 my-local-site # import the latest 10 pages (offset by 100) into a local dev environment
 
@@ -169,9 +169,9 @@ clay export -s my-site ~/backups/my-site # export site to yaml
 
 clay export -s my-site -l 0 -u users.yaml # export only users
 
-clay export -c domain.com/components/article/instances/a8d6s article.json # export specific article
+clay export -c domain.com/_components/article/instances/a8d6s article.json # export specific article
 
-clay export --page domain.com/pages/g7d6f8 | clay import local-site # roundabout way to import from Clay to Clay
+clay export --page domain.com/_pages/g7d6f8 | clay import local-site # roundabout way to import from Clay to Clay
 ```
 
 
@@ -211,11 +211,11 @@ clay export # export CLAY_DEFAULT_SITE to stdout
 
 clay export -s my-prod-site path/to/backup.json # export site data to json file
 
-clay export -c domain.com/components/article/instances/g76s8d path/to/article-backup.yml # export specific article to yaml
+clay export -c domain.com/_components/article/instances/g76s8d path/to/article-backup.yml # export specific article to yaml
 
 clay export --page https://domain.com/2017-some-slug.html path/to/page-backup.yaml # export specific page (via public url) to yaml
 
-clay export --page domain.com/pages/df6sf8 # export specific page (via page uri) to stdout
+clay export --page domain.com/_pages/df6sf8 # export specific page (via page uri) to stdout
 
 clay export -s my-site -l 10 path/to/cool-ten-articles.json # export latest ten pages to json
 
@@ -230,9 +230,9 @@ clay lint [<url> or --file] [--site] [--recursive]
 
 Lints Clay data and schemas against standardized conventions. Specify either a url or a `--file` option.
 
-Linting against a component or page url (e.g. `domain.com/components/article/instances/s8d7h`) will check to see if that component references other components which don't exist on that clay instance, and will check the data against that component's schema. It will print warnings if it sees either issue.
+Linting against a component or page url (e.g. `domain.com/_components/article/instances/s8d7h`) will check to see if that component references other components which don't exist on that clay instance, and will check the data against that component's schema. It will print warnings if it sees either issue.
 
-Linting against a public url (if you specify the `--site` option) will check to see if that url exists in that site's `/uris/`. You can recursively (`--recursive`) lint _all_ components in a component, page, or public url.
+Linting against a public url (if you specify the `--site` option) will check to see if that url exists in that site's `/_uris/`. You can recursively (`--recursive`) lint _all_ components in a component, page, or public url.
 
 Linting against a file or directory will do different things, depending on what path you specify:
 
@@ -242,13 +242,13 @@ Linting against a file or directory will do different things, depending on what 
 * `-r, --recursive` will lint directories (or component urls) recursively
 
 ```
-clay lint domain.com/components/layout/instances/article # lint a component
+clay lint domain.com/_components/layout/instances/article # lint a component
 
 clay lint -f components/foo # lint the schema and bootstrap in a directory
 
 clay lint -f www/my-project -r # lint schemas and bootstraps recursively
 
-clay lint domain.com/components/layout/instances/article -r # lint everything in the layout AND its children
+clay lint domain.com/_components/layout/instances/article -r # lint everything in the layout AND its children
 ```
 
 ## Create
