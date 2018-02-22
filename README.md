@@ -101,6 +101,8 @@ clay lint --yaml < article.yml
 clay export --yaml domain.com/_components/article/instances/123 > article.yml
 ```
 
+If you're a backend developer or database architect, it may be helpful to think of _dispatches_ and _bootstraps_ as [denormalized and normalized data](https://medium.com/@katedoesdev/normalized-vs-denormalized-databases-210e1d67927d). You'll notice that the two examples above contain the same data. The denormalized _dispatches_ allow a single API call per line and use less memory because they're streamable, while the normalized _bootstraps_ are better for hand-coding data because components are not duplicated if referenced multiple times. Generally speaking, use _dispatches_ for transporting and storing data and _bootstraps_ for hand-coding.
+
 ## Config
 
 ```bash
