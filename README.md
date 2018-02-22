@@ -86,6 +86,12 @@ _components:
     instances:
       234:
         text: Four score and seven years ago...
+  meta-title:
+    instances:
+      345:
+        title: My Article
+        ogTitle: My Longer Titled Article
+        twitterTitle: Article
 ```
 
 A _bootstrap_ may be piped into and out of any `claycli` commands that accept _dispatches_. To tell `claycli` that you're dealing with _bootstraps_, please use the `--yaml` argument.
