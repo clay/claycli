@@ -52,10 +52,11 @@ For smaller Clay installations (or, ironically, for very large teams where devs 
 
 ### Dispatch
 
-Many `claycli` arguments allow you to pipe in the contents of files to `stdin` or pipe data out from `stdout`. The format that `claycli` uses to represent data is called a _dispatch_, and it consists of newline-separated JSON without site prefixes.
+Many `claycli` arguments allow you to pipe in the contents of files to `stdin` or pipe data out from `stdout`. The format that `claycli` uses to represent data (similar to a database dump) is called a _dispatch_, and it consists of newline-separated JSON without site prefixes.
 
 ```
 {"/_components/article/instances/123":{"title":"My Article","content":[{"_ref":"/_components/paragraph/instances/234","text":"Four score and seven years ago..."}]}}
+{"/_components/meta-title/instances/345":{"title":"My Article","ogTitle":"My Longer Titled Article","twitterTitle":"Article"}}
 ```
 
 Each line of a _dispatch_ contains [composed data for a component](https://github.com/clay/amphora/blob/master/lib/routes/readme.md#component-data) (or page, user, list, etc), including any data for its child components. This means that each line is able to be sent as a [cascading PUT](https://github.com/clay/amphora/pull/73) to the Clay server, which is a highly efficient way of importing large amounts of data. Note that a _dispatch_ is not meant to be human-readable, and manually editing it is a very easy way to introduce data errors.
@@ -64,7 +65,9 @@ A _dispatch_ may be piped into or out of commands such as `clay import` and `cla
 
 ```bash
 clay lint < article_dump.clay
-clay import --key prod domain.com < article_dump.clay
+clay export domain.com > article_dump.clay
+clay import domain.com < article_dump.clay
+clay export domain.com | clay import localhost
 ```
 
 ### Bootstrap
