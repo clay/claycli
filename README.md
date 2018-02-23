@@ -168,7 +168,7 @@ The `publish` argument will trigger a publish of the pages and / or components y
 * `-k, --key` allows specifying an api key or alias
 * `-c, --concurrency` allows setting the concurrency of api calls
 * `-p, --publish` triggers publishing of imported pages
-* `-y, --yaml` specifies that piped-in files are _bootstrap_ format
+* `-y, --yaml` specifies that input is _bootstrap_ format
 * `-V, --verbose` will print out helpful debugging messages
 
 ### Examples
