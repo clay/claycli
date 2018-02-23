@@ -150,7 +150,8 @@ Instead of specifying a url, you may pipe in a component's `schema.yml` to lint.
 clay lint domain.com/_pages/123 # lint all components on a page
 clay lint domain.com/2018/02/some-slug.html # lint a page via public url
 clay lint my-cool-article # lint a component specified via config alias
-clay lint < components/article/schema.yml # lint schema
+clay lint < components/article/schema.yml # lint single schema
+cat components/article/schema.yml components/paragraph/schema.yml | clay lint # lint multiple schemata
 ```
 
 ## Import
