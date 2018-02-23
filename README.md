@@ -138,13 +138,7 @@ Verify Clay data against standardized conventions and make sure all child compon
 
 Linting a page, component, or user url will verify that the data for that url exists, and (for pages and components) will (recursively) verify that all references to child components exist. The url may be a raw url, an alias specified via `clay config`, or may be omitted in favor of `CLAYCLI_DEFAULT_URL`.
 
-Instead of specifying a url, you may pipe in a newline-separated stream of urls to lint. This is useful for linting multiple pages or components simultaneously.
-
-```
-http://domain.com/_pages/123
-http://domain.com/_pages/234
-http://domain.com/_pages/345
-```
+Instead of specifying a url, you may pipe in a component's `schema.yml` to lint. It will go through the schema and verify that it conforms to [Kiln's schema rules](https://claycms.gitbooks.io/kiln/editing-components.html).
 
 ### Arguments
 
@@ -156,8 +150,7 @@ http://domain.com/_pages/345
 clay lint domain.com/_pages/123 # lint all components on a page
 clay lint domain.com/2018/02/some-slug.html # lint a page via public url
 clay lint my-cool-article # lint a component specified via config alias
-cat pages_list.txt | clay lint # lint multiple pages
-clay lint < pages_list.txt # lint multiple pages
+clay lint < components/article/schema.yml # lint schema
 ```
 
 ## Import
@@ -190,16 +183,25 @@ clay export --key prod domain.com/_components/article/instances/123 | clay impor
 ## Export
 
 ```bash
-clay export [--key <api key>] [--concurrency <number>] [--limit <number>] [--offset <number>] [--layout] [--yaml] [--verbose] [url]
+clay export [--key <api key>] [--concurrency <number>] [--size <number>] [--layout] [--yaml] [--verbose] [url]
 ```
 
 Exports data from Clay to `stdout`. Data may be in _dispatch_ or _bootstrap_ format. The url may be a raw url, an alias specified via `clay config`, or may be omitted in favor of `CLAYCLI_DEFAULT_URL`.
 
-If the url does not point to a specific type of data (a page, public url, component, user, list, etc), `claycli` will query the built-in `pages` index to pull the latest 10 pages from the site. When querying the `pages` index, you must either specify a `key` or have the `CLAYCLI_DEFAULT_KEY` set. Api key is not required when exporting specific types of data.
+If the url does not point to a specific type of data (a page, public url, component, user, list, etc), `claycli` will query the built-in `pages` index to pull the latest 10 pages from the site. When querying the `pages` index, you must either specify a `key` or have the `CLAYCLI_DEFAULT_KEY` set. The api key is only required when exporting multiple pages (by querying the `pages` index).
 
-You may specify `limit` and `offset` arguments to change the amount / position of the query, which is useful for long-running exports that you want to pause and resume.
+Instead of fetching the latest pages, you may pipe in a yaml-formatted [elasticsearch query](https://www.elastic.co/guide/en/elasticsearch/reference/current/_introducing_the_query_language.html). Use this to set custom offsets (for batching and chunking exports), export non-page content from other indices, or filter exported data via certain properties. Note that if you pipe in a query that includes `size`, it will take precedence over the CLI `size` argument.
 
-Instead of querying the `pages` index, you may pipe in a newline-separated stream of urls to export (and use `limit` / `offset` against those urls).
+```yaml
+index: published-products
+size: 5
+from: 10
+sort:
+  - price
+body:
+  query:
+    match_all: {}
+```
 
 By default, layouts are not exported when exporting pages. This allows you to easily copy individual pages between sites and environments. To trigger layout exporting, please use the `layout` argument.
 
@@ -207,10 +209,9 @@ By default, layouts are not exported when exporting pages. This allows you to ea
 
 * `-k, --key` allows specifying an api key or alias
 * `-c, --concurrency` allows setting the concurrency of api calls
-* `-l, --limit` specifies the number of pages to export (defaults to 10)
-* `-o, --offset` specifies the offset of the pages query (defaults to 0, the most recently updated pages)
-* `-L, --layout` triggers exporting of layouts
-* `-y, --yaml` specifies that piped-in files are _bootstrap_ format
+* `-s, --size` specifies the number of pages to export (defaults to 10)
+* `-l, --layout` triggers exporting of layouts
+* `-y, --yaml` specifies that output is _bootstrap_ format
 * `-V, --verbose` will print out helpful debugging messages
 
 ### Examples
@@ -220,9 +221,9 @@ clay export domain.com/_components/article/instances/123 > article_dump.clay # e
 clay export --yaml domain.com/_pages/123 > page_bootstrap.yml # export individual page
 clay export --layout --yaml domain.com/_pages/123 > page_bootstrap.yml # export page with layout
 clay export domain.com/_pages/123 | clay import --key local local.domain.com # copy page to local environment
-clay export --key prod --limit 1 --offset 1 domain.com > penultimate_page.clay # export second most recent page
-cat pages_list.txt | clay export > db_dump.clay # export multiple pages
-clay export --yaml < pages_list.txt > pages.yml # export multiple pages
+clay export --key prod --size 1 domain.com > recent_page.clay # export latest updated page
+cat query.yml | clay export > db_dump.clay # export custom query to dispatch
+clay export --yaml < query.yml > pages.yml # export custom query to bootstrap
 
 # other things you may export
 
@@ -230,7 +231,7 @@ clay export domain.com/_users/abs8a7s8d --yaml > my_user.yml # export single use
 clay export domain.com/_users --yaml > users.yml # export all users
 clay export domain.com/_lists/tags > tags.clay # export single list
 clay export domain.com/_lists > lists.clay # export all lists
-clay export domain.com/2017/02/some-slug.html # export page via public url
+clay export domain.com/2017/02/some-slug.html # export published page via public url
 clay export domnain.com/_lists/new-pages # export built-in 'New Page Templates' list (page uris will be unprefixed)
 ```
 
