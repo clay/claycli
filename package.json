@@ -12,6 +12,19 @@
     "test": "npm run lint && jest --coverage && cat ./coverage/lcov.info | coveralls",
     "watch": "jest --watch"
   },
+  "jest": {
+    "collectCoverage": true,
+    "collectCoverageFrom": [
+      "**/*.js",
+      "!lib/logger.js",
+      "!**/node_modules/**",
+      "!**/cli/**",
+      "!**/coverage/**"
+    ],
+    "setupFiles": [
+      "./setup-jest.js"
+    ]
+  },
   "pre-push": [
     "lint"
   ],
@@ -32,15 +45,18 @@
   "devDependencies": {
     "coveralls": "^2.13.1",
     "eslint": "^4.17.0",
-    "jest": "^22.4.1"
+    "jest": "^22.4.1",
+    "jest-fetch-mock": "^1.4.2"
   },
   "dependencies": {
+    "clay-log": "^1.2.1",
     "clayutils": "^2.0.3",
-    "highland": "^2.10.5",
+    "highland": "^3.0.0-beta.5",
+    "isomorphic-fetch": "^2.2.1",
     "js-yaml": "^3.8.4",
-    "lodash": "^4.17.4",
-    "node-fetch": "^1.6.3",
+    "lodash": "^4.17.5",
     "ora": "^1.2.0",
+    "string-replace-async": "^1.2.1",
     "update-notifier": "^2.1.0",
     "yargs": "^8.0.1"
   }
