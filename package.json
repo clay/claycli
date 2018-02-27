@@ -60,7 +60,7 @@
     "lodash": "^4.17.5",
     "ora": "^1.2.0",
     "string-replace-async": "^1.2.1",
-    "update-notifier": "^2.1.0",
-    "yargs": "^8.0.1"
+    "update-notifier": "^2.3.0",
+    "yargs": "^11.0.0"
   }
 }
