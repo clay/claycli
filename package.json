@@ -43,6 +43,7 @@
   },
   "homepage": "https://github.com/nymag/clay-cli#readme",
   "devDependencies": {
+    "base-64": "^0.1.0",
     "coveralls": "^2.13.1",
     "eslint": "^4.17.0",
     "jest": "^22.4.1",
