@@ -3,7 +3,7 @@
 
 const yargs = require('yargs'),
   updateNotifier = require('update-notifier'),
-  pkg = require('./package.json'),
+  pkg = require('../package.json'),
   notifier = updateNotifier({
     pkg
   });
@@ -17,7 +17,7 @@ if (notifier.update) {
 yargs
   .usage('Usage: clay <command> [options]')
   .wrap(yargs.terminalWidth())
-  .commandDir('cmd')
+  .command(require('./config'))
   // common options
   .help()
   .version()

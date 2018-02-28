@@ -16,7 +16,8 @@
     "collectCoverage": true,
     "collectCoverageFrom": [
       "**/*.js",
-      "!lib/logger.js",
+      "!lib/debug-logger.js",
+      "!lib/terminal-logger.js",
       "!**/node_modules/**",
       "!**/cli/**",
       "!**/coverage/**",
@@ -60,6 +61,7 @@
     "lodash": "^4.17.5",
     "ora": "^1.2.0",
     "string-replace-async": "^1.2.1",
+    "terminal-logger": "^0.2.3",
     "update-notifier": "^2.3.0",
     "yargs": "^11.0.0"
   }

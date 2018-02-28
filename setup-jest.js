@@ -1,5 +1,6 @@
 'use strict';
 const Highland = require('highland'),
+  mockInfo = jest.fn(),
   mockDebug = jest.fn(),
   mockWarn = jest.fn(),
   mockError = jest.fn(),
@@ -22,7 +23,8 @@ global.h = Highland.use({
 global.fetch = require('jest-fetch-mock');
 
 jest.setMock('isomorphic-fetch', fetch);
-jest.setMock('./lib/logger', () => ({
+jest.setMock('./lib/debug-logger', () => ({
+  info: mockInfo,
   debug: mockDebug,
   warn: mockWarn,
   error: mockError
