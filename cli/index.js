@@ -18,6 +18,7 @@ yargs
   .usage('Usage: clay <command> [options]')
   .wrap(yargs.terminalWidth())
   .command(require('./config'))
+  .command(require('./lint'))
   // common options
   .help()
   .version()
