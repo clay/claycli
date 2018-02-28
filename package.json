@@ -59,7 +59,7 @@
     "isomorphic-fetch": "^2.2.1",
     "js-yaml": "^3.8.4",
     "lodash": "^4.17.5",
-    "ora": "^1.2.0",
+    "ora": "^2.0.0",
     "string-replace-async": "^1.2.1",
     "terminal-logger": "^0.2.3",
     "update-notifier": "^2.3.0",
