@@ -30,7 +30,7 @@ function handler(argv) {
       const missing = _.map(_.filter(resolved, (item) => item.result === 'error'), 'url');
 
       if (missing.length) {
-        spinner.fail(`Missing ${pluralize('reference', missing.length, true)}:` + chalk.grey(`\n${missing.join('\n')}`));
+        spinner.fail(`Missing ${pluralize('reference', missing.length, true)}:` + chalk.gray(`\n${missing.join('\n')}`));
       } else {
         spinner.succeed(`All references exist! (${pluralize('uri', resolved.length, true)})`);
       }
@@ -48,7 +48,7 @@ function handler(argv) {
         const errors = _.filter(resolved, (item) => item.result === 'error');
 
         if (errors.length) {
-          spinner.fail(`Schema has ${pluralize('error', errors.length, true)}:` + chalk.grey(`\n${errors.map((e) => e.message + ':\n' + e.example).join('\n')}`));
+          spinner.fail(`Schema has ${pluralize('error', errors.length, true)}:` + chalk.gray(`\n${errors.map((e) => e.message + (e.example ? ':\n' + e.example : '')).join('\n')}`));
         } else {
           spinner.succeed('Schema has no issues');
         }
