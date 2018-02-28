@@ -2,6 +2,7 @@
 const _ = require('lodash'),
   pluralize = require('pluralize'),
   chalk = require('chalk'),
+  getStdin = require('get-stdin'),
   options = require('./cli-options'),
   log = require('../lib/terminal-logger')('lint'),
   linter = require('../lib/cmd/lint');
@@ -16,13 +17,13 @@ function builder(yargs) {
 }
 
 function handler(argv) {
-  let spinner = log.spinner({
-    text: 'Checking references',
-    spinner: 'dots',
-    color: 'magenta'
-  });
+  if (argv.url) { // lint url
+    let spinner = log.spinner({
+      text: 'Linting url',
+      spinner: 'dots',
+      color: 'magenta'
+    });
 
-  if (argv.url) {
     spinner.start();
     return linter.lintUrl(argv.url).toArray((resolved) => {
       const missing = _.map(_.filter(resolved, (item) => item.result === 'error'), 'url');
@@ -32,6 +33,25 @@ function handler(argv) {
       } else {
         spinner.succeed(`All references exist! (${pluralize('uri', resolved.length, true)})`);
       }
+    });
+  } else { // lint schema from stdin
+    let spinner = log.spinner({
+      text: 'Linting schema',
+      spinner: 'dots',
+      color: 'blue'
+    });
+
+    spinner.start();
+    return getStdin().then((str) => {
+      return linter.lintSchema(str).toArray((resolved) => {
+        const errors = _.filter(resolved, (item) => item.result === 'error');
+
+        if (errors.length) {
+          spinner.fail(`Schema has ${pluralize('error', errors.length, true)}:` + chalk.grey(`\n${errors.map((e) => e.message + ':\n' + e.example).join('\n')}`));
+        } else {
+          spinner.succeed('Schema has no issues');
+        }
+      });
     });
   }
 }
