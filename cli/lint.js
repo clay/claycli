@@ -13,6 +13,7 @@ function builder(yargs) {
     .example('$0 lint domain.com/_components/foo', 'Lint component')
     .example('$0 lint domain.com/_pages/foo', 'Lint page')
     .example('$0 lint domain.com/some-slug', 'Lint public url')
+    .example('$0 lint < path/to/schema.yml', 'Lint schema file')
     .option('c', options.concurrency);
 }
 
