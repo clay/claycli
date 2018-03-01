@@ -177,6 +177,8 @@ clay import --key local localhost:3001 < db_dump.clay # import a dispatch
 clay import --key qa --publish --yaml < bootstrap.yml # import and publish pages in a bootstrap
 wordpress-export domain.com/blog | clay import --key local localhost.domain.com # pipe from 3rd party exporter
 clay export --key prod domain.com/_components/article/instances/123 | clay import --key local localhost.domain.com # pipe from clay exporter
+cat *.clay | clay import --key local localhost:3001 # import multiple dispatches
+tail -n +1 *.yml | clay import --key local --yaml localhost:3001 # import multiple bootstraps (tail adds a delimiter)
 ```
 
 ## Export
