@@ -22,12 +22,24 @@ module.exports = {
     alias: 'size', // -s, --size
     describe: 'number of pages to query for',
     type: 'number',
-    default: 10
+    default: 10,
+    requiresArg: true
   },
   concurrency: {
-    // no aliases
+    alias: 'concurrency', // -c, --concurrency
     describe: 'number of concurrent requests against clay',
     type: 'number',
-    default: 10
+    default: 10,
+    requiresArg: true
+  },
+  publish: {
+    alias: 'publish', // -p, --publish
+    describe: 'publish items when importing',
+    type: 'boolean'
+  },
+  yaml: {
+    alias: 'yaml', // -y, --yaml
+    describe: 'parse bootstrap format',
+    type: 'boolean'
   }
 };

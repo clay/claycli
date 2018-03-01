@@ -19,6 +19,7 @@ yargs
   .wrap(yargs.terminalWidth())
   .command(require('./config'))
   .command(require('./lint'))
+  .command(require('./import'))
   // common options
   .help()
   .version()
