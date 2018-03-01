@@ -32,7 +32,7 @@ function handler(argv) {
       if (missing.length) {
         spinner.fail(`Missing ${pluralize('reference', missing.length, true)}:` + chalk.gray(`\n${missing.join('\n')}`));
       } else {
-        spinner.succeed(`All references exist! (${pluralize('uri', resolved.length, true)})`);
+        spinner.succeed(`All references exist! (checked ${pluralize('uri', resolved.length, true)})`);
       }
     });
   } else { // lint schema from stdin
