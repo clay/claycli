@@ -4,16 +4,15 @@ const _ = require('lodash'),
   chalk = require('chalk'),
   getStdin = require('get-stdin'),
   options = require('./cli-options'),
-  log = require('../lib/terminal-logger')('lint'),
-  linter = require('../lib/cmd/lint');
+  log = require('../lib/terminal-logger')('import'),
+  importString = require('../lib/cmd/import');
 
 function builder(yargs) {
   return yargs
-    .usage('Usage: $0 lint [url]')
-    .example('$0 lint domain.com/_components/foo', 'Lint component')
-    .example('$0 lint domain.com/_pages/foo', 'Lint page')
-    .example('$0 lint domain.com/some-slug', 'Lint public url')
-    .example('$0 lint < path/to/schema.yml', 'Lint schema file')
+    .usage('Usage: $0 import [url]')
+    .example('$0 import --key prod domain.com < db_dump.clay', 'Import dispatch from stdin')
+    .example('$0 import --key prod --publish domain.com < db_dump.clay', 'Import and publish page')
+    .example('$0 import --key prod --yaml domain.com < bootstrap.yml', 'Import bootstrap from stdin')
     .option('c', options.concurrency);
 }
 
@@ -43,7 +42,6 @@ function handler(argv) {
     });
 
     spinner.start();
-    return require('highland')(process.stdin).map(console.log);
     return getStdin().then((str) => {
       return linter.lintSchema(str).toArray((resolved) => {
         const errors = _.filter(resolved, (item) => item.result === 'error');

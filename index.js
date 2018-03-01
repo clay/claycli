@@ -4,3 +4,4 @@
 
 module.exports.config = require('./lib/cmd/config');
 module.exports.lint = require('./lib/cmd/lint');
+module.exports.import = require('./lib/cmd/import');
