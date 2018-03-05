@@ -44,7 +44,6 @@ For smaller Clay installations (or, ironically, for very large teams where devs 
 
 * `-v, --version` will print the `claycli` version and exit
 * `-h, --help` will print helpful info about `claycli` and exit
-* `-V, --verbose` will print out helpful debugging messages as it runs commands
 * `-c, --concurrency` allows setting the concurrency of api calls (defaults to 10)
 * `-k, --key` allows specifying an api key or alias
 
@@ -155,7 +154,7 @@ clay lint < components/article/schema.yml # lint single schema
 ## Import
 
 ```bash
-clay import [--key <api key>] [--concurrency <number>] [--publish] [--yaml] [--verbose] [site prefix]
+clay import [--key <api key>] [--concurrency <number>] [--publish] [--yaml] [site prefix]
 ```
 
 Imports data into Clay from `stdin`. Data may be in _dispatch_ or _bootstrap_ format. Site prefix may be a raw url, an alias specified via `clay config`, or may be omitted in favor of `CLAYCLI_DEFAULT_URL`. Key may be an alias specified via `clay config`, or may be omitted in favor of `CLAYCLI_DEFAULT_KEY`.
@@ -168,7 +167,6 @@ The `publish` argument will trigger a publish of the pages and / or components y
 * `-c, --concurrency` allows setting the concurrency of api calls
 * `-p, --publish` triggers publishing of imported pages
 * `-y, --yaml` specifies that input is _bootstrap_ format
-* `-V, --verbose` will print out helpful debugging messages
 
 ### Examples
 
@@ -184,7 +182,7 @@ tail -n +1 *.yml | clay import --key local --yaml localhost:3001 # import multip
 ## Export
 
 ```bash
-clay export [--key <api key>] [--concurrency <number>] [--size <number>] [--layout] [--yaml] [--verbose] [url]
+clay export [--key <api key>] [--concurrency <number>] [--size <number>] [--layout] [--yaml] [url]
 ```
 
 Exports data from Clay to `stdout`. Data may be in _dispatch_ or _bootstrap_ format. The url may be a raw url, an alias specified via `clay config`, or may be omitted in favor of `CLAYCLI_DEFAULT_URL`.
@@ -213,7 +211,6 @@ By default, layouts are not exported when exporting pages. This allows you to ea
 * `-s, --size` specifies the number of pages to export (defaults to 10)
 * `-l, --layout` triggers exporting of layouts
 * `-y, --yaml` specifies that output is _bootstrap_ format
-* `-V, --verbose` will print out helpful debugging messages
 
 ### Examples
 

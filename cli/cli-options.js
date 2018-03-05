@@ -37,6 +37,11 @@ module.exports = {
     describe: 'publish items when importing',
     type: 'boolean'
   },
+  layout: {
+    alias: 'layout', // -l, --layout
+    describe: 'export layout when exporting page(s)',
+    type: 'boolean'
+  },
   yaml: {
     alias: 'yaml', // -y, --yaml
     describe: 'parse bootstrap format',
