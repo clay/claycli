@@ -50,9 +50,7 @@ function handler(argv) {
   stream = rest.isElasticPrefix(url).flatMap((isPrefix) => {
     if (isPrefix) {
       return h(getStdin()
-        .then((str) => {
-          return str && _.isString(str) ? JSON.parse(str) : null;
-        })
+        .then(yaml.safeLoad)
         .then((query) => {
           return exporter.fromQuery(url, query, {
             key: argv.key,
