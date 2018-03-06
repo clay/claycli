@@ -82,13 +82,14 @@ function handler(argv) {
       push(null, { result: 'error', url: err.url }); // every url that errors out should be captured
     })
     .toArray((resolved) => {
-      const errors = _.map(_.filter(resolved, (item) => _.isObject(item) && item.result === 'error'), 'message');
+      const errors = _.map(_.filter(resolved, (item) => _.isObject(item) && item.result === 'error'), 'message'),
+        thing = argv.yaml ? 'bootstrap' : 'dispatch';
 
       if (errors.length) {
-        spinner.fail('Exported 0 uris (´°ω°`)');
-        log.status.error(`Skipped ${pluralize('uri', errors.length, true)} due to errors: \n${chalk.gray(errors.join('\n'))}`);
+        spinner.fail(`Exported 0 ${thing}s (´°ω°\`)`);
+        log.status.error(`Skipped ${pluralize(thing, errors.length, true)} due to errors: \n${chalk.gray(errors.join('\n'))}`);
       } else {
-        spinner.succeed(`Exported ${pluralize('uri', resolved.length, true)}!`);
+        spinner.succeed(`Exported ${pluralize(thing, resolved.length, true)}!`);
       }
     });
 }
