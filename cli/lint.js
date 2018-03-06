@@ -43,7 +43,6 @@ function handler(argv) {
     });
 
     spinner.start();
-    return require('highland')(process.stdin).map(console.log);
     return getStdin().then((str) => {
       return linter.lintSchema(str).toArray((resolved) => {
         const errors = _.filter(resolved, (item) => item.result === 'error');

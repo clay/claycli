@@ -20,6 +20,7 @@ yargs
   .command(require('./config'))
   .command(require('./lint'))
   .command(require('./import'))
+  .command(require('./export'))
   // common options
   .help()
   .version()
