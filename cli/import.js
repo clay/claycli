@@ -3,7 +3,7 @@ const _ = require('lodash'),
   pluralize = require('pluralize'),
   chalk = require('chalk'),
   options = require('./cli-options'),
-  log = require('../lib/terminal-logger')('import'),
+  reporter = require('../lib/reporters'),
   importItems = require('../lib/cmd/import');
 
 function builder(yargs) {
@@ -15,16 +15,8 @@ function builder(yargs) {
     .option('k', options.key)
     .option('c', options.concurrency)
     .option('p', options.publish)
-    .option('y', options.yaml);
-}
-
-/**
- * log fatal errors and exit with non-zero status
- * @param  {Error} e
- */
-function fatalError(e) {
-  log.status.error(`Unable to import:\n${chalk.gray(e.message)}`);
-  process.exit(1);
+    .option('y', options.yaml)
+    .option('r', options.reporter);
 }
 
 /**
@@ -33,36 +25,32 @@ function fatalError(e) {
  * @return {function}
  */
 function handler(argv) {
-  let spinner = log.spinner({
-    text: 'Importing items',
-    spinner: 'dots',
-    color: 'magenta'
-  });
+  const log = reporter.log(argv.reporter, 'import');
 
-  spinner.start();
+  log('Importing items...');
   return importItems(process.stdin, argv.url, {
     key: argv.key,
     concurrency: argv.concurrency,
     publish: argv.publish,
     yaml: argv.yaml
   })
-    .stopOnError(fatalError)
-    .toArray((resolved) => {
-      const successes = _.map(_.filter(resolved, (item) => item.result === 'success'), 'url'),
-        pages = _.map(_.filter(successes, (s) => _.includes(s, 'pages')), (page) => `${page}.html`),
-        errors = _.map(_.filter(resolved, (item) => item.result === 'error'), 'message');
+    .stopOnError((e) => {
+      reporter.logSummary(argv.reporter, 'import', () => 'Unable to import')([{ type: 'error', message: e.message }]);
+      process.exit(1);
+    })
+    .map(reporter.logAction(argv.reporter, 'import'))
+    .toArray((results) => {
+      const pages = _.map(_.filter(results, (result) => result.type === 'success' && _.includes(result, 'pages')), (page) => `${page.url}.html`);
 
-      if (successes.length && pages.length) {
-        spinner.succeed(`Imported ${pluralize('page', pages.length, true)}: \n${chalk.gray(pages.join('\n'))}`);
-      } else if (successes.length) {
-        spinner.succeed(`Imported ${pluralize('uri', successes.length, true)}: \n${chalk.gray(successes.join('\n'))}`);
-      } else {
-        spinner.fail('Imported 0 uris (´°ω°`)');
-      }
-
-      if (errors.length) {
-        log.status.error(`Skipped ${pluralize('uri', errors.length, true)} due to errors: \n${chalk.gray(errors.join('\n'))}`);
-      }
+      reporter.logSummary(argv.reporter, 'import', (successes) => {
+        if (successes && pages.length) {
+          return { success: true, message: `Imported ${pluralize('page', pages.length, true)}\n${chalk.gray(pages.join('\n'))}` };
+        } else if (successes) {
+          return { success: true, message: `Imported ${pluralize('uri', successes, true)}` };
+        } else {
+          return { success: false, message: 'Imported 0 uris (´°ω°`)' };
+        }
+      })(results);
     });
 }
 

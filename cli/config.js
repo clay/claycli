@@ -1,7 +1,7 @@
 'use strict';
 const _ = require('lodash'),
   options = require('./cli-options'),
-  log = require('../lib/terminal-logger')('config'),
+  reporter = require('../lib/reporters'),
   config = require('../lib/cmd/config');
 
 function builder(yargs) {
@@ -12,18 +12,19 @@ function builder(yargs) {
     .example('$0 config --url some-article', 'Get url')
     .example('$0 config --url mysite domain.com', 'Set url')
     .option('k', options.key)
-    .option('u', options.url);
+    .option('u', options.url)
+    .option('r', options.reporter);
 }
 
 function set(argv) {
   if (argv.key) {
     config.set('key', argv.key, argv.value);
-    log.tick(`set ${argv.key} ${argv.value}`);
+    reporter.logSummary(argv.reporter, 'config', () => ({ success: true, message: `set ${argv.key} ${argv.value}` }))([]);
   } else if (argv.url) {
     config.set('url', argv.url, argv.value);
-    log.tick(`set ${argv.url} ${argv.value}`);
+    reporter.logSummary(argv.reporter, 'config', () => ({ success: true, message: `set ${argv.url} ${argv.value}` }))([]);
   } else {
-    log.status.error('Please provide either --key or --url');
+    reporter.logSummary(argv.reporter, 'config', () => ({ success: false, message: 'Please provide either --key or --url' }))([]);
     process.exit(1);
   }
 }
@@ -40,16 +41,16 @@ function get(argv) {
     key = argv.url;
     val = config.get('url', argv.url);
   } else {
-    log.status.error('Please provide either --key or --url');
+    reporter.logSummary(argv.reporter, 'config', () => ({ success: false, message: 'Please provide either --key or --url' }))([]);
     process.exit(1);
   }
 
   // normally, we'd want to pass through any alias,
   // but here we're explicitly checking to see if the alias exists in the config
   if (!_.includes([key, `http://${key}`, process.env.CLAYCLI_DEFAULT_KEY, process.env.CLAYCLI_DEFAULT_URL], val)) {
-    log.tick(val);
+    reporter.logSummary(argv.reporter, 'config', () => ({ success: true, message: val }))([]);
   } else {
-    log.cross(`${type}: ${key} not found`);
+    reporter.logSummary(argv.reporter, 'config', () => ({ success: false, message: `${type}: ${key} not found` }))([]);
   }
 }
 

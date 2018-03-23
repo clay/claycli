@@ -8,7 +8,7 @@ const _ = require('lodash'),
   options = require('./cli-options'),
   config = require('../lib/cmd/config'),
   rest = require('../lib/rest'),
-  log = require('../lib/terminal-logger')('import'),
+  log = {},
   exporter = require('../lib/cmd/export');
 
 function builder(yargs) {
