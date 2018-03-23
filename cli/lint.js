@@ -17,11 +17,13 @@ function builder(yargs) {
 }
 
 function handler(argv) {
+  const log = reporter.log(argv.reporter, 'lint');
+
   if (argv.url) { // lint url
-    reporter.log(argv.reporter, 'Linting url...');
+    log('Linting url...');
     return linter.lintUrl(argv.url)
-      .map(reporter.logAction(argv.reporter))
-      .toArray(reporter.logSummary(argv.reporter, (successes, errors) => {
+      .map(reporter.logAction(argv.reporter, 'lint'))
+      .toArray(reporter.logSummary(argv.reporter, 'lint', (successes, errors) => {
         if (errors) {
           return { success: false, message: `Missing ${pluralize('reference', errors, true)}`};
         } else {
@@ -29,11 +31,11 @@ function handler(argv) {
         }
       }));
   } else { // lint schema from stdin
-    reporter.log(argv.reporter, 'Linting schema...');
+    log('Linting schema...');
     return getStdin().then((str) => {
       return linter.lintSchema(str)
         // no dot logging of individual schema linting, since it's just a single dot
-        .toArray(reporter.logSummary(argv.reporter, (successes, errors) => {
+        .toArray(reporter.logSummary(argv.reporter, 'lint', (successes, errors) => {
           if (errors) {
             return { success: false, message: `Schema has ${pluralize('error', errors, true)}` };
           } else {
