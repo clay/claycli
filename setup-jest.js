@@ -1,8 +1,5 @@
 'use strict';
-const mockDebug = jest.fn(),
-  mockWarn = jest.fn(),
-  mockError = jest.fn(),
-  mockLoad = jest.fn();
+const mockLoad = jest.fn();
 
 // config mocking
 jest.doMock('home-config', () => ({
@@ -13,8 +10,3 @@ jest.doMock('home-config', () => ({
 global.fetch = require('jest-fetch-mock');
 
 jest.setMock('isomorphic-fetch', fetch);
-jest.setMock('./lib/debug-logger', () => ({
-  debug: mockDebug,
-  warn: mockWarn,
-  error: mockError
-}));

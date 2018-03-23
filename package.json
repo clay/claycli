@@ -61,7 +61,6 @@
     "js-yaml": "^3.10.0",
     "lodash": "^4.17.5",
     "nyansole": "^0.5.1",
-    "ora": "^2.0.0",
     "pluralize": "^7.0.0",
     "string-replace-async": "^1.2.1",
     "terminal-logger": "^0.2.3",
