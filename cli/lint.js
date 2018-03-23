@@ -30,7 +30,6 @@ function handler(argv) {
       }));
   } else { // lint schema from stdin
     reporter.log(argv.reporter, 'Linting schema...');
-
     return getStdin().then((str) => {
       return linter.lintSchema(str)
         // no dot logging of individual schema linting, since it's just a single dot
