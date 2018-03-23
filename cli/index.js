@@ -1,6 +1,12 @@
 #!/usr/bin/env node
 'use strict'; // eslint-disable-line
 
+// force colors.js to use colors when exporting
+// by passing a SECRET HIDDEN FLAG into claycli, which triggers
+// terminal-logger's colors.js checker
+process.argv.push('--color');
+process.argv.push('always');
+
 // command line interface
 
 const yargs = require('yargs'),

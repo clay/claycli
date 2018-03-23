@@ -1,14 +1,12 @@
 'use strict';
-const _ = require('lodash'),
-  pluralize = require('pluralize'),
+const pluralize = require('pluralize'),
   h = require('highland'),
   yaml = require('js-yaml'),
-  chalk = require('chalk'),
   getStdin = require('get-stdin'),
   options = require('./cli-options'),
   config = require('../lib/cmd/config'),
   rest = require('../lib/rest'),
-  log = {},
+  reporter = require('../lib/reporters'),
   exporter = require('../lib/cmd/export');
 
 function builder(yargs) {
@@ -20,16 +18,17 @@ function builder(yargs) {
     .option('k', options.key)
     .option('s', options.size)
     .option('l', options.layout)
-    .option('y', options.yaml);
+    .option('y', options.yaml)
+    .option('r', options.reporter);
 }
 
 /**
  * log fatal errors and exit with non-zero status
  * @param  {Error} e
- * @param {object} spinner
+ * @param {object} argv
  */
-function fatalError(e, spinner) {
-  spinner.fail(`Unable to export:\n${e.message}`);
+function fatalError(e, argv) {
+  reporter.logSummary(argv.reporter, 'export', () => ({ success: false, message: 'Unable to export' }))([{ type: 'error', message: e.url, details: e.message }]);
   process.exit(1);
 }
 
@@ -38,16 +37,14 @@ function fatalError(e, spinner) {
  * @param  {object} argv
  */
 function handler(argv) {
-  let spinner = log.spinner({
-      text: 'Exporting items',
-      spinner: 'dots',
-      color: 'magenta'
-    }),
-    url = config.get('url', argv.url),
+  const log = reporter.log(argv.reporter, 'export');
+
+  let url = config.get('url', argv.url),
     stream;
 
-  spinner.start();
+  log('Exporting items...');
   stream = rest.isElasticPrefix(url).flatMap((isPrefix) => {
+    // if we're pointed at an elastic prefix, run a query to fetch pages
     if (isPrefix) {
       return h(getStdin()
         .then(yaml.safeLoad)
@@ -59,9 +56,9 @@ function handler(argv) {
             layout: argv.layout,
             yaml: argv.yaml
           });
-        })
-        .catch((e) => fatalError(e, spinner))).flatten();
+        })).flatten();
     } else {
+      // export a single url
       return exporter.fromURL(url, {
         key: argv.key,
         concurrency: argv.concurrency,
@@ -73,23 +70,23 @@ function handler(argv) {
   });
 
   stream
-    .stopOnError((e) => fatalError(e, spinner))
+    .stopOnError((e) => fatalError(e, argv))
     .map((res) => argv.yaml ? yaml.safeDump(res) : `${JSON.stringify(res)}\n`)
     .tap((str) => process.stdout.write(str))
+    .map((data) => ({ type: 'success', message: data }))
     .errors((err, push) => {
-      push(null, { result: 'error', url: err.url }); // every url that errors out should be captured
+      push(null, { type: 'error', message: err.url, details: err.message }); // every url that errors out should be captured
     })
-    .toArray((resolved) => {
-      const errors = _.map(_.filter(resolved, (item) => _.isObject(item) && item.result === 'error'), 'message'),
-        thing = argv.yaml ? 'bootstrap' : 'dispatch';
+    .map(reporter.logAction(argv.reporter, 'export'))
+    .toArray(reporter.logSummary(argv.reporter, 'export', (successes) => {
+      const thing = argv.yaml ? 'bootstrap' : 'dispatch';
 
-      if (errors.length) {
-        spinner.fail(`Exported 0 ${thing}s (´°ω°\`)`);
-        log.status.error(`Skipped ${pluralize(thing, errors.length, true)} due to errors: \n${chalk.gray(errors.join('\n'))}`);
+      if (successes) {
+        return { success: true, message: `Exported ${pluralize(thing, successes, true)}` };
       } else {
-        spinner.succeed(`Exported ${pluralize(thing, resolved.length, true)}!`);
+        return { success: false, message: `Exported 0 ${thing}s (´°ω°\`)` };
       }
-    });
+    }));
 }
 
 module.exports = {
