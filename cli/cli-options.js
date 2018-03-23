@@ -1,10 +1,11 @@
 'use strict';
 
 module.exports = {
-  verbose: {
-    alias: 'verbose', // -v, --verbose
-    describe: 'print debug logs',
-    type: 'boolean'
+  reporter: {
+    alias: 'reporter', // -r, --reporter
+    describe: 'how to print logs',
+    type: 'string',
+    requiresArg: true
   },
   url: {
     alias: 'url', // -u, --url

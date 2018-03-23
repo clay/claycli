@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 'use strict'; // eslint-disable-line
 
+// command line interface
+
 const yargs = require('yargs'),
   updateNotifier = require('update-notifier'),
   pkg = require('../package.json'),

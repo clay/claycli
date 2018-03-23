@@ -16,8 +16,7 @@
     "collectCoverage": true,
     "collectCoverageFrom": [
       "**/*.js",
-      "!lib/debug-logger.js",
-      "!lib/terminal-logger.js",
+      "!lib/reporters/**",
       "!**/node_modules/**",
       "!**/cli/**",
       "!**/coverage/**",
@@ -52,7 +51,7 @@
   },
   "dependencies": {
     "base-64": "^0.1.0",
-    "chalk": "^2.3.1",
+    "chalk": "^2.3.2",
     "clay-log": "^1.3.0",
     "clayutils": "^2.0.3",
     "get-stdin": "^5.0.1",
