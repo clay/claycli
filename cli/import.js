@@ -34,6 +34,7 @@ function handler(argv) {
     publish: argv.publish,
     yaml: argv.yaml
   })
+    .map(reporter.logAction(argv.reporter, 'import'))
     .map((item) => {
       // catch people trying to import dispatches from yaml files
       if (item.type === 'error' && item.message === 'Cannot import dispatch from yaml') {
@@ -43,7 +44,6 @@ function handler(argv) {
         return item;
       }
     })
-    .map(reporter.logAction(argv.reporter, 'import'))
     .toArray((results) => {
       const pages = _.map(_.filter(results, (result) => result.type === 'success' && _.includes(result.message, 'pages')), (page) => `${page.message}.html`);
 
