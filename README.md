@@ -44,14 +44,31 @@ For smaller Clay installations (or, ironically, for very large teams where devs 
 
 * `-v, --version` will print the `claycli` version and exit
 * `-h, --help` will print helpful info about `claycli` and exit
+* `-r, --reporter` allows specifying how results should be logged
 * `-c, --concurrency` allows setting the concurrency of api calls (defaults to 10)
 * `-k, --key` allows specifying an api key or alias
+
+### Logging
+
+When running `claycli` programmatically (i.e., `import { someMethod } from 'claycli'`), most commands will return a stream of objects with `{ type, message, details }`. The `type` may be `success` (signalling that an operation succeeded), `error`, `warning`, `info`, or `debug`. As you can see, most of those correspond directly to log levels.
+
+When running `claycli` from the command line, you may specify a `reporter` argument to output logs in different formats. The default is `dots`, which will print out green and red dots showing operation success / failure. There is also `pretty` (which prints more detailed messages on each line), `json` (which prints newline-separated json logs in a format that can be passed to ELK), and `nyan` (which is mostly just for fun).
+
+```bash
+clay lint --reporter pretty domain.com/_components/article
+```
+
+You may also specify with reporter to use by setting the `CLAYCLI_REPORTER` environment variable. If you add a `reporter` argument, it will be used instead of the env variable.
+
+```bash
+export CLAYCLI_REPORTER=json
+```
 
 ## Handling Files
 
 ### Dispatch
 
-Many `claycli` arguments allow you to pipe in the contents of files to `stdin` or pipe data out from `stdout`. The format that `claycli` uses to represent data (similar to a database dump) is called a _dispatch_, and it consists of newline-separated JSON without site prefixes.
+Many `claycli` commands allow you to pipe in the contents of files to `stdin` or pipe data out from `stdout`. The format that `claycli` uses to represent data (similar to a database dump) is called a _dispatch_, and it consists of newline-separated JSON without site prefixes.
 
 ```
 {"/_components/article/instances/123":{"title":"My Article","content":[{"_ref":"/_components/paragraph/instances/234","text":"Four score and seven years ago..."}]}}
