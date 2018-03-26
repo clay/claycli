@@ -131,6 +131,7 @@ Show or set configuration options. These are saved to `~/.clayconfig`. As specif
 
 * `-k, --key` allows viewing or saving an api key
 * `-u, --url` allows viewing or saving a url / site prefix
+* `-r, --reporter` allows specifying how results should be logged (note: all reporters except `json` report `clay config` the same)
 
 ### Examples
 
@@ -157,6 +158,7 @@ Instead of specifying a url, you may pipe in a component's `schema.yml` to lint.
 
 ### Arguments
 
+* `-r, --reporter` allows specifying how results should be logged
 * `-c, --concurrency` allows setting the concurrency of api calls
 
 ### Examples
@@ -181,6 +183,7 @@ The `publish` argument will trigger a publish of the pages and / or components y
 ### Arguments
 
 * `-k, --key` allows specifying an api key or alias
+* `-r, --reporter` allows specifying how results should be logged
 * `-c, --concurrency` allows setting the concurrency of api calls
 * `-p, --publish` triggers publishing of imported pages
 * `-y, --yaml` specifies that input is _bootstrap_ format
@@ -209,6 +212,27 @@ If the url does not point to a specific type of data (a page, public url, compon
 Instead of fetching the latest pages, you may pipe in a yaml-formatted [elasticsearch query](https://www.elastic.co/guide/en/elasticsearch/reference/current/_introducing_the_query_language.html). Use this to set custom offsets (for batching and chunking exports), export non-page content from other indices, or filter exported data via certain properties. Note that if you pipe in a query that includes `size`, it will take precedence over the CLI `size` argument.
 
 ```yaml
+index: pages
+size: 100
+body:
+  sort:
+    updateTime:
+        order: desc # sort by latest updated
+  query:
+    bool:
+      must:
+        -
+          prefix:
+            uri: domain.com/site-path # show only pages for a specific site
+        -
+          match:
+            published: true # show only published pages
+
+```
+
+You may also query other elastic indices, but please make sure that each document returned has a clay uri (e.g. `domain.com/_components/foo/instances/bar` or `domain.com/_pages/foo`) as its `_id`.
+
+```yaml
 index: published-products
 size: 5
 from: 10
@@ -224,6 +248,7 @@ By default, layouts are not exported when exporting pages. This allows you to ea
 ### Arguments
 
 * `-k, --key` allows specifying an api key or alias
+* `-r, --reporter` allows specifying how results should be logged
 * `-c, --concurrency` allows setting the concurrency of api calls
 * `-s, --size` specifies the number of pages to export (defaults to 10)
 * `-l, --layout` triggers exporting of layouts
