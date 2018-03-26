@@ -1,5 +1,6 @@
 'use strict';
 const _ = require('lodash'),
+  chalk = require('chalk'),
   options = require('./cli-options'),
   reporter = require('../lib/reporters'),
   config = require('../lib/cmd/config');
@@ -40,9 +41,22 @@ function get(argv) {
     type = 'url';
     key = argv.url;
     val = config.get('url', argv.url);
+  } else if (argv.reporter !== 'json') {
+    // pretty print all config options
+    reporter.logSummary(argv.reporter, 'config', () => ({ success: true, message: `Raw Config Values:\n${_.reduce(config.getAll(), (str, items, type) => {
+      if (type === '__filename') {
+        return str;
+      }
+
+      return str += `${chalk.blue(type)}:\n${_.reduce(items, (itemsStr, itemVal, itemKey) => {
+        return itemsStr += `${chalk.bold(itemKey)} = ${itemVal}\n`;
+      }, '')}\n`;
+    }, '')}`}))([]);
+    process.exit(0);
   } else {
-    reporter.logSummary(argv.reporter, 'config', () => ({ success: false, message: 'Please provide either --key or --url' }))([]);
-    process.exit(1);
+    // json-print all config options
+    reporter.logSummary(argv.reporter, 'config', () => ({ success: true, message: `Raw Config Values:\n${JSON.stringify(config.getAll())}` }))([]);
+    process.exit(0);
   }
 
   // normally, we'd want to pass through any alias,
