@@ -40,7 +40,7 @@ function handler(argv) {
     })
     .map(reporter.logAction(argv.reporter, 'import'))
     .toArray((results) => {
-      const pages = _.map(_.filter(results, (result) => result.type === 'success' && _.includes(result, 'pages')), (page) => `${page.url}.html`);
+      const pages = _.map(_.filter(results, (result) => result.type === 'success' && _.includes(result.message, 'pages')), (page) => `${page.message}.html`);
 
       reporter.logSummary(argv.reporter, 'import', (successes) => {
         if (successes && pages.length) {
