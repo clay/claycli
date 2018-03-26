@@ -34,9 +34,14 @@ function handler(argv) {
     publish: argv.publish,
     yaml: argv.yaml
   })
-    .stopOnError((e) => {
-      reporter.logSummary(argv.reporter, 'import', () => 'Unable to import')([{ type: 'error', message: e.message }]);
-      process.exit(1);
+    .map((item) => {
+      // catch people trying to import dispatches from yaml files
+      if (item.type === 'error' && item.message === 'Cannot import dispatch from yaml') {
+        reporter.logSummary(argv.reporter, 'import', () => ({ success: false, message: 'Unable to import' }))([item]);
+        process.exit(1);
+      } else {
+        return item;
+      }
     })
     .map(reporter.logAction(argv.reporter, 'import'))
     .toArray((results) => {
