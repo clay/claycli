@@ -1,5 +1,6 @@
 'use strict';
-const pluralize = require('pluralize'),
+const _ = require('lodash'),
+  pluralize = require('pluralize'),
   h = require('highland'),
   yaml = require('js-yaml'),
   getStdin = require('get-stdin'),
@@ -7,7 +8,8 @@ const pluralize = require('pluralize'),
   config = require('../lib/cmd/config'),
   rest = require('../lib/rest'),
   reporter = require('../lib/reporters'),
-  exporter = require('../lib/cmd/export');
+  exporter = require('../lib/cmd/export'),
+  prefixes = require('../lib/prefixes');
 
 function builder(yargs) {
   return yargs
@@ -40,10 +42,11 @@ function handler(argv) {
   const log = reporter.log(argv.reporter, 'export');
 
   let url = config.get('url', argv.url),
-    stream;
+    isElasticPrefix, stream;
 
   log('Exporting items...');
   stream = rest.isElasticPrefix(url).flatMap((isPrefix) => {
+    isElasticPrefix = isPrefix;
     // if we're pointed at an elastic prefix, run a query to fetch pages
     if (isPrefix) {
       return h(getStdin()
@@ -71,9 +74,19 @@ function handler(argv) {
 
   stream
     .stopOnError((e) => fatalError(e, argv))
-    .map((res) => argv.yaml ? yaml.safeDump(res) : `${JSON.stringify(res)}\n`)
-    .tap((str) => process.stdout.write(str))
-    .map((data) => ({ type: 'success', message: data }))
+    .map((res) => {
+      const rootKey = Object.keys(res)[0], // could be unprefixed uri OR type of thing (if exporting a bootstrap)
+        str = argv.yaml ? yaml.safeDump(res) : `${JSON.stringify(res)}\n`;
+
+      process.stdout.write(str); // pipe stringified exported stuff to stdout
+      if (argv.yaml) {
+        return { type: 'success', message: _.tail(rootKey).join('') }; // e.g. components
+      } else if (isElasticPrefix) {
+        return { type: 'success', message: `${url}${rootKey}` }; // e.g. http://domain.com/_components/foo
+      } else {
+        return { type: 'success', message: `${prefixes.getFromUrl(url)}${rootKey}` }; // e.g. http://domain.com/_pages/foo
+      }
+    })
     .errors((err, push) => {
       push(null, { type: 'error', message: err.url, details: err.message }); // every url that errors out should be captured
     })
