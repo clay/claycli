@@ -196,7 +196,9 @@ clay import --key qa --publish --yaml < bootstrap.yml # import and publish pages
 wordpress-export domain.com/blog | clay import --key local localhost.domain.com # pipe from 3rd party exporter
 clay export --key prod domain.com/_components/article/instances/123 | clay import --key local localhost.domain.com # pipe from clay exporter
 cat *.clay | clay import --key local localhost:3001 # import multiple dispatches
-tail -n +1 *.yml | clay import --key local --yaml localhost:3001 # import multiple bootstraps (tail adds a delimiter)
+tail -n +1 *.yml | clay import --key local --yaml localhost:3001 # import multiple bootstraps (bash 3)
+find . -name '*.yml' -exec cat "{}" \; | clay import --key local --yaml localhost:3001 # recursively import multiple bootstraps (bash 3)
+cat **/*.yml | clay import --key local --yaml localhost:3001 # recursively import multiple bootstraps (bash 4+ & zsh)
 ```
 
 ## Export
