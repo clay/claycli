@@ -62,6 +62,7 @@
     "lodash": "^4.17.5",
     "nyansole": "^0.5.1",
     "pluralize": "^7.0.0",
+    "split-lines": "^1.1.0",
     "string-replace-async": "^1.2.1",
     "terminal-logger": "^0.2.3",
     "update-notifier": "^2.3.0",
