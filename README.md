@@ -15,279 +15,270 @@ npm install -g claycli
 clay <command> [options]
 ```
 
-If installed globally, you can simply call `clay` from the command line. Much like `git`, `claycli` can be configured using a `.clayconfig` file in your home folder. In it you can specify references to api keys, site prefixes, and files (or directories) that you use frequently. You'll reference them with the `--key`, `--site`, and `--file` options when using applicable `claycli` commands. For sites, it'll assume `http://` and port `80` unless you specify otherwise.
+If installed globally, call `clay` from the command line. Much like `git`, `claycli` is configured using a [dotfile](https://medium.com/@webprolific/getting-started-with-dotfiles-43c3602fd789) (`.clayconfig`) in your home folder. In it you may specify references to api keys and urls / site prefixes that you use frequently. For urls and site prefixes, it will assume `http://` and port `80` unless you specify otherwise.
+
+Note that a _site prefix_ is everything before the api route, e.g. `http://domain.com/site1` in `http://domain.com/site1/_components/article`.
 
 ```
 [keys]
   local = ha8yds9a8shdf98asdf
   qa = 8quwqwer09ewr0w9uer
   prod = bj34b6345k634jnk63n4
-[sites]
+[urls]
   local-site1 = https://localhost.site1.com:3001
-  local-site2 = localhost.site1.com/site-2 # http and port 80
-[files]
-  site1-bootstraps = ~/projects/clay/bootstraps
-  users = ~/Desktop/_users.json
+  local-site2 = site2.com/site-2 # http and port 80
 ```
 
-For smaller Clay installations (or, ironically, for very large teams where devs spend most of their time on individual sites), you can specify a default api key and site by using the `CLAY_DEFAULT_KEY` and `CLAY_DEFAULT_SITE` environment variables.
+For smaller Clay installations (or, ironically, for very large teams where devs spend most of their time on individual sites), you may specify a default api key and url / site prefix by using the `CLAYCLI_DEFAULT_KEY` and `CLAYCLI_DEFAULT_URL` environment variables.
 
-## Commands
+# Commands
 
 * [`config`](https://github.com/clay/claycli#config)
-* [`touch`](https://github.com/clay/claycli#touch)
+* [`lint`](https://github.com/clay/claycli#lint)
 * [`import`](https://github.com/clay/claycli#import)
 * [`export`](https://github.com/clay/claycli#export)
-* [`lint`](https://github.com/clay/claycli#lint)
-* [`create`](https://github.com/clay/claycli#create)
-* [`clone`](https://github.com/clay/claycli#clone)
-* `users` _(Coming Soon!)_
-* `log` _(Coming Soon!)_
 
-## Common Options
+## Common Arguments
 
-`claycli` uses some common options across many commands.
+`claycli` uses some common arguments across many commands.
 
-* `-v, --version` will print the `claycli` version and exit.
-* `-h, --help` will print helpful info about `claycli` and various commands.
-* `-V, --verbose` will print out helpful debugging messages as it runs commands.
-* `-s, --site` allows a site url, uri (no protocol or port), or alias to a site specified in your `.clayconfig`. If this argument is not provided, `claycli` will use the value of the `CLAY_DEFAULT_SITE` environment variable.
-* `-k, --key` allows an api key or an alias to a key specified in your `.clayconfig`. If this argument is not provided, `claycli` will use the value of the `CLAY_DEFAULT_KEY` environment variable.
-* `-f, --file` imports or exports from a JSON or YAML file, and will recursively parse a folder of said files. Note that this may be slow when run against large folders.
+* `-v, --version` will print the `claycli` version and exit
+* `-h, --help` will print helpful info about `claycli` and exit
+* `-r, --reporter` allows specifying how results should be logged
+* `-c, --concurrency` allows setting the concurrency of api calls (defaults to 10)
+* `-k, --key` allows specifying an api key or alias
+
+### Logging
+
+When running `claycli` programmatically (i.e., `import { someMethod } from 'claycli'`), most commands will return a stream of objects with `{ type, message, details }`. The `type` may be `success` (signalling that an operation succeeded), `error`, `warning`, `info`, or `debug`. As you can see, most of those correspond directly to log levels.
+
+When running `claycli` from the command line, you may specify a `reporter` argument to output logs in different formats. The default is `dots`, which will print out green and red dots showing operation success / failure. There is also `pretty` (which prints more detailed messages on each line), `json` (which prints newline-separated json logs in a format that can be passed to ELK), and `nyan` (which is mostly just for fun).
+
+```bash
+clay lint --reporter pretty domain.com/_components/article
+```
+
+You may also specify with reporter to use by setting the `CLAYCLI_REPORTER` environment variable. If you add a `reporter` argument, it will be used instead of the env variable.
+
+```bash
+export CLAYCLI_REPORTER=json
+```
+
+## Handling Files
+
+### Dispatch
+
+Many `claycli` commands allow you to pipe in the contents of files to `stdin` or pipe data out from `stdout`. The format that `claycli` uses to represent data (similar to a database dump) is called a _dispatch_, and it consists of newline-separated JSON without site prefixes.
+
+```
+{"/_components/article/instances/123":{"title":"My Article","content":[{"_ref":"/_components/paragraph/instances/234","text":"Four score and seven years ago..."}]}}
+{"/_components/meta-title/instances/345":{"title":"My Article","ogTitle":"My Longer Titled Article","twitterTitle":"Article"}}
+```
+
+Each line of a _dispatch_ contains [composed data for a component](https://github.com/clay/amphora/blob/master/lib/routes/readme.md#component-data) (or page, user, list, etc), including any data for its child components. This means that each line is able to be sent as a [cascading PUT](https://github.com/clay/amphora/pull/73) to the Clay server, which is a highly efficient way of importing large amounts of data. Note that a _dispatch_ is not meant to be human-readable, and manually editing it is a very easy way to introduce data errors.
+
+A _dispatch_ may be piped into or out of commands such as `clay import` and `clay export`. Because _dispatches_ are a special format (rather than regular JSON files), the convention is to use the `.clay` extension, but this isn't required.
+
+```bash
+clay export domain.com > article_dump.clay
+clay import domain.com < article_dump.clay
+clay export domain.com | clay import localhost
+```
+
+### Bootstrap
+
+For working with human-readable data, we use a format called a _bootstrap_. These are human-readable [yaml](http://docs.ansible.com/ansible/latest/YAMLSyntax.html) files that divide components (and pages, users, lists, etc) by type. [This is the same format that is used by the `bootstrap.yml` files in your Clay install](http://clay.github.io/amphora/docs/lifecycle/startup/bootstrap.html).
+
+```yaml
+_components:
+  article:
+    instances:
+      123:
+        title: My Article
+        content:
+          - _ref: /_components/paragraph/instances/234
+  paragraph:
+    instances:
+      234:
+        text: Four score and seven years ago...
+  meta-title:
+    instances:
+      345:
+        title: My Article
+        ogTitle: My Longer Titled Article
+        twitterTitle: Article
+```
+
+A _bootstrap_ may be piped into and out of any `claycli` commands that accept _dispatches_. To tell `claycli` that you're dealing with _bootstraps_, please use the `--yaml` argument.
+
+```bash
+clay export --yaml domain.com > article_dump.yml
+clay import --yaml domain.com < article_dump.yml
+```
+
+If you're a backend developer or database architect, it may be helpful to think of _dispatches_ and _bootstraps_ as [denormalized and normalized data](https://medium.com/@katedoesdev/normalized-vs-denormalized-databases-210e1d67927d). You'll notice that the two examples above contain the same data. The denormalized _dispatches_ allow a single API call per line and use less memory because they're streamable, while the normalized _bootstraps_ are better for hand-coding data because components are not duplicated if referenced multiple times. Generally speaking, use _dispatches_ for transporting and storing data and _bootstraps_ for hand-coding.
 
 ## Config
 
-```
-clay config (keys|sites|files).<alias> <value>
-```
-
-Show or set configuration options, specifying either `keys`, `sites`, or `files` with an alias and value. As noted above, sites can be specified as urls or uris (with no protocol or port, it'll assume `http` and port `80`).
-
-```
-clay config sites.foo # prints url for site 'foo'
-
-clay config keys.bar s8df7sd8 # sets apikey 'bar = s8df7sd8'
-
-clay config files.foo bar.yaml # sets file shortcut 'foo = <current directory>/bar.yaml'
+```bash
+clay config --key <alias> [value]
+clay config --url <alias> [value]
 ```
 
-## Touch
-
-```
-clay touch <component> [--site] [--dry-run]
-```
-
-Do GET requests against every instance of a specific component to trigger component upgrades.
-
-* `-n, --dry-run` will print the number of instances that'll be requested
-* otherwise, it will run GET requests against all instances of the specified component
-
-```
-clay touch domain.com/_components/article # GET all instances of 'article' on domain.com
-
-clay touch article -s my-site # GET all instances of 'article' on my site
-```
-
-## Import
-
-```
-clay import [--site, --file, --page, --component] [--key] [--users, --lists] [--limit, --offset, --query] <site>
-```
-
-Imports data into Clay. You can import from:
-
-* `stdin` (pipe to `clay import` from another cli tool, such as a 3rd party importer)
-* `-s, --site <site>` a Clay site
-* `-f, --file <path>` a YAML/JSON file (or directory of files)
-* `-c, --component <uri>` a specific component url
-* `--page <uri or url>` a specific page url
-
-You can specify the site to import into with the same syntax as the `--site` option, e.g. alias or url. If you don't specify a site to import into, it'll use the `CLAY_DEFAULT_SITE` environment variable. If you don't specify a `--key` to use, it'll use the `CLAY_DEFAULT_KEY` environment variable.
-
-When importing a `--site`, it will iterate through the most recently updated pages, importing each one. You can specify a `--limit` (defaults to 100) and `--offset` to import older or newer pages, or specity a `--query` pointing to a JSON/YAML file with an elasticsearch query. This query will be run against the built-in `pages` index in amphora.
-
-By default, importing a site will import the latest pages and publish them if necessary. If you add the `--lists` option, it will import the `new-pages` list (and the pages specified therein) and any other lists on the origin site. If you add the `--users` option, it will import users.
-
-If you specify a specific component or page url, `claycli` will import that item _and its child components_. It will not automatically publish an individually-imported page.
-
-Importing from file(s) will import everything in those files, including lists, uris, users, components, and pages.
-
-When writing importers that pipe to `claycli`, make sure you export your data in the form of `{ <uri minus site prefix>: data }`, e.g. `{ '/_components/foo': { a: 'b' }}`. Importing from `stdin` will parse newline/EOF-delineated streams of those objects.
-
-_Note that importing data may overwrite data on the site you're importing into!_
-
-```
-my-wordpress-to-clay-exporter | clay import # pipe from an importer to your CLAY_DEFAULT_SITE
-
-clay import -s my-prod-site my-local-site # import 100 latest pages from production to a local dev environment
-
-clay import -s stg.domain.com qa.domain.com -k qa # import from staging server to qa, providing the apikey for the qa server
-
-clay import -f path/to/bootstraps/ my-local-site # import from a directory of yaml files
-
-clay import -f ~/_users.yaml qa.domain.com/my-site -k qa # import users from a file into a qa server
-
-clay import -c domain.com/_components/article/instances/a8d6s # only import this specific article into your CLAY_DEFAULT_SITE
-
-clay import --page domain.com/_pages/g7d6f8 qa -k qa # import a specific page into a qa server
-
-clay import -s my-site -l 10 -o 100 my-local-site # import the latest 10 pages (offset by 100) into a local dev environment
-
-clay import -s my-site -l 0 -u other-site # import only users (no pages, components, or lists)
-```
-
-## Export
-
-```
-clay export [--site, --page, --component] [--users, --lists] [--limit, --offset, --query] [file]
-```
-
-Exports data from Clay. You can export from:
-
-* `-s, --site <site>` a Clay site
-* `-c, --component <uri>` a specific component url
-* `--page <uri or url>` a specific page url
-
-You can specify either a YAML or JSON file to export to (by typing e.g. `path/to/file.json`), or export to `stdout` (in the same format that importing from `stdin` uses). If you specify a file path but no extension, it will default to `.yml`.
-
-When exporting a `--site`, it will iterate through the most recently updated pages, exporting each one. You can specify a `--limit` (defaults to 100) and `--offset` to export older or newer pages, or specity a `--query` pointing to a JSON/YAML file with an elasticsearch query. This query will be run against the built-in `pages` index in amphora.
-
-By default, exporting a site will export the latest pages. If you add the `--lists` option, it will export the `new-pages` list (and the pages specified therein) and any other lists on the origin site. If you add the `--users` option, it will export users.
-
-If you specify a specific component or page url, `claycli` will export that item _and its child components_.
-
-_Note that exporting data may overwrite files!_
-
-```
-clay export -s my-site | my-clay-to-wordpress-importer  # pipe from a site into an external importer
-
-clay export -s my-prod-site # export 100 latest pages to stdout (good for sampling data)
-
-clay export -s my-site backup.json # export site to json
-
-clay export -s my-site ~/backups/my-site # export site to yaml
-
-clay export -s my-site -l 0 -u users.yaml # export only users
-
-clay export -c domain.com/_components/article/instances/a8d6s article.json # export specific article
-
-clay export --page domain.com/_pages/g7d6f8 | clay import local-site # roundabout way to import from Clay to Clay
-```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Exports data from Clay. You can export to a YAML/JSON file by specifying a file path (it'll default to YAML if no extension is specified), or `stdout` (useful for exporting Clay data into non-Clay systems, and for linting). You can specify the site to export from _or a specific page/component_. If you don't specify a site, page, or component to export from, it'll use the `CLAY_DEFAULT_SITE` environment variable. Exporting pages and components will also export their children.
-
-* `-n, --dry-run` will tell you the total number of components, pages, uris, and lists (but not users) that will be exported
-* normally, if you export to a file, it'll warn you if the file already exists
-* `--force` will suppress that warnings and overwrite the file
-* `-u, --users` will export users as well as other site data
-* `-l, --limit <number>` will limit a site export to the specified number of most recent pages
-
-```
-clay export # export CLAY_DEFAULT_SITE to stdout
-
-clay export -s my-prod-site path/to/backup.json # export site data to json file
-
-clay export -c domain.com/_components/article/instances/g76s8d path/to/article-backup.yml # export specific article to yaml
-
-clay export --page https://domain.com/2017-some-slug.html path/to/page-backup.yaml # export specific page (via public url) to yaml
-
-clay export --page domain.com/_pages/df6sf8 # export specific page (via page uri) to stdout
-
-clay export -s my-site -l 10 path/to/cool-ten-articles.json # export latest ten pages to json
-
-clay export # if no CLAY_DEFAULT_SITE is set, it'll interactively prompt for exporting
+Show or set configuration options. These are saved to `~/.clayconfig`. As specified above, sites will assume `http` and port `80` if you do not write the protocol and port.
+
+### Arguments
+
+* `-k, --key` allows viewing or saving an api key
+* `-u, --url` allows viewing or saving a url / site prefix
+* `-r, --reporter` allows specifying how results should be logged (note: all reporters except `json` report `clay config` the same)
+
+### Examples
+
+```bash
+clay config # view all configuration options
+clay config --key local # view 'local' api key
+clay config --key local ab27s9d # set 'local' api key
+clay config --url qa # view 'qa' site prefix
+clay config --url qa https://qa.domain.com:3001 # set 'qa' site prefix
+clay config --url my-cool-article domain.com/_components/article/instances/123 # set a specific url
 ```
 
 ## Lint
 
-```
-clay lint [<url> or --file] [--site] [--recursive]
-```
-
-Lints Clay data and schemas against standardized conventions. Specify either a url or a `--file` option.
-
-Linting against a component or page url (e.g. `domain.com/_components/article/instances/s8d7h`) will check to see if that component references other components which don't exist on that clay instance, and will check the data against that component's schema. It will print warnings if it sees either issue.
-
-Linting against a public url (if you specify the `--site` option) will check to see if that url exists in that site's `/_uris/`. You can recursively (`--recursive`) lint _all_ components in a component, page, or public url.
-
-Linting against a file or directory will do different things, depending on what path you specify:
-
-* `clay lint -f path/to/schema.yml` (or `schema.yaml`) will lint the schema, checking for `_description` and printing a warning if it is not defined (once component versioning is added to Clay, it will check for `_version` as well)
-* `clay lint -f path/to/some/other.yml` (or `*.yaml`, or `*.json`) will lint bootstrap data, checking to see if component references exist (similar to linting against a component url, but only looking at data in that bootstrap file)
-* `clay lint path/to/directory` will do both of these actions, checking for component references in _any_ of the bootstrap files
-* `-r, --recursive` will lint directories (or component urls) recursively
-
-```
-clay lint domain.com/_components/layout/instances/article # lint a component
-
-clay lint -f components/foo # lint the schema and bootstrap in a directory
-
-clay lint -f www/my-project -r # lint schemas and bootstraps recursively
-
-clay lint domain.com/_components/layout/instances/article -r # lint everything in the layout AND its children
+```bash
+clay lint [--concurrency <number>] [url]
 ```
 
-## Create
+Verify Clay data against standardized conventions and make sure all child components exist.
 
-```
-clay create component <component> [--dry-run, --force] [--description, --tag, --client, --model]
-```
+Linting a page, component, or user url will verify that the data for that url exists, and (for pages and components) will (recursively) verify that all references to child components exist. The url may be a raw url, an alias specified via `clay config`, or may be omitted in favor of `CLAYCLI_DEFAULT_URL`.
 
-```
-clay create site <site> [--dry-run, --force] [--name, --host, --path]
-```
+Instead of specifying a url, you may pipe in a component's `schema.yml` to lint. It will go through the schema and verify that it conforms to [Kiln's schema rules](https://claycms.gitbooks.io/kiln/editing-components.html).
 
-Interactively create components and sites. Most interactive options (`description`, `tag`, etc) can be passed in as cli options.
+### Arguments
 
-* `-n, --dry-run` will give info about the component or site that will be generated
-* normally, it will warn you if the component or site already exists
-* `--force` will suppress that warning and override the existing thing
+* `-r, --reporter` allows specifying how results should be logged
+* `-c, --concurrency` allows setting the concurrency of api calls
 
-For components, it will ask for description (which goes in the schema), html tag (defaults to `div`), and whether or not it should generate `client.js` and `model.js` files. Note: [Until `server.js` is fully removed from Amphora](https://github.com/nymag/amphora/tree/master/lib/routes#legacy-server-logic), it will generate passthrough `model.js` files regardless of what you specify.
+### Examples
 
-* `-d, --description, "<text>"` is a human-readable description for the component, which should be wrapped in quotes
-* `-t, --tag <tagname>` is the tag a component should use, or "layout" (for creating a layout) or "comment" (for creating head components)
-* `-c, --client` will create a `client.js` file in the component
-* `-m, --model` will create a `model.js` file in a component
-
-For sites, it will ask for a display name, host, and path. Specify an empty path (or `/`) for sites at the root of the specified domain/host. It will generate a site with `config.yml`, `bootstrap.yml`, and `index.js` files.
-
-* `-n, --name "<site name>"` is the human-readable display name of your site
-* `-h, --host <hostname>` is the domain/host it should run on
-* `--path <path>` is the path it should run on, if any
-
-## Clone
-
-```
-clay clone component <component> [--dry-run, --force] [--description]
+```bash
+clay lint domain.com/_pages/123 # lint all components on a page
+clay lint domain.com/2018/02/some-slug.html # lint a page via public url
+clay lint my-cool-article # lint a component specified via config alias
+clay lint < components/article/schema.yml # lint single schema
 ```
 
-```
-clay clone site <site> [--dry-run, --force] [--name, --host, --path]
+## Import
+
+```bash
+clay import [--key <api key>] [--concurrency <number>] [--publish] [--yaml] [site prefix]
 ```
 
-Cloning components and sites works similarly to creating them, though the `component` subcommand only allows `description`. It will copy _all_ files from the original component/site into the cloned one, and update references in the `template.hbs`, `schema.yml`, `bootstrap.yml`, and `styles.scss` if they exist. Note that you may need to manually update your `client.js` or `model.js` to re-enable component logic.
+Imports data into Clay from `stdin`. Data may be in _dispatch_ or _bootstrap_ format. Site prefix may be a raw url, an alias specified via `clay config`, or may be omitted in favor of `CLAYCLI_DEFAULT_URL`. Key may be an alias specified via `clay config`, or may be omitted in favor of `CLAYCLI_DEFAULT_KEY`.
+
+The `publish` argument will trigger a publish of the pages and / or components you're importing. Note that the generated url of an imported page might be different than its original url, depending on your Clay url generation / publishing logic.
+
+### Arguments
+
+* `-k, --key` allows specifying an api key or alias
+* `-r, --reporter` allows specifying how results should be logged
+* `-c, --concurrency` allows setting the concurrency of api calls
+* `-p, --publish` triggers publishing of imported pages
+* `-y, --yaml` specifies that input is _bootstrap_ format
+
+### Examples
+
+```bash
+clay import --key local localhost:3001 < db_dump.clay # import a dispatch
+clay import --key qa --publish --yaml < bootstrap.yml # import and publish pages in a bootstrap
+wordpress-export domain.com/blog | clay import --key local localhost.domain.com # pipe from 3rd party exporter
+clay export --key prod domain.com/_components/article/instances/123 | clay import --key local localhost.domain.com # pipe from clay exporter
+cat *.clay | clay import --key local localhost:3001 # import multiple dispatches
+tail -n +1 *.yml | clay import --key local --yaml localhost:3001 # import multiple bootstraps
+find . -name '*.yml' -exec cat "{}" \; | clay import --key local --yaml localhost:3001 # recursively import multiple bootstraps
+cat **/*.yml | clay import --key local --yaml localhost:3001 # recursively import multiple bootstraps (bash v4+ & zsh)
+```
+
+## Export
+
+```bash
+clay export [--key <api key>] [--concurrency <number>] [--size <number>] [--layout] [--yaml] [url]
+```
+
+Exports data from Clay to `stdout`. Data may be in _dispatch_ or _bootstrap_ format. The url may be a raw url, an alias specified via `clay config`, or may be omitted in favor of `CLAYCLI_DEFAULT_URL`.
+
+If the url does not point to a specific type of data (a page, public url, component, user, list, etc), `claycli` will query the built-in `pages` index to pull the latest 10 pages from the site. When querying the `pages` index, you must either specify a `key` or have the `CLAYCLI_DEFAULT_KEY` set. The api key is only required when exporting multiple pages (by querying the `pages` index).
+
+Instead of fetching the latest pages, you may pipe in a yaml-formatted [elasticsearch query](https://www.elastic.co/guide/en/elasticsearch/reference/current/_introducing_the_query_language.html). Use this to set custom offsets (for batching and chunking exports), export non-page content from other indices, or filter exported data via certain properties. Note that if you pipe in a query that includes `size`, it will take precedence over the CLI `size` argument.
+
+```yaml
+index: pages
+size: 100
+body:
+  sort:
+    updateTime:
+        order: desc # sort by latest updated
+  query:
+    bool:
+      must:
+        -
+          prefix:
+            uri: domain.com/site-path # show only pages for a specific site
+        -
+          match:
+            published: true # show only published pages
+
+```
+
+You may also query other elastic indices, but please make sure that each document returned has a clay uri (e.g. `domain.com/_components/foo/instances/bar` or `domain.com/_pages/foo`) as its `_id`.
+
+```yaml
+index: published-products
+size: 5
+from: 10
+sort:
+  - price
+body:
+  query:
+    match_all: {}
+```
+
+By default, layouts are not exported when exporting pages. This allows you to easily copy individual pages between sites and environments. To trigger layout exporting, please use the `layout` argument.
+
+### Arguments
+
+* `-k, --key` allows specifying an api key or alias
+* `-r, --reporter` allows specifying how results should be logged
+* `-c, --concurrency` allows setting the concurrency of api calls
+* `-s, --size` specifies the number of pages to export (defaults to 10)
+* `-l, --layout` triggers exporting of layouts
+* `-y, --yaml` specifies that output is _bootstrap_ format
+
+### Examples
+
+```bash
+clay export domain.com/_components/article/instances/123 > article_dump.clay # export individual component
+clay export --yaml domain.com/_pages/123 > page_bootstrap.yml # export individual page
+clay export --layout --yaml domain.com/_pages/123 > page_bootstrap.yml # export page with layout
+clay export domain.com/_pages/123 | clay import --key local local.domain.com # copy page to local environment
+clay export --key prod --size 1 domain.com > recent_page.clay # export latest updated page
+cat query.yml | clay export > db_dump.clay # export custom query to dispatch
+clay export --yaml < query.yml > pages.yml # export custom query to bootstrap
+
+# other things you may export
+
+clay export domain.com/_users/abs8a7s8d --yaml > my_user.yml # export single user
+clay export domain.com/_users --yaml > users.yml # export all users
+clay export domain.com/_lists/tags > tags.clay # export single list
+clay export domain.com/_lists > lists.clay # export all lists
+clay export domain.com/2017/02/some-slug.html # export published page via public url
+clay export domnain.com/_lists/new-pages # export built-in 'New Page Templates' list (page uris will be unprefixed)
+```
+
+# Contributing
+
+Pull requests and stars are always welcome. For bugs and feature requests, [please create an issue](https://github.com/clay/claycli/issues/new).
+
+This project is released under the [MIT license](https://github.com/clay/claycli/blob/master/LICENSE).
