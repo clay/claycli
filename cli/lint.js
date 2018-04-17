@@ -19,20 +19,9 @@ function builder(yargs) {
 function handler(argv) {
   const log = reporter.log(argv.reporter, 'lint');
 
-  if (argv.url) { // lint url
-    log('Linting url...');
-    return linter.lintUrl(argv.url)
-      .map(reporter.logAction(argv.reporter, 'lint'))
-      .toArray(reporter.logSummary(argv.reporter, 'lint', (successes, errors) => {
-        if (errors) {
-          return { success: false, message: `Missing ${pluralize('reference', errors, true)}`};
-        } else {
-          return { success: true, message: `All references exist! (checked ${pluralize('uri', successes, true)})` };
-        }
-      }));
-  } else { // lint schema from stdin
-    log('Linting schema...');
-    return getStdin().then((str) => {
+  return getStdin().then((str) => {
+    if (str) { // lint schema from stdin
+      log('Linting schema...');
       return linter.lintSchema(str)
         // no dot logging of individual schema linting, since it's just a single dot
         .toArray(reporter.logSummary(argv.reporter, 'lint', (successes, errors) => {
@@ -42,8 +31,19 @@ function handler(argv) {
             return { success: true, message: 'Schema has no issues' };
           }
         }));
-    });
-  }
+    } else { // lint url
+      log('Linting url...');
+      return linter.lintUrl(argv.url)
+        .map(reporter.logAction(argv.reporter, 'lint'))
+        .toArray(reporter.logSummary(argv.reporter, 'lint', (successes, errors) => {
+          if (errors) {
+            return { success: false, message: `Missing ${pluralize('reference', errors, true)}`};
+          } else {
+            return { success: true, message: `All references exist! (checked ${pluralize('uri', successes, true)})` };
+          }
+        }));
+    }
+  });
 }
 
 module.exports = {
