@@ -44,6 +44,10 @@ function handler(argv) {
   let url = config.get('url', argv.url),
     isElasticPrefix, stream;
 
+  if (!url) {
+    fatalError({ url: 'URL is not defined!', message: 'Please specify a url to export from'}, argv);
+  }
+
   log('Exporting items...');
   stream = rest.isElasticPrefix(url).flatMap((isPrefix) => {
     isElasticPrefix = isPrefix;
