@@ -64,7 +64,7 @@ You may also specify with reporter to use by setting the `CLAYCLI_REPORTER` envi
 export CLAYCLI_REPORTER=json
 ```
 
-`claycli` pipes to `stderr`.
+`claycli` pipes to `stderr`. If you want to pipe the logs to a file or another command, you may use `2>`.
 
 ```bash
 `clay lint --reporter json domain.com/_components/article 2> article-log.json`
