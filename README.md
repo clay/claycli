@@ -158,9 +158,9 @@ clay lint [--concurrency <number>] [url]
 
 Verify Clay data against standardized conventions and make sure all child components exist.
 
-Linting a page, component, or user url will verify that the data for that url exists, and (for pages and components) will (recursively) verify that all references to child components exist. The url may be a raw url, an alias specified via `clay config`, or may be omitted in favor of `CLAYCLI_DEFAULT_URL`.
+Linting a page, component, or user url will verify that the data for that url exists, and (for pages and components) will (recursively) verify that all references to child components exist. The url must be a raw url, an alias specified via `clay config`, or omitted in favor of `CLAYCLI_DEFAULT_URL`.
 
-Instead of specifying a url, you may pipe in a component's `schema.yml` to lint. It will go through the schema and verify that it conforms to [Kiln's schema rules](https://claycms.gitbooks.io/kiln/editing-components.html).
+Instead of linting a url, you may pipe in a component's `schema.yml` to lint. It will go through the schema and verify that it conforms to [Kiln's schema rules](https://claycms.gitbooks.io/kiln/editing-components.html).
 
 ### Arguments
 
@@ -182,7 +182,7 @@ clay lint < components/article/schema.yml # lint single schema
 clay import [--key <api key>] [--concurrency <number>] [--publish] [--yaml] [site prefix]
 ```
 
-Imports data into Clay from `stdin`. Data may be in _dispatch_ or _bootstrap_ format. Site prefix may be a raw url, an alias specified via `clay config`, or may be omitted in favor of `CLAYCLI_DEFAULT_URL`. Key may be an alias specified via `clay config`, or may be omitted in favor of `CLAYCLI_DEFAULT_KEY`.
+Imports data into Clay from `stdin`. Data may be in _dispatch_ or _bootstrap_ format. Site prefix must be a raw url, an alias specified via `clay config`, or omitted in favor of `CLAYCLI_DEFAULT_URL`. Key must be an alias specified via `clay config`, or omitted in favor of `CLAYCLI_DEFAULT_KEY`.
 
 The `publish` argument will trigger a publish of the pages and / or components you're importing. Note that the generated url of an imported page might be different than its original url, depending on your Clay url generation / publishing logic.
 
@@ -213,9 +213,9 @@ cat **/*.yml | clay import --key local --yaml localhost:3001 # recursively impor
 clay export [--key <api key>] [--concurrency <number>] [--size <number>] [--layout] [--yaml] [url]
 ```
 
-Exports data from Clay to `stdout`. Data may be in _dispatch_ or _bootstrap_ format. The url may be a raw url, an alias specified via `clay config`, or may be omitted in favor of `CLAYCLI_DEFAULT_URL`.
+Exports data from Clay to `stdout`. Data may be in _dispatch_ or _bootstrap_ format. The url must be a raw url, an alias specified via `clay config`, or omitted in favor of `CLAYCLI_DEFAULT_URL`.
 
-If the url does not point to a specific type of data (a page, public url, component, user, list, etc), `claycli` will query the built-in `pages` index to pull the latest 10 pages from the site. When querying the `pages` index, you must either specify a `key` or have the `CLAYCLI_DEFAULT_KEY` set. The api key is only required when exporting multiple pages (by querying the `pages` index).
+If the url points to a site prefix (i.e. it does not point to a specific type of data (a specific page, public url, component, user, list, etc)), `claycli` will query the built-in `pages` index to pull the latest 10 pages from the site. When querying the `pages` index, you must specify a `key` or have the `CLAYCLI_DEFAULT_KEY` set. The api key is only required when exporting multiple pages (by querying the `pages` index or by running custom queries, below).
 
 Instead of fetching the latest pages, you may pipe in a yaml-formatted [elasticsearch query](https://www.elastic.co/guide/en/elasticsearch/reference/current/_introducing_the_query_language.html). Use this to set custom offsets (for batching and chunking exports), export non-page content from other indices, or filter exported data via certain properties. Note that if you pipe in a query that includes `size`, it will take precedence over the CLI `size` argument.
 
@@ -270,8 +270,11 @@ clay export --yaml domain.com/_pages/123 > page_bootstrap.yml # export individua
 clay export --layout --yaml domain.com/_pages/123 > page_bootstrap.yml # export page with layout
 clay export domain.com/_pages/123 | clay import --key local local.domain.com # copy page to local environment
 clay export --key prod --size 1 domain.com > recent_page.clay # export latest updated page
-cat query.yml | clay export > db_dump.clay # export custom query to dispatch
-clay export --yaml < query.yml > pages.yml # export custom query to bootstrap
+cat query.yml | clay export --key prod domain.com > db_dump.clay # export custom query to dispatch
+clay export --yaml --key prod domain.com/sub-site < query.yml > pages.yml # export custom query to bootstrap
+
+# note that 'cat query.yml | clay export' and 'clay export < query.yml' are equivalent ways
+# to pipe from a file into claycli in most operating systems
 
 # other things you may export
 
