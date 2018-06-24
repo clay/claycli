@@ -58,7 +58,7 @@ When running `claycli` from the command line, you may specify a `reporter` argum
 clay lint --reporter pretty domain.com/_components/article
 ```
 
-You may also specify with reporter to use by setting the `CLAYCLI_REPORTER` environment variable. If you add a `reporter` argument, it will be used instead of the env variable.
+You may also specify which reporter to use by setting the `CLAYCLI_REPORTER` environment variable. If you add a `reporter` argument, it will be used instead of the env variable.
 
 ```bash
 export CLAYCLI_REPORTER=json
