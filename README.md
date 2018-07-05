@@ -158,7 +158,7 @@ clay lint [--concurrency <number>] [url]
 
 Verify Clay data against standardized conventions and make sure all child components exist.
 
-Linting a page, component, or user url will verify that the data for that url exists, and (for pages and components) will (recursively) verify that all references to child components exist. The url must be a raw url, an alias specified via `clay config`, or omitted in favor of `CLAYCLI_DEFAULT_URL`.
+Linting a page, component, or user url will verify that the data for that url exists, and (for pages and components) will (recursively) verify that all references to child components exist. The url must be a raw url, an alias specified via `clay config`, or omitted in favor of `CLAYCLI_DEFAULT_URL`. Linting a public url (or a page/component url that has a `.html` extension) will attempt to render that url with the extension and, if that fails, try to figure out which component isn't rendering correctly. You may lint other renderers by providing their extensions, e.g. `.amp` or `.rss`.
 
 Instead of linting a url, you may pipe in a component's `schema.yml` to lint. It will go through the schema and verify that it conforms to [Kiln's schema rules](https://claycms.gitbooks.io/kiln/editing-components.html).
 
@@ -172,6 +172,7 @@ Instead of linting a url, you may pipe in a component's `schema.yml` to lint. It
 ```bash
 clay lint domain.com/_pages/123 # lint all components on a page
 clay lint domain.com/2018/02/some-slug.html # lint a page via public url
+clay lint domain.com/_components/article/instances/abc.html # lint a component and its html
 clay lint my-cool-article # lint a component specified via config alias
 clay lint < components/article/schema.yml # lint single schema
 ```
