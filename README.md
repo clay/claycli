@@ -287,6 +287,33 @@ clay export domain.com/2017/02/some-slug.html # export published page via public
 clay export domnain.com/_lists/new-pages # export built-in 'New Page Templates' list (page uris will be unprefixed)
 ```
 
+# Programmatic API
+
+The core `claycli` functionality is exposed as an api, allowing you to use it in Node.js.
+
+**Config**
+
+* `config.get(type, alias)` - get `key` or `url` from config
+* `config.getAll()` - get full config object
+* `config.set(type, alias, value)` - set `key` or `url` in config
+
+**Lint**
+
+* `lint.lintUrl(url, { concurrency })` - lint a url
+* `lint.lintSchema(yaml)` - lint a schema (passed in as a string of yaml)
+
+**Import**
+
+* `import(string, url, { key, concurrency, publish, yaml })` - import a string of dispatches or bootstraps to the specified (site prefix) url
+* `import.parseBootstrap(string, url)` - parse a string of bootstrap data into a stream of prefixed dispatches. note: does NOT do http calls
+* `import.parseDispatch(string, url)` - parse a string of dispatches into a stream of prefixed dispatches. note: does NOT do http calls
+
+**Export**
+
+* `export.fromURL(url, { concurrency, layout, yaml })` - export a single url, e.g. `domain.com/_components/foo` or `domain.com/_pages`
+* `export.fromQuery(url, query, { key, concurrency, layout, yaml, size })` - export the results of a query (passed in as a string of yaml)
+* `export.clearLayouts()` - clear the layouts cache. when exporting pages with layouts, they'll be cached so they don't need to be exported for every page
+
 # Contributing
 
 Pull requests and stars are always welcome. For bugs and feature requests, [please create an issue](https://github.com/clay/claycli/issues/new).
