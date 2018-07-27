@@ -39,7 +39,7 @@ module.exports = {
     type: 'boolean'
   },
   layout: {
-    alias: 'layout', // -l, --layout
+    alias: 'layout', // -l, --layout (note: -l is also used when compiling fonts)
     describe: 'export layout when exporting page(s)',
     type: 'boolean'
   },
@@ -47,5 +47,27 @@ module.exports = {
     alias: 'yaml', // -y, --yaml
     describe: 'parse bootstrap format',
     type: 'boolean'
+  },
+  // compilation options
+  minify: {
+    alias: 'minify', // -m, --minify
+    describe: 'run through minification',
+    type: 'boolean'
+  },
+  watch: {
+    alias: 'watch', // -w, --watch
+    describe: 'watch files and recompile on changes',
+    type: 'boolean'
+  },
+  inlined: {
+    alias: 'inlined', // -i, --inlined
+    describe: 'compile base64 inlined fonts',
+    type: 'boolean'
+  },
+  linked: {
+    alias: 'linked', // -l, --linked (note: -l is also used when exporting layouts)
+    describe: 'compile linked fonts',
+    type: 'boolean',
+    default: undefined // will be undefined if unset
   }
 };
