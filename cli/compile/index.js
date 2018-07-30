@@ -6,6 +6,7 @@ function builder(yargs) {
   return yargs
     .usage('Usage: $0 compile [asset type]')
     .command(require('./fonts'))
+    .command(require('./media'))
     .example('$0 compile', 'compile all assets')
     .example('$0 compile --watch', 'compile and watch all assets')
     .option('w', options.watch)
