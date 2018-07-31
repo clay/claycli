@@ -34,7 +34,7 @@ module.exports = {
     requiresArg: true
   },
   publish: {
-    alias: 'publish', // -p, --publish
+    alias: 'publish', // -p, --publish (note: -p is also used when compiling css with plugins)
     describe: 'publish items when importing',
     type: 'boolean'
   },
@@ -69,5 +69,10 @@ module.exports = {
     describe: 'compile linked fonts',
     type: 'boolean',
     default: undefined // will be undefined if unset
+  },
+  plugins: {
+    alias: 'plugins', // -p, --plugins (note: -p is also used when publishing imports)
+    describe: 'space-separated list of postcss plugins',
+    type: 'array'
   }
 };
