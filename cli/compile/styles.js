@@ -24,7 +24,7 @@ function handler(argv) {
       try {
         return require(pluginName)();
       } catch (e) {
-        console.error(chalk.red(e.message));
+        console.error(`${chalk.red('Error: Cannot init plugin "' + pluginName + '"')}\n${chalk.grey(e.message)}`);
       }
     }),
     compiled = compile.styles({
