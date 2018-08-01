@@ -1,7 +1,5 @@
 'use strict';
-const _ = require('lodash'),
-  chalk = require('chalk'),
-  pluralize = require('pluralize'),
+const pluralize = require('pluralize'),
   compile = require('../../lib/cmd/compile'),
   options = require('../cli-options'),
   reporter = require('../../lib/reporters'),
@@ -44,11 +42,7 @@ function handler(argv) {
       })(results);
 
       if (compiled.watch) {
-        compiled.watch.on('raw', (e, filepath) => {
-          if (!_.includes(filepath, '.DS_Store')) {
-            console.log(chalk.green('✓ ') + chalk.grey(filepath.replace(process.cwd(), '')));
-          }
-        });
+        compiled.watch.on('raw', helpers.debouncedWatcher);
       }
     });
 }
@@ -56,7 +50,6 @@ function handler(argv) {
 module.exports = {
   command: 'fonts',
   describe: 'Compile fonts',
-  aliases: ['f'],
   builder,
   handler
 };

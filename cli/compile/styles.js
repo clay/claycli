@@ -39,7 +39,7 @@ function handler(argv) {
       const t2 = Date.now();
 
       reporter.logSummary(argv.reporter, 'styles', (successes) => {
-        let message = `Compiled ${argv.minify ? 'and minified ' : '' }${pluralize('file', successes, true)} in ${helpers.time(t2, t1)}`;
+        let message = `Compiled ${argv.minify ? 'and minified ' : '' }${pluralize('css file', successes, true)} in ${helpers.time(t2, t1)}`;
 
         if (compiled.watch) {
           message += '\nWatching for changes...';
@@ -48,11 +48,7 @@ function handler(argv) {
       })(results);
 
       if (compiled.watch) {
-        compiled.watch.on('raw', (e, filepath) => {
-          if (!_.includes(filepath, '.DS_Store')) {
-            console.log(chalk.green('✓ ') + chalk.grey(filepath.replace(process.cwd(), '')));
-          }
-        });
+        compiled.watch.on('raw', helpers.debouncedWatcher);
       }
     });
 }
@@ -60,7 +56,6 @@ function handler(argv) {
 module.exports = {
   command: 'styles',
   describe: 'Compile styles',
-  aliases: ['f'],
   builder,
   handler
 };

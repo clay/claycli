@@ -7,24 +7,28 @@ const pluralize = require('pluralize'),
 
 function builder(yargs) {
   return yargs
-    .usage('Usage: $0 media')
-    .example('$0 media', 'compile component, layout, and styleguide media files')
-    .example('$0 media --watch', 'compile and watch media files')
+    .usage('Usage: $0 templates')
+    .example('$0 templates', 'compile handlebars templates')
+    .example('$0 templates --watch', 'compile and watch handlebars templates')
     .option('w', options.watch)
+    .option('m', options.minify)
     .option('r', options.reporter);
 }
 
 function handler(argv) {
   const t1 = Date.now(),
-    compiled = compile.media({ watch: argv.watch });
+    compiled = compile.templates({
+      watch: argv.watch,
+      minify: argv.minify
+    });
 
   return compiled.build
-    .map(reporter.logAction(argv.reporter, 'media'))
+    .map(reporter.logAction(argv.reporter, 'templates'))
     .toArray((results) => {
       const t2 = Date.now();
 
-      reporter.logSummary(argv.reporter, 'media', (successes) => {
-        let message = `Compiled ${pluralize('file', successes, true)} in ${helpers.time(t2, t1)}`;
+      reporter.logSummary(argv.reporter, 'templates', (successes) => {
+        let message = `Compiled ${argv.minify ? 'and minified ' : '' }${pluralize('template', successes, true)} in ${helpers.time(t2, t1)}`;
 
         if (compiled.watch) {
           message += '\nWatching for changes...';
@@ -39,8 +43,8 @@ function handler(argv) {
 }
 
 module.exports = {
-  command: 'media',
-  describe: 'Compile media',
+  command: 'templates',
+  describe: 'Compile templates',
   builder,
   handler
 };

@@ -56,10 +56,12 @@
     "base-64": "^0.1.0",
     "chalk": "^2.3.2",
     "clay-log": "^1.3.0",
+    "clayhandlebars": "^3.2.3",
     "clayutils": "^2.5.0",
     "date-fns": "^1.29.0",
     "dependency-tree": "^6.1.1",
     "detective-postcss": "^2.1.2",
+    "escape-quotes": "^1.0.2",
     "event-stream": "^3.3.4",
     "fs-extra": "^7.0.0",
     "get-stdin": "^5.0.1",
@@ -85,6 +87,7 @@
     "split-lines": "^1.1.0",
     "string-replace-async": "^1.2.1",
     "terminal-logger": "^0.2.3",
+    "uglify-js": "^3.4.6",
     "update-notifier": "^2.3.0",
     "yargs": "^11.0.0"
   }

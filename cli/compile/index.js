@@ -14,6 +14,7 @@ function builder(yargs) {
     .command(require('./fonts'))
     .command(require('./media'))
     .command(require('./styles'))
+    .command(require('./templates'))
     .example('$0 compile', 'compile all assets')
     .example('$0 compile --watch', 'compile and watch all assets')
     .option('w', options.watch)
@@ -47,12 +48,15 @@ function handler(argv) {
       watch: argv.watch,
       minify: argv.minify,
       plugins
-    });
-
-  tasks = [fonts, media, styles],
-  builders = _.map(tasks, (task) => task.build),
-  watchers = _.map(tasks, (task) => task.watch),
-  isWatching = !!watchers[0];
+    }),
+    templates = compile.templates({
+      watch: argv.watch,
+      minify: argv.minify
+    }),
+    tasks = [fonts, media, styles, templates],
+    builders = _.map(tasks, (task) => task.build),
+    watchers = _.map(tasks, (task) => task.watch),
+    isWatching = !!watchers[0];
 
   return h(builders)
     .merge()
@@ -61,7 +65,7 @@ function handler(argv) {
       const t2 = Date.now();
 
       reporter.logSummary(argv.reporter, 'compile', (successes) => {
-        let message = `Compiled ${pluralize('file', successes, true)} in ${helpers.time(t2, t1)}`;
+        let message = `Compiled ${argv.minify ? 'and minified ' : '' }${pluralize('file', successes, true)} in ${helpers.time(t2, t1)}`;
 
         if (isWatching) {
           message += '\nWatching for changes...';
@@ -71,11 +75,7 @@ function handler(argv) {
 
       if (isWatching) {
         _.each(watchers, (watcher) => {
-          watcher.on('raw', (e, filepath) => {
-            if (!_.includes(filepath, '.DS_Store')) {
-              console.log(chalk.green('✓ ') + chalk.grey(filepath.replace(process.cwd(), '')));
-            }
-          });
+          watcher.on('raw', helpers.debouncedWatcher);
         });
       }
     });
