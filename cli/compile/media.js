@@ -23,15 +23,10 @@ function handler(argv) {
   return compiled.build
     .map(reporter.logAction(argv.reporter, 'media'))
     .toArray((results) => {
-      const compiledFiles = _.map(_.filter(results, (result) => result.type === 'success'), (result) => result.message),
-        t2 = Date.now();
+      const t2 = Date.now();
 
       reporter.logSummary(argv.reporter, 'media', (successes) => {
         let message = `Compiled ${pluralize('file', successes, true)} in ${helpers.time(t2, t1)}`;
-
-        if (successes) {
-          message += `\n${chalk.gray(compiledFiles.join('\n'))}`;
-        }
 
         if (compiled.watch) {
           message += '\nWatching for changes...';

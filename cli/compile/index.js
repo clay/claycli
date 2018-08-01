@@ -21,12 +21,21 @@ function builder(yargs) {
     // font-specific options
     .option('i', options.inlined)
     .option('l', options.linked)
+    // style-specific options
+    .option('p', options.plugins)
     // reporter option
     .option('r', options.reporter);
 }
 
 function handler(argv) {
   const t1 = Date.now(),
+    plugins = _.map(argv.plugins, (pluginName) => {
+      try {
+        return require(pluginName)();
+      } catch (e) {
+        console.error(`${chalk.red('Error: Cannot init plugin "' + pluginName + '"')}\n${chalk.grey(e.message)}`);
+      }
+    }),
     fonts = compile.fonts({
       watch: argv.watch,
       minify: argv.minify,
@@ -34,10 +43,16 @@ function handler(argv) {
       linked: argv.linked
     }),
     media = compile.media({ watch: argv.watch }),
-    tasks = [fonts, media],
-    builders = _.map(tasks, (task) => task.build),
-    watchers = _.map(tasks, (task) => task.watch),
-    isWatching = !!watchers[0];
+    styles = compile.styles({
+      watch: argv.watch,
+      minify: argv.minify,
+      plugins
+    });
+
+  tasks = [fonts, media, styles],
+  builders = _.map(tasks, (task) => task.build),
+  watchers = _.map(tasks, (task) => task.watch),
+  isWatching = !!watchers[0];
 
   return h(builders)
     .merge()
