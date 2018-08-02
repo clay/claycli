@@ -8,7 +8,7 @@ const pluralize = require('pluralize'),
 function builder(yargs) {
   return yargs
     .usage('Usage: $0 media')
-    .example('$0 media', 'compile component, layout, and styleguide media files')
+    .example('$0 media', 'compile media files')
     .example('$0 media --watch', 'compile and watch media files')
     .option('w', options.watch)
     .option('r', options.reporter);
@@ -40,7 +40,7 @@ function handler(argv) {
 
 module.exports = {
   command: 'media',
-  describe: 'Compile media',
+  describe: 'Compile component, layout, styleguide, and site media files',
   builder,
   handler
 };
