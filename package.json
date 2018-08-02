@@ -69,6 +69,7 @@
     "gulp-changed": "^3.2.0",
     "gulp-concat": "^2.6.1",
     "gulp-cssmin": "^0.2.0",
+    "gulp-group-concat": "^1.1.6",
     "gulp-if": "^2.0.2",
     "gulp-newer": "git+https://github.com/nelsonpecora/gulp-newer.git",
     "gulp-postcss": "^7.0.1",
