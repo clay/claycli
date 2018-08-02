@@ -37,48 +37,50 @@ function handler(argv) {
         console.error(`${chalk.red('Error: Cannot init plugin "' + pluginName + '"')}\n${chalk.grey(e.message)}`);
       }
     }),
-    fonts = compile.fonts({
-      watch: argv.watch,
-      minify: argv.minify,
-      inlined: argv.inlined,
-      linked: argv.linked
-    }),
-    media = compile.media({ watch: argv.watch }),
-    styles = compile.styles({
-      watch: argv.watch,
-      minify: argv.minify,
-      plugins
-    }),
-    templates = compile.templates({
-      watch: argv.watch,
-      minify: argv.minify
-    }),
-    tasks = [fonts, media, styles, templates],
-    builders = _.map(tasks, (task) => task.build),
-    watchers = _.map(tasks, (task) => task.watch),
-    isWatching = !!watchers[0];
+    media = compile.media({ watch: argv.watch }); // run media task before others (specifically, templates)
 
-  return h(builders)
-    .merge()
-    .map(reporter.logAction(argv.reporter, 'compile'))
-    .toArray((results) => {
-      const t2 = Date.now();
+  return h(media.build).collect().toArray((mediaResults) => {
+    const fonts = compile.fonts({
+        watch: argv.watch,
+        minify: argv.minify,
+        inlined: argv.inlined,
+        linked: argv.linked
+      }),
+      styles = compile.styles({
+        watch: argv.watch,
+        minify: argv.minify,
+        plugins
+      }),
+      templates = compile.templates({
+        watch: argv.watch,
+        minify: argv.minify
+      }),
+      tasks = [fonts, media, styles, templates],
+      watchers = _.map(tasks, (task) => task.watch).concat([media.watch]),
+      isWatching = !!watchers[0];
 
-      reporter.logSummary(argv.reporter, 'compile', (successes) => {
-        let message = `Compiled ${argv.minify ? 'and minified ' : '' }${pluralize('file', successes, true)} in ${helpers.time(t2, t1)}`;
+    return h([h.of(mediaResults), fonts.build, styles.build, templates.build])
+      .merge()
+      .map(reporter.logAction(argv.reporter, 'compile'))
+      .toArray((results) => {
+        const t2 = Date.now();
+
+        reporter.logSummary(argv.reporter, 'compile', (successes) => {
+          let message = `Compiled ${argv.minify ? 'and minified ' : '' }${pluralize('file', successes, true)} in ${helpers.time(t2, t1)}`;
+
+          if (isWatching) {
+            message += '\nWatching for changes...';
+          }
+          return { success: true, message };
+        })(results);
 
         if (isWatching) {
-          message += '\nWatching for changes...';
+          _.each(watchers, (watcher) => {
+            watcher.on('raw', helpers.debouncedWatcher);
+          });
         }
-        return { success: true, message };
-      })(results);
-
-      if (isWatching) {
-        _.each(watchers, (watcher) => {
-          watcher.on('raw', helpers.debouncedWatcher);
-        });
-      }
-    });
+      });
+  });
 }
 
 module.exports = {
