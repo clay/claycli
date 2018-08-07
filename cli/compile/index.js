@@ -15,6 +15,7 @@ function builder(yargs) {
     .command(require('./media'))
     .command(require('./styles'))
     .command(require('./templates'))
+    .command(require('./scripts'))
     .example('$0 compile', 'compile all assets')
     .example('$0 compile --watch', 'compile and watch all assets')
     .option('w', options.watch)
@@ -55,11 +56,16 @@ function handler(argv) {
         watch: argv.watch,
         minify: argv.minify
       }),
-      tasks = [fonts, media, styles, templates],
+      scripts = compile.scripts({
+        watch: argv.watch,
+        minify: argv.minify
+      }),
+      tasks = [fonts, media, styles, templates, scripts],
+      builders = _.map(tasks, (task) => task.build),
       watchers = _.map(tasks, (task) => task.watch).concat([media.watch]),
       isWatching = !!watchers[0];
 
-    return h([h.of(mediaResults), fonts.build, styles.build, templates.build])
+    return h([h.of(mediaResults)].concat(builders))
       .merge()
       .map(reporter.logAction(argv.reporter, 'compile'))
       .toArray((results) => {

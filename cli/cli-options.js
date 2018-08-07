@@ -74,5 +74,10 @@ module.exports = {
     alias: 'plugins', // -p, --plugins (note: -p is also used when publishing imports)
     describe: 'space-separated list of postcss plugins',
     type: 'array'
+  },
+  globs: {
+    alias: 'globs', // -g, --globs
+    describe: 'globbing patterns of legacy js to compile to _global.js',
+    type: 'array'
   }
 };
