@@ -142,12 +142,23 @@ Show or set configuration options. These are saved to `~/.clayconfig`. As specif
 ### Examples
 
 ```bash
-clay config # view all configuration options
-clay config --key local # view 'local' api key
-clay config --key local ab27s9d # set 'local' api key
-clay config --url qa # view 'qa' site prefix
-clay config --url qa https://qa.domain.com:3001 # set 'qa' site prefix
-clay config --url my-cool-article domain.com/_components/article/instances/123 # set a specific url
+# view all configuration options
+clay config
+
+# view 'local' api key
+clay config --key local
+
+# set 'local' api key
+clay config --key local ab27s9d
+
+# view 'qa' site prefix
+clay config --url qa
+
+# set 'qa' site prefix
+clay config --url qa https://qa.domain.com:3001
+
+# set a specific url
+clay config --url my-cool-article domain.com/_components/article/instances/123
 ```
 
 ## Lint
@@ -170,11 +181,20 @@ Instead of linting a url, you may pipe in a component's `schema.yml` to lint. It
 ### Examples
 
 ```bash
-clay lint domain.com/_pages/123 # lint all components on a page
-clay lint domain.com/2018/02/some-slug.html # lint a page via public url
-clay lint domain.com/_components/article/instances/abc.html # lint a component and its html
-clay lint my-cool-article # lint a component specified via config alias
-clay lint < components/article/schema.yml # lint single schema
+# lint all components on a page
+clay lint domain.com/_pages/123
+
+# lint a page via public url
+clay lint domain.com/2018/02/some-slug.html
+
+# lint a component and its html
+clay lint domain.com/_components/article/instances/abc.html
+
+# lint a component specified via config alias
+clay lint my-cool-article
+
+# lint single schema
+clay lint < components/article/schema.yml
 ```
 
 ## Import
@@ -198,14 +218,29 @@ The `publish` argument will trigger a publish of the pages and / or components y
 ### Examples
 
 ```bash
-clay import --key local localhost:3001 < db_dump.clay # import a dispatch
-clay import --key qa --publish --yaml < bootstrap.yml # import and publish pages in a bootstrap
-wordpress-export domain.com/blog | clay import --key local localhost.domain.com # pipe from 3rd party exporter
-clay export --key prod domain.com/_components/article/instances/123 | clay import --key local localhost.domain.com # pipe from clay exporter
-cat *.clay | clay import --key local localhost:3001 # import multiple dispatches
-tail -n +1 *.yml | clay import --key local --yaml localhost:3001 # import multiple bootstraps
-find . -name '*.yml' -exec cat "{}" \; | clay import --key local --yaml localhost:3001 # recursively import multiple bootstraps
-cat **/*.yml | clay import --key local --yaml localhost:3001 # recursively import multiple bootstraps (bash v4+ & zsh)
+# import a dispatch
+clay import --key local localhost:3001 < db_dump.clay
+
+# import and publish pages in a bootstrap
+clay import --key qa --publish --yaml < bootstrap.yml
+
+# pipe from 3rd party exporter
+wordpress-export domain.com/blog | clay import --key local localhost.domain.com
+
+# pipe from clay exporter
+clay export --key prod domain.com/_components/article/instances/123 | clay import --key local localhost.domain.com 
+
+# import multiple dispatches
+cat *.clay | clay import --key local localhost:3001
+
+# import multiple bootstraps
+tail -n +1 *.yml | clay import --key local --yaml localhost:3001
+
+# recursively import multiple bootstraps
+find . -name '*.yml' -exec cat "{}" \; | clay import --key local --yaml localhost:3001
+
+# recursively import multiple bootstraps (bash v4+ & zsh)
+cat **/*.yml | clay import --key local --yaml localhost:3001 
 ```
 
 ## Export
@@ -266,53 +301,91 @@ By default, layouts are not exported when exporting pages. This allows you to ea
 ### Examples
 
 ```bash
-clay export domain.com/_components/article/instances/123 > article_dump.clay # export individual component
-clay export --yaml domain.com/_pages/123 > page_bootstrap.yml # export individual page
-clay export --layout --yaml domain.com/_pages/123 > page_bootstrap.yml # export page with layout
-clay export domain.com/_pages/123 | clay import --key local local.domain.com # copy page to local environment
-clay export --key prod --size 1 domain.com > recent_page.clay # export latest updated page
-cat query.yml | clay export --key prod domain.com > db_dump.clay # export custom query to dispatch
-clay export --yaml --key prod domain.com/sub-site < query.yml > pages.yml # export custom query to bootstrap
+# export individual component
+clay export domain.com/_components/article/instances/123 > article_dump.clay
+
+# export individual page
+clay export --yaml domain.com/_pages/123 > page_bootstrap.yml
+
+# export page with layout
+clay export --layout --yaml domain.com/_pages/123 > page_bootstrap.yml 
+
+# copy page to local environment
+clay export domain.com/_pages/123 | clay import --key local local.domain.com
+
+# export latest updated page
+clay export --key prod --size 1 domain.com > recent_page.clay
+
+# export custom query to dispatch
+cat query.yml | clay export --key prod domain.com > db_dump.clay
+
+# export custom query to bootstrap
+clay export --yaml --key prod domain.com/sub-site < query.yml > pages.yml
 
 # note that 'cat query.yml | clay export' and 'clay export < query.yml' are equivalent ways
 # to pipe from a file into claycli in most operating systems
 
+#
 # other things you may export
+#
 
-clay export domain.com/_users/abs8a7s8d --yaml > my_user.yml # export single user
-clay export domain.com/_users --yaml > users.yml # export all users
-clay export domain.com/_lists/tags > tags.clay # export single list
-clay export domain.com/_lists > lists.clay # export all lists
-clay export domain.com/2017/02/some-slug.html # export published page via public url
-clay export domnain.com/_lists/new-pages # export built-in 'New Page Templates' list (page uris will be unprefixed)
+# export single user
+clay export domain.com/_users/abs8a7s8d --yaml > my_user.yml
+
+# export all users
+clay export domain.com/_users --yaml > users.yml
+
+# export single list
+clay export domain.com/_lists/tags > tags.clay
+
+# export all lists
+clay export domain.com/_lists > lists.clay
+
+# export published page via public url
+clay export domain.com/2017/02/some-slug.html
+
+# export built-in 'New Page Templates' list (page uris will be unprefixed)
+clay export domnain.com/_lists/new-pages 
 ```
 
 # Programmatic API
 
 The core `claycli` functionality is exposed as an api, allowing you to use it in Node.js.
 
-**Config**
+## Config
 
 * `config.get(type, alias)` - get `key` or `url` from config
 * `config.getAll()` - get full config object
 * `config.set(type, alias, value)` - set `key` or `url` in config
 
-**Lint**
+## Lint
+Lint a url  
+`lint.lintUrl(url, { concurrency })`
 
-* `lint.lintUrl(url, { concurrency })` - lint a url
-* `lint.lintSchema(yaml)` - lint a schema (passed in as a string of yaml)
+Lint a schema (passed in as a string of yaml)  
+`lint.lintSchema(yaml)` - 
 
-**Import**
+## Import
 
-* `import(string, url, { key, concurrency, publish, yaml })` - import a string of dispatches or bootstraps to the specified (site prefix) url
-* `import.parseBootstrap(string, url)` - parse a string of bootstrap data into a stream of prefixed dispatches. note: does NOT do http calls
-* `import.parseDispatch(string, url)` - parse a string of dispatches into a stream of prefixed dispatches. note: does NOT do http calls
+Import a string of dispatches or bootstraps to the specified (site prefix) url   
+`import(string, url, { key, concurrency, publish, yaml })`
 
-**Export**
+Parse a string of bootstrap data into a stream of prefixed dispatches. _note: does NOT do http calls_  
+`import.parseBootstrap(string, url)`
 
-* `export.fromURL(url, { concurrency, layout, yaml })` - export a single url, e.g. `domain.com/_components/foo` or `domain.com/_pages`
-* `export.fromQuery(url, query, { key, concurrency, layout, yaml, size })` - export the results of a query (passed in as a string of yaml)
-* `export.clearLayouts()` - clear the layouts cache. when exporting pages with layouts, they'll be cached so they don't need to be exported for every page
+Parse a string of dispatches into a stream of prefixed dispatches. _note: does NOT do http calls_  
+`import.parseDispatch(string, url)`
+
+## Export
+
+Export a single url, e.g. `domain.com/_components/foo` or `domain.com/_pages`  
+`export.fromURL(url, { concurrency, layout, yaml })`
+
+Export the results of a query (passed in as a string of yaml)  
+`export.fromQuery(url, query, { key, concurrency, layout, yaml, size })`
+
+Clear the layouts cache. when exporting pages with layouts, they'll be cached so they don't need to be exported for every page  
+`export.clearLayouts()`
 
 # Contributing
 
