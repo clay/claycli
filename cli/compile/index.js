@@ -25,6 +25,8 @@ function builder(yargs) {
     .option('l', options.linked)
     // style-specific options
     .option('p', options.plugins)
+    // script-specific options
+    .option('g', options.globs)
     // reporter option
     .option('r', options.reporter);
 }
@@ -58,7 +60,8 @@ function handler(argv) {
       }),
       scripts = compile.scripts({
         watch: argv.watch,
-        minify: argv.minify
+        minify: argv.minify,
+        globs: argv.globs
       }),
       tasks = [fonts, media, styles, templates, scripts],
       builders = _.map(tasks, (task) => task.build),
