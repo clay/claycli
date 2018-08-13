@@ -94,6 +94,7 @@
     "isomorphic-fetch": "^2.2.1",
     "js-yaml": "^3.10.0",
     "lodash": "^4.17.5",
+    "node-sass": "^4.9.3",
     "nyansole": "^0.5.1",
     "pluralize": "^7.0.0",
     "postcss-import": "^11.1.0",
@@ -109,7 +110,7 @@
     "uglifyify": "^5.0.1",
     "unreachable-branch-transform": "^0.5.1",
     "update-notifier": "^2.3.0",
-    "vueify": "^9.4.1",
+    "vueify": "git+https://github.com/clay/vueify.git",
     "yargs": "^11.0.0"
   }
 }
