@@ -53,7 +53,6 @@
     "jest-mock-console": "^0.4.0"
   },
   "dependencies": {
-    "aliasify": "^2.1.0",
     "amphora-fs": "^1.0.1",
     "autoprefixer": "^9.0.2",
     "babel-plugin-transform-es2015-modules-commonjs": "^6.26.2",
