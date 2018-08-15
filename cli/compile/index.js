@@ -11,8 +11,8 @@ const h = require('highland'),
 function builder(yargs) {
   return yargs
     .usage('Usage: $0 compile [asset type]')
-    .command(require('./fonts'))
     .command(require('./media'))
+    .command(require('./fonts'))
     .command(require('./styles'))
     .command(require('./templates'))
     .command(require('./scripts'))
