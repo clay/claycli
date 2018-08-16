@@ -29,6 +29,7 @@ yargs
   .command(require('./lint'))
   .command(require('./import'))
   .command(require('./export'))
+  .command(require('./compile'))
   // common options
   .help()
   .version()

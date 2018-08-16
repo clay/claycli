@@ -1,9 +1,8 @@
 'use strict';
-const mockLoad = jest.fn();
 
-// config mocking
+// mock npm modules
 jest.doMock('home-config', () => ({
-  load: mockLoad
+  load: jest.fn()
 }));
 
 // global version of fetch that's properly mocked

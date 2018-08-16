@@ -37,6 +37,7 @@ For smaller Clay installations (or, ironically, for very large teams where devs 
 * [`lint`](https://github.com/clay/claycli#lint)
 * [`import`](https://github.com/clay/claycli#import)
 * [`export`](https://github.com/clay/claycli#export)
+* [`compile`](https://github.com/clay/claycli#compile)
 
 ## Common Arguments
 
@@ -228,7 +229,7 @@ clay import --key qa --publish --yaml < bootstrap.yml
 wordpress-export domain.com/blog | clay import --key local localhost.domain.com
 
 # pipe from clay exporter
-clay export --key prod domain.com/_components/article/instances/123 | clay import --key local localhost.domain.com 
+clay export --key prod domain.com/_components/article/instances/123 | clay import --key local localhost.domain.com
 
 # import multiple dispatches
 cat *.clay | clay import --key local localhost:3001
@@ -240,7 +241,7 @@ tail -n +1 *.yml | clay import --key local --yaml localhost:3001
 find . -name '*.yml' -exec cat "{}" \; | clay import --key local --yaml localhost:3001
 
 # recursively import multiple bootstraps (bash v4+ & zsh)
-cat **/*.yml | clay import --key local --yaml localhost:3001 
+cat **/*.yml | clay import --key local --yaml localhost:3001
 ```
 
 ## Export
@@ -308,7 +309,7 @@ clay export domain.com/_components/article/instances/123 > article_dump.clay
 clay export --yaml domain.com/_pages/123 > page_bootstrap.yml
 
 # export page with layout
-clay export --layout --yaml domain.com/_pages/123 > page_bootstrap.yml 
+clay export --layout --yaml domain.com/_pages/123 > page_bootstrap.yml
 
 # copy page to local environment
 clay export domain.com/_pages/123 | clay import --key local local.domain.com
@@ -345,47 +346,431 @@ clay export domain.com/_lists > lists.clay
 clay export domain.com/2017/02/some-slug.html
 
 # export built-in 'New Page Templates' list (page uris will be unprefixed)
-clay export domnain.com/_lists/new-pages 
+clay export domnain.com/_lists/new-pages
+```
+
+## Compile
+
+```bash
+clay compile [--watch] [--minify] [--inlined] [--linked] [--plugins <space-separated list of postcss plugins>] [--globs <space-separated glob strings>] [--reporter <reporter>]
+```
+
+Compile assets based on standardized Clay conventions. Assets are compiled to a `public` folder at the root of your Clay install (the directory where you run the `clay compile` command), with scripts (including templates), styles (including fonts), and media output to the `js`, `css`, and `media` folders. You may run `clay compile` to compile _all_ assets, or run any of its subcommands (`media`, `fonts`, `styles`, `templates`, `scripts`) to compile a specific type of asset.
+
+Specifying `--watch` on `claycli compile` or any of its subcommands will compile assets once, then watch source files (and their dependencies) for changes. Specifying `--minify` (or setting `CLAYCLI_COMPILE_MINIFIED`) will run assets through minification and bundling if applicable. The `CLAYCLI_COMPILE_ASSET_HOST` and `CLAYCLI_COMPILE_ASSET_PATH` variables are used by the `styles` and `fonts` subcommands to generate links to media and font files in the compiled CSS.
+
+#### Arguments
+
+* `-w, --watch` enables watching of source files after compilation
+* `-m, --minify` enables minification and bundling of source files
+* `-i, --inlined` enables the generation of base64 inlined font CSS
+* `-l, --linked` enables the generation of linked font CSS
+* `-p, --plugins` allows running additional postcss plugins when compiling styles
+* `-g, --globs` allows compiling additional JavaScript to `public/js/_global.js`
+* `-r, --reporter` allows specifying how results should be logged
+
+#### Examples
+
+```bash
+# compile all assets once
+clay compile
+
+# compile and watch all assets
+clay compile --watch
+
+# compile all assets once for production environments
+clay compile --minify
+
+# compile all assets, creating both inlined and linked font CSS
+clay compile --inlined --linked
+```
+
+### Media
+
+```bash
+clay compile media [--watch] [--reporter <reporter>]
+```
+
+Copy component, layout, styleguide, and site-specific media files from their source folders to the `public` directory. Media files are images (`jpg`, `jpeg`, `png`, `gif`), `svgs`, and favicons (`ico`).
+
+* `components/<name>/media/` are referenced by component templates and get copied to `public/media/components/<name>/`
+* `layouts/<name>/media/` are referenced by layout templates and get copied to `public/media/layouts/<name>/`
+* `styleguides/<name>/media/` are referenced by that styleguide's CSS and get copied to `public/media/stylesguides/<name>/`
+* `sites/<name>/media/` are favicons and other site-specific icons that are referenced by particular components in the `<head>` of pages. They get copied to `public/media/sites/<name>/`
+
+#### Arguments
+
+* `-w, --watch` enables watching of source files after compilation
+* `-r, --reporter` allows specifying how results should be logged
+
+#### Examples
+
+```bash
+# compile media files once
+clay compile media
+
+# compile and watch media files
+clay compile media --watch
+```
+
+### Fonts
+
+```bash
+clay compile fonts [--watch] [--minify] [--inlined] [--linked] [--reporter <reporter>]
+```
+
+Compile fonts from `styleguides/<name>/fonts/` to the `public` directory. By default (and if `--linked` is specified or `CLAYCLI_COMPILE_LINKED_FONTS` is set), this will generate a `public/css/_linked-fonts.<name>.css` file with `@font-face` declarations and copy the original font file to `public/fonts/`. Note that naming collisions are possible when using fonts of the same filename across different styleguides. If `--inlined` is specified (or `CLAYCLI_COMPILE_INLINED_FONTS` is set), this will generate a `public/css/_inlined-fonts.<name>.css` file with `@font-face` declarations that include a base64-encoded copy of the font.
+
+`@font-face` declarations are generated based on the filename of the original font file, with a simple convention to support various weights and styles.
+
+* `<name>.<ext>` font with normal weight and style
+* `<name>-<weight>.<ext>` or `<name>-<style>.<ext>` specify a font weight _or_ style
+* `<name>-<weight>-<style>.<ext>` specify a font weight _and_ style
+
+All named and numbered font weights are supported, as well as the `italic` and `oblique` font styles. When referencing fonts in your CSS, use the (case-insensitive) `<name>` for your `font-family` rule so the `font-weight` and `font-style` rules will work as expected. Supported font extensions are `woff`, `woff2`, `otf`, and `ttf`.
+
+Specifying `--minify` (or using `CLAYCLI_COMPILE_MINIFIED` or more specifically `CLAYCLI_COMPILE_MINIFIED_FONTS`) will run the generated font CSS through [`clean-css`](https://github.com/jakubpawlowicz/clean-css).
+
+#### Arguments
+
+* `-w, --watch` enables watching of source files after compilation
+* `-m, --minify` enables minification of font CSS
+* `-i, --inlined` enables the generation of base64 inlined font CSS
+* `-l, --linked` enables the generation of linked font CSS
+* `-r, --reporter` allows specifying how results should be logged
+
+#### Examples
+
+```bash
+# compile linked fonts
+clay compile fonts
+
+# compile inlined fonts
+clay compile fonts --inlined
+
+# compile linked and inline fonts
+clay compile fonts --inline --linked
+
+# compile fonts once for production environments
+clay compile fonts --minify
+```
+
+### Styles
+
+```bash
+clay compile styles [--watch] [--minify] [--plugins <space-separated list of postcss plugins>] [--reporter <reporter>]
+```
+
+Compile styleguide CSS files with PostCSS. Source files from `styleguides/<styleguide name>/components/<component name>.css` (and `styleguides/<styleguide name>/layouts/<layout name>.css`) will be compiled to `public/css/<component or layout name>.<styleguide name>.css`.
+
+By default, styles will be compiled using the [`import`](https://github.com/postcss/postcss-import), [`autoprefixer`](https://github.com/postcss/autoprefixer), [`mixins`](https://github.com/postcss/postcss-mixins), [`nested`](https://github.com/postcss/postcss-nested), and [`simple-vars`](https://github.com/postcss/postcss-simple-vars) PostCSS plugins, but you may specify additional plugins (that you have installed with `npm`) into the `--plugins` argument.
+
+Setting `CLAYCLI_COMPILE_ASSET_HOST` and `CLAYCLI_COMPILE_ASSET_PATH` will set the `$asset-host` and `$asset-path` variables, which allows linking to media hosted on other static file servers.
+
+```scss
+/* styleguides/example/components/example-component.css */
+.some-twitter-icon {
+  background-image: url('$asset-host/media/styleguides/example/twitter.svg');
+  background-size: 22px 18px;
+}
+```
+
+Specifying `--minify` (or using `CLAYCLI_COMPILE_MINIFIED` or more specifically `CLAYCLI_COMPILE_MINIFIED_STYLES`) will run the compiled CSS through [`clean-css`](https://github.com/jakubpawlowicz/clean-css).
+
+#### Arguments
+
+* `-w, --watch` enables watching of source files and their dependencies after compilation
+* `-m, --minify` enables minification of CSS
+* `-p, --plugins` allows running additional postcss plugins
+* `-r, --reporter` allows specifying how results should be logged
+
+#### Examples
+
+```bash
+# compile css
+clay compile styles
+
+# compile and watch css and any @import'ed css files
+clay compile styles --watch
+
+# compile css with additional postcss plugins
+clay compile styles --plugins postcss-preset-env stylelint
+
+# compile styles once for production environments
+clay compile styles --minify
+```
+
+### Templates
+
+```bash
+clay compile templates [--watch] [--minify] [--reporter <reporter>]
+```
+
+Precompile handlebars templates so they can be used by Kiln to re-render components (and layouts) on the client side. Note that it is strongly encouraged to enable minification even in dev environments, as specifying `--minify` (or using `CLAYCLI_COMPILE_MINIFIED` or more specifically `CLAYCLI_COMPILE_MINIFIED_TEMPLATES`) will minify the compiled templates with [UglifyJS](https://github.com/mishoo/UglifyJS) and bundle the them into six files based on the component/layout name. Minifying the templates provides the best balance between file size and the number of files Kiln has to fetch on page load.
+
+* `public/js/_templates-a-d.js`
+* `public/js/_templates-e-h.js`
+* `public/js/_templates-i-l.js`
+* `public/js/_templates-m-p.js`
+* `public/js/_templates-q-t.js`
+* `public/js/_templates-u-z.js`
+
+Templates will also be compiled to `public/js/<name>.template.js`.
+
+#### Arguments
+
+* `-w, --watch` enables watching of source files after compilation
+* `-m, --minify` enables bundling of precompiled templates
+* `-r, --reporter` allows specifying how results should be logged
+
+#### Examples
+
+```bash
+# precompile handlebars templates
+clay compile templates
+
+# precompile and bundle templates
+clay compile templates --minify
+
+# precompile, bundle, and watch templates
+clay compile templates --minify --watch
+```
+
+### Scripts
+
+```bash
+clay compile scripts [--watch] [--minify] [--globs <space-separated glob strings>] [--reporter <reporter>]
+```
+
+Compile component `client.js` and `model.js` files, kiln plugins, and legacy global JavaScript, while intelligently calculating and deduplicating dependencies. This generates a number of different types of files:
+
+* `public/js/<name>.client.js` from compiled `client.js`
+* `public/js/<name>.model.js` from compiled `model.js`
+* `public/js/_models-<letter>-<letter>.js` from compiled and _bundled_ `model.js`
+* `public/js/_kiln-plugins.js` from compiled kiln plugins in `services/kiln/`
+* `public/css/_kiln-plugins.css` from compiled kiln plugin styles in their `.vue` components
+* `public/js/_global.js` from compiled legacy scripts specified by the `--globs` argument
+* `public/js/<number>.js` from compiled dependencies of `client.js`, `model.js`, kiln plugin, or global scripts
+* `public/js/_deps-<letter>-<letter>.js` from compiled and bundled dependencies
+
+This also creates a number of files that are used for instantiating component controllers, serving scripts, and speeding up incremental builds:
+
+* `public/js/_client-init.js` script that instantiates `client.js` [component controllers which export a default function](https://claycms.gitbook.io/kiln/kiln-fundamentals/components#model-and-controller)
+* `public/js/_prelude.js` dynamic bundler initialization script
+* `public/js/_postlude.js` dynamic bundler access script, adds `window.require()` which enables loading of bundled dependencies
+* `public/js/_ids.json` cache of module IDs, used when serving bundles
+* `public/js/_registry.json` cache of module dependencies, used when serving bundles
+* `client-env.json` environment variables in `model.js` and dependencies, must be added to `.gitignore` (values for these variables are [passed to Amphora via `env`](https://claycms.gitbook.io/amphora/startup/instantiation#instantiation-arguments) on server start)
+* `browserify-cache.json` local cache for fast incremental builds, must be added to `.gitignore`
+
+Specifying `--minify` (or using `CLAYCLI_COMPILE_MINIFIED` or more specifically `CLAYCLI_COMPILE_MINIFIED_SCRIPTS`) will run all compiled scripts through [`terser`](https://github.com/fabiosantoscode/terser).
+
+This will also copy `clay-kiln-edit.js` and `clay-kiln-view.js` to `public/js` if you have Kiln installed. When you specify `--watch`, Kiln scripts will also be watched for changes.
+
+#### Dependency Management
+
+Any files you `require()` or `import` in your `client.js`, `model.js`, kiln plugins, or legacy global JavaScript are compiled to `<number>.js` and `_deps-<letter>-<letter>.js`, based on their name (for example, `lodash` might be compiled to `283.js` and `_deps-i-l.js`). When resolving media, call `claycli.compile.scripts.getDependencies()` in your Clay install's `resolveMedia` function to dynamically load necessary dependencies for view (`client.js` and legacy `_global.js`) and edit (`model.js` and kiln plugins) modes.
+
+```js
+// in your resolve-media service
+const getDependencies = require('claycli').compile.scripts.getDependencies;
+
+/**
+ * figure out what scripts and styles should be loaded on each page
+ * @param  {object} media
+ * @param  {array} media.scripts array of filenames from amphora
+ * @param  {array} media.styles array of filenames from amphora
+ * @param  {object} locals site info, edit mode info, etc from amphora
+ */
+function resolveMedia(media, locals) {
+  const assetPath = locals.site.assetPath; // from site config
+
+  // note: for this example, we're only dealing with scripts.
+  // your own media resolution must also take into account styles, fonts, and templates
+  if (locals.edit) {
+    // edit mode, get script dependencies for linking (so, bundled / minified files)
+    media.scripts = getDependencies(media.scripts, assetPath, { edit: true, minify: true });
+  } else {
+    // view mode, get script dependencies for inlining (so, individual dependency files)
+    media.scripts = getDependencies(media.scripts, assetPath);
+  }
+}
+```
+
+By convention, internal services are specified in a `services/` directory at the root of your Clay install. Services that work in both the client and server live in `services/universal/` (or `services/isomorphic/` if you prefer). If you have `services/client/` and `services/server/` directories, `claycli` will automatically substitute server-side dependencies with their client-side equivalents when compiling. This is useful for database / API calls and wrappers around 3rd party libraries that have wildly different Node.js vs browser implementations.
+
+#### Kiln Plugins
+
+This will look for kiln plugins in `services/kiln/index.js`. You may specify vuex plugins, custom inputs, toolbar buttons, and pre-publish validators, [among other things](https://claycms.gitbook.io/kiln/api-documentation/api). For example, you might have one validator, one input, and one vuex plugin:
+
+```js
+// services/kiln/index.js
+module.exports = () => {
+  // add globals if they don't already exist
+  window.kiln = window.kiln || {};
+  window.kiln.validators = window.kiln.validators || {};
+  window.kiln.inputs = window.kiln.inputs || {};
+  window.kiln.plugins = window.kiln.plugins || {};
+  // add your plugins into the globals
+  window.kiln.validators['unique-url'] = require('./validate-unique-url');
+  window.kiln.inputs['content-picker-button'] = require('./content-picker-button.vue');
+  window.kiln.plugins['kiln-error-tracking'] = require('./kiln-tracking-plugin');
+};
+```
+
+Any styles (denoted with `<style lang="postcss">` sections in your `.vue` components) will be extracted and bundled into `public/css/_kiln-plugins.css`, so please make sure to include it in your `resolveMedia` function in edit mode.
+
+#### Legacy Global Scripts
+
+If you have any legacy scripts that are not `require()`'d or `import`'d by your `client.js` or their dependencies, you may specify `--globs` to include them. They will be compiled and have their dependencies dynamically deduplicated in the same way as your other scripts, but will be served in view mode on _every page_.
+
+#### Arguments
+
+* `-w, --watch` enables watching of scripts and their dependencies after compilation
+* `-m, --minify` enables minification of scripts
+* `-g, --globs` allows compiling additional JavaScript
+* `-r, --reporter` allows specifying how results should be logged
+
+#### Examples
+
+```bash
+# compile scripts once
+clay compile scripts
+
+# compile and watch scripts and dependencies
+clay compile scripts --watch
+
+# compile scripts once for production environments
+clay compile scripts --minify
+
+# compile scripts, including legacy js
+# note: this glob will match all '.js' files in 'global/js/' unless they end in '.test.js',
+# which is a common unit testing convention
+clay compile scripts --globs 'global/js/!(*.test).js'
 ```
 
 # Programmatic API
 
-The core `claycli` functionality is exposed as an api, allowing you to use it in Node.js.
+The core `claycli` functionality is exposed as an api, allowing you to use it in Node.js. All main commands are properties of the exported `claycli` object.
+
+```js
+const { config, lint, import, export, compile } = require('claycli');
+```
 
 ## Config
 
-* `config.get(type, alias)` - get `key` or `url` from config
-* `config.getAll()` - get full config object
-* `config.set(type, alias, value)` - set `key` or `url` in config
+Get `key` or `url` from config
+
+```js
+config.get(type, alias);
+```
+
+Set `key` or `url` in config
+
+```js
+config.set(type, alias, value);
+```
+
+Get full configuration object
+
+```js
+config.getAll();
+```
 
 ## Lint
+
 Lint a url  
-`lint.lintUrl(url, { concurrency })`
+
+```js
+lint.lintUrl(url, { concurrency });
+```
 
 Lint a schema (passed in as a string of yaml)  
-`lint.lintSchema(yaml)` - 
+
+```js
+lint.lintSchema(yaml);
+```
 
 ## Import
 
 Import a string of dispatches or bootstraps to the specified (site prefix) url   
-`import(string, url, { key, concurrency, publish, yaml })`
 
-Parse a string of bootstrap data into a stream of prefixed dispatches. _note: does NOT do http calls_  
-`import.parseBootstrap(string, url)`
+```js
+import(string, url, { key, concurrency, publish, yaml });
+```
 
-Parse a string of dispatches into a stream of prefixed dispatches. _note: does NOT do http calls_  
-`import.parseDispatch(string, url)`
+Parse a string of bootstrap data into a stream of prefixed dispatches. _Note: does NOT do http calls_  
+
+```js
+import.parseBootstrap(string, url);
+```
+
+Parse a string of dispatches into a stream of prefixed dispatches. _Note: does NOT do http calls_  
+
+```js
+import.parseDispatch(string, url);
+```
 
 ## Export
 
 Export a single url, e.g. `domain.com/_components/foo` or `domain.com/_pages`  
-`export.fromURL(url, { concurrency, layout, yaml })`
+
+```js
+export.fromURL(url, { concurrency, layout, yaml });
+```
 
 Export the results of a query (passed in as a string of yaml)  
-`export.fromQuery(url, query, { key, concurrency, layout, yaml, size })`
+
+```js
+export.fromQuery(url, query, { key, concurrency, layout, yaml, size });
+```
 
 Clear the layouts cache. when exporting pages with layouts, they'll be cached so they don't need to be exported for every page  
-`export.clearLayouts()`
+
+```js
+export.clearLayouts();
+```
+
+## Compile
+
+_Note:_ There is currently no single `require('claycli').compile` method that will compile all assets. Please use the individual `media`, `fonts`, `styles`, `templates`, and `scripts` methods as needed.
+
+Compile media files
+
+```js
+compile.media({ watch });
+```
+
+Compile fonts
+
+```js
+compile.fonts({ minify, watch, inlined, linked });
+```
+
+Compile styles
+
+```js
+compile.styles({ minify, watch, plugins });
+```
+
+Compile templates
+
+```js
+compile.templates({ minify, watch });
+```
+
+Compile scripts
+
+```js
+compile.scripts({ minify, watch, globs });
+```
+
+Calculate script dependencies. _Note:_ when calling this from `resolveMedia`, the first argument is `media.scripts`
+
+```js
+compile.scripts.getDependencies(scripts, assetPath, { edit, minify });
+```
+
 
 # Contributing
 
