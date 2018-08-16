@@ -467,6 +467,14 @@ By default, styles will be compiled using the [`import`](https://github.com/post
 
 Setting `CLAYCLI_COMPILE_ASSET_HOST` and `CLAYCLI_COMPILE_ASSET_PATH` will set the `$asset-host` and `$asset-path` variables, which allows linking to media hosted on other static file servers.
 
+```scss
+/* styleguides/example/components/example-component.css */
+.some-twitter-icon {
+  background-image: url('$asset-host/media/styleguides/example/twitter.svg');
+  background-size: 22px 18px;
+}
+```
+
 Specifying `--minify` (or using `CLAYCLI_COMPILE_MINIFIED` or more specifically `CLAYCLI_COMPILE_MINIFIED_STYLES`) will run the compiled CSS through [`clean-css`](https://github.com/jakubpawlowicz/clean-css).
 
 #### Arguments
@@ -498,7 +506,7 @@ clay compile styles --minify
 clay compile templates [--watch] [--minify] [--reporter <reporter>]
 ```
 
-Precompile handlebars templates so they can be used by Kiln to re-render components (and layouts) on the client side. Note that it is strongly encouraged to enable minification even in dev environments, as specifying `--minify` (or using `CLAYCLI_COMPILE_MINIFIED` or more specifically `CLAYCLI_COMPILE_MINIFIED_TEMPLATES`) will minify the compiled templates with [UglifyJS](https://github.com/mishoo/UglifyJS) and bundle the them into six files based on the component/layout name.
+Precompile handlebars templates so they can be used by Kiln to re-render components (and layouts) on the client side. Note that it is strongly encouraged to enable minification even in dev environments, as specifying `--minify` (or using `CLAYCLI_COMPILE_MINIFIED` or more specifically `CLAYCLI_COMPILE_MINIFIED_TEMPLATES`) will minify the compiled templates with [UglifyJS](https://github.com/mishoo/UglifyJS) and bundle the them into six files based on the component/layout name. Minifying the templates provides the best balance between file size and the number of files Kiln has to fetch on page load.
 
 * `public/js/_templates-a-d.js`
 * `public/js/_templates-e-h.js`
@@ -563,6 +571,32 @@ This will also copy `clay-kiln-edit.js` and `clay-kiln-view.js` to `public/js` i
 
 Any files you `require()` or `import` in your `client.js`, `model.js`, kiln plugins, or legacy global JavaScript are compiled to `<number>.js` and `_deps-<letter>-<letter>.js`, based on their name (for example, `lodash` might be compiled to `283.js` and `_deps-i-l.js`). When resolving media, call `claycli.compile.scripts.getDependencies()` in your Clay install's `resolveMedia` function to dynamically load necessary dependencies for view (`client.js` and legacy `_global.js`) and edit (`model.js` and kiln plugins) modes.
 
+```js
+// in your resolve-media service
+const getDependencies = require('claycli').compile.scripts.getDependencies;
+
+/**
+ * figure out what scripts and styles should be loaded on each page
+ * @param  {object} media
+ * @param  {array} media.scripts array of filenames from amphora
+ * @param  {array} media.styles array of filenames from amphora
+ * @param  {object} locals site info, edit mode info, etc from amphora
+ */
+function resolveMedia(media, locals) {
+  const assetPath = locals.site.assetPath; // from site config
+
+  // note: for this example, we're only dealing with scripts.
+  // your own media resolution must also take into account styles, fonts, and templates
+  if (locals.edit) {
+    // edit mode, get script dependencies for linking (so, bundled / minified files)
+    media.scripts = getDependencies(media.scripts, assetPath, { edit: true, minify: true });
+  } else {
+    // view mode, get script dependencies for inlining (so, individual dependency files)
+    media.scripts = getDependencies(media.scripts, assetPath);
+  }
+}
+```
+
 By convention, internal services are specified in a `services/` directory at the root of your Clay install. Services that work in both the client and server live in `services/universal/` (or `services/isomorphic/` if you prefer). If you have `services/client/` and `services/server/` directories, `claycli` will automatically substitute server-side dependencies with their client-side equivalents when compiling. This is useful for database / API calls and wrappers around 3rd party libraries that have wildly different Node.js vs browser implementations.
 
 #### Kiln Plugins
@@ -594,7 +628,7 @@ If you have any legacy scripts that are not `require()`'d or `import`'d by your 
 
 * `-w, --watch` enables watching of scripts and their dependencies after compilation
 * `-m, --minify` enables minification of scripts
-* `-g, --globs` allows compiling additional JavaScript to `public/js/_global.js`
+* `-g, --globs` allows compiling additional JavaScript
 * `-r, --reporter` allows specifying how results should be logged
 
 #### Examples
