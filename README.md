@@ -679,13 +679,13 @@ config.getAll();
 
 ## Lint
 
-Lint a url  
+Lint a url
 
 ```js
 lint.lintUrl(url, { concurrency });
 ```
 
-Lint a schema (passed in as a string of yaml)  
+Lint a schema (passed in as a string of yaml)
 
 ```js
 lint.lintSchema(yaml);
@@ -693,19 +693,25 @@ lint.lintSchema(yaml);
 
 ## Import
 
-Import a string of dispatches or bootstraps to the specified (site prefix) url   
+Import a string of dispatches or bootstraps to the specified (site prefix) url
 
 ```js
 import(string, url, { key, concurrency, publish, yaml });
 ```
 
-Parse a string of bootstrap data into a stream of prefixed dispatches. _Note: does NOT do http calls_  
+Parse a string of bootstrap data into a stream of prefixed dispatches. _Note: does NOT do http calls_
 
 ```js
 import.parseBootstrap(string, url);
 ```
 
-Parse a string of dispatches into a stream of prefixed dispatches. _Note: does NOT do http calls_  
+Parse an object of bootstrap data into a stream of prefixes dispatches. This method is good if you want to handle converting Yaml to JSON in your own application where you might need memoization. _Note: does NOT do http calls_
+
+```js
+import.parseBootstrapObject(obj, url);
+```
+
+Parse a string of dispatches into a stream of prefixed dispatches. _Note: does NOT do http calls_
 
 ```js
 import.parseDispatch(string, url);
@@ -713,19 +719,19 @@ import.parseDispatch(string, url);
 
 ## Export
 
-Export a single url, e.g. `domain.com/_components/foo` or `domain.com/_pages`  
+Export a single url, e.g. `domain.com/_components/foo` or `domain.com/_pages`
 
 ```js
 export.fromURL(url, { concurrency, layout, yaml });
 ```
 
-Export the results of a query (passed in as a string of yaml)  
+Export the results of a query (passed in as a string of yaml)
 
 ```js
 export.fromQuery(url, query, { key, concurrency, layout, yaml, size });
 ```
 
-Clear the layouts cache. when exporting pages with layouts, they'll be cached so they don't need to be exported for every page  
+Clear the layouts cache. when exporting pages with layouts, they'll be cached so they don't need to be exported for every page
 
 ```js
 export.clearLayouts();
