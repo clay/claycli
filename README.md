@@ -708,7 +708,7 @@ import.parseBootstrap(string, url);
 Parse an object of bootstrap data into a stream of prefixes dispatches. This method is good if you want to handle converting Yaml to JSON in your own application where you might need memoization. _Note: does NOT do http calls_
 
 ```js
-import.parseBootstrapJson(obj, url);
+import.parseBootstrapObject(obj, url);
 ```
 
 Parse a string of dispatches into a stream of prefixed dispatches. _Note: does NOT do http calls_
