@@ -110,7 +110,7 @@
     "uglifyify": "^5.0.1",
     "unreachable-branch-transform": "^0.5.1",
     "update-notifier": "^2.3.0",
-    "vueify": "git+https://github.com/clay/vueify.git",
+    "@nymag/vueify": "^9.4.2",
     "yargs": "^11.0.0"
   }
 }
