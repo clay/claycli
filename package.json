@@ -79,6 +79,7 @@
     "escape-quotes": "^1.0.2",
     "event-stream": "^3.3.4",
     "fs-extra": "^7.0.0",
+    "fsevents": "^1.2.4",
     "get-stdin": "^5.0.1",
     "glob": "^7.1.2",
     "gulp": "^4.0.0",
