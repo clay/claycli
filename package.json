@@ -112,5 +112,8 @@
     "unreachable-branch-transform": "^0.5.1",
     "update-notifier": "^2.3.0",
     "yargs": "^11.0.0"
+  },
+  "optionalDependencies": {
+    "fsevents": "^1.2.4"
   }
 }
