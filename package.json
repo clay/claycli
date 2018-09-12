@@ -53,13 +53,12 @@
     "jest-mock-console": "^0.4.0"
   },
   "dependencies": {
-    "@nymag/vueify": "^9.4.4",
+    "@babel/core": "^7.0.1",
+    "@babel/preset-env": "^7.0.0",
+    "@nymag/vueify": "^9.4.5",
     "amphora-fs": "^1.0.1",
     "autoprefixer": "^9.0.2",
-    "babel-core": "^6.26.3",
-    "babel-plugin-transform-es2015-modules-commonjs": "^6.26.2",
-    "babel-preset-es2015": "^6.24.1",
-    "babelify": "^8.0.0",
+    "babelify": "^10.0.0",
     "base-64": "^0.1.0",
     "browserify": "^16.2.2",
     "browserify-cache-api": "^3.0.1",
