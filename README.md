@@ -267,12 +267,12 @@ body:
     bool:
       must:
         -
-          prefix:
-            uri: domain.com/site-path # show only pages for a specific site
+          terms:
+            siteSlug: 
+              - intelligencer # show only pages for a specific site
         -
           match:
             published: true # show only published pages
-
 ```
 
 You may also query other elastic indices, but please make sure that each document returned has a clay uri (e.g. `domain.com/_components/foo/instances/bar` or `domain.com/_pages/foo`) as its `_id`.
