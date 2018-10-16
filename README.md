@@ -267,8 +267,9 @@ body:
     bool:
       must:
         -
-          prefix:
-            uri: domain.com/site-path # show only pages for a specific site
+          terms:
+            siteSlug: 
+              - intelligencer # show only pages for a specific site
         -
           match:
             published: true # show only published pages
