@@ -89,6 +89,7 @@
     "gulp-newer": "git+https://github.com/nelsonpecora/gulp-newer.git",
     "gulp-postcss": "^7.0.1",
     "gulp-rename": "^1.4.0",
+    "gulp-replace": "^1.0.0",
     "highland": "^2.13.0",
     "home-config": "^0.1.0",
     "isomorphic-fetch": "^2.2.1",
