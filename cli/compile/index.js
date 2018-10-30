@@ -33,13 +33,6 @@ function builder(yargs) {
 
 function handler(argv) {
   const t1 = Date.now(),
-    plugins = _.map(argv.plugins, (pluginName) => {
-      try {
-        return require(pluginName)();
-      } catch (e) {
-        console.error(`${chalk.red('Error: Cannot init plugin "' + pluginName + '"')}\n${chalk.grey(e.message)}`);
-      }
-    }),
     media = compile.media({ watch: argv.watch }); // run media task before others (specifically, templates)
 
   return h(media.build).collect().toArray((mediaResults) => {
@@ -52,7 +45,7 @@ function handler(argv) {
       styles = compile.styles({
         watch: argv.watch,
         minify: argv.minify,
-        plugins
+        plugins: helpers.determinePostCSSPlugins(argv)
       }),
       templates = compile.templates({
         watch: argv.watch,
