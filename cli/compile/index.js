@@ -1,7 +1,6 @@
 'use strict';
 const h = require('highland'),
   _ = require('lodash'),
-  chalk = require('chalk'),
   pluralize = require('pluralize'),
   compile = require('../../lib/cmd/compile'),
   options = require('../cli-options'),

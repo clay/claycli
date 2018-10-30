@@ -1,6 +1,6 @@
 'use strict';
-const _ = require('lodash'),
-  pluralize = require('pluralize'),
+
+const pluralize = require('pluralize'),
   compile = require('../../lib/cmd/compile'),
   options = require('../cli-options'),
   reporter = require('../../lib/reporters'),
