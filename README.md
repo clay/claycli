@@ -360,6 +360,8 @@ Compile assets based on standardized Clay conventions. Assets are compiled to a 
 
 Specifying `--watch` on `claycli compile` or any of its subcommands will compile assets once, then watch source files (and their dependencies) for changes. Specifying `--minify` (or setting `CLAYCLI_COMPILE_MINIFIED`) will run assets through minification and bundling if applicable. The `CLAYCLI_COMPILE_ASSET_HOST` and `CLAYCLI_COMPILE_ASSET_PATH` variables are used by the `styles` and `fonts` subcommands to generate links to media and font files in the compiled CSS.
 
+A project specific clay config file is also supported, [read more here](https://github.com/clay/claycli#project-specific-config-file).
+
 #### Arguments
 
 * `-w, --watch` enables watching of source files after compilation
