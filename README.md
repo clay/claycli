@@ -268,7 +268,7 @@ body:
       must:
         -
           terms:
-            siteSlug: 
+            siteSlug:
               - intelligencer # show only pages for a specific site
         -
           match:
@@ -359,6 +359,8 @@ clay compile [--watch] [--minify] [--inlined] [--linked] [--plugins <space-separ
 Compile assets based on standardized Clay conventions. Assets are compiled to a `public` folder at the root of your Clay install (the directory where you run the `clay compile` command), with scripts (including templates), styles (including fonts), and media output to the `js`, `css`, and `media` folders. You may run `clay compile` to compile _all_ assets, or run any of its subcommands (`media`, `fonts`, `styles`, `templates`, `scripts`) to compile a specific type of asset.
 
 Specifying `--watch` on `claycli compile` or any of its subcommands will compile assets once, then watch source files (and their dependencies) for changes. Specifying `--minify` (or setting `CLAYCLI_COMPILE_MINIFIED`) will run assets through minification and bundling if applicable. The `CLAYCLI_COMPILE_ASSET_HOST` and `CLAYCLI_COMPILE_ASSET_PATH` variables are used by the `styles` and `fonts` subcommands to generate links to media and font files in the compiled CSS.
+
+A project specific clay config file is also supported, [read more here](https://github.com/clay/claycli#project-specific-config-file).
 
 #### Arguments
 
@@ -648,6 +650,45 @@ clay compile scripts --minify
 # note: this glob will match all '.js' files in 'global/js/' unless they end in '.test.js',
 # which is a common unit testing convention
 clay compile scripts --globs 'global/js/!(*.test).js'
+```
+
+### Project Specific Config File
+
+Not all projects are the same, and for project specific compilation changes you can add a `claycli.config.js` file to your project's root. This file must simply export an Object whose contains key/value pairs are read during compilation. Good use cases for this file include:
+
+* Adding PostCSS plugins to [`styles`](https://github.com/clay/claycli#styles) compilation
+* Updating options passed into Autoprefixer
+* Changing Babel browser target to meet your env support requirements
+
+#### Arguments
+
+The `claycli.config.js` file currently supports the following arguments:
+
+* `plugins` (_Array_): list of PostCSS plugins that will be concatenated to the end of the list already supported by the `styles` compilation command
+* `babelTargets` (_String|Array_): the value of this property is passed to the [Babel `targets` option](https://babeljs.io/docs/en/babel-preset-env#targets) to describe the environments your compiled scripts support
+* `autoprefixerOptions` (_Object_): an Object which is [passed directly to `autoprefixer`](https://www.npmjs.com/package/autoprefixer#options) for style and Kiln plugin compilation
+
+#### Example
+
+```js
+'use strict';
+
+module.exports = {
+  plugins: [
+    require('postcss-functions')({
+      functions: {
+        em: function (pixels, browserContext) {
+          var browserContext = parseInt(browserContext, 10) || 16,
+            pixels = parseFloat(pixels);
+
+          return pixels / browserContext + 'em';
+        }
+      }
+    })
+  ],
+  babelTargets: '> 0.25%, not dead',
+  autoprefixerOptions: { browsers: ['last 2 versions', 'ie >= 9', 'ios >= 7', 'android >= 4.4.2'] }
+};
 ```
 
 # Programmatic API
