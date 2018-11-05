@@ -654,9 +654,9 @@ clay compile scripts --globs 'global/js/!(*.test).js'
 
 Not all projects are the same, and for project specific compilation changes you can add a `claycli.config.js` file to your project's root. This file must simply export an Object whose contains key/value pairs are read during compilation. Good use cases for this file include:
 
-* Adding PostCSS plugins to `styles` compilation
+* Adding PostCSS plugins to [`styles`](https://github.com/clay/claycli#styles) compilation
 * Updating options passed into Autoprefixer
-* Changing Babel browser target
+* Changing Babel browser target to meet your env support requirements
 
 #### Arguments
 
