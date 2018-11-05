@@ -1,7 +1,6 @@
 'use strict';
-const _ = require('lodash'),
-  chalk = require('chalk'),
-  pluralize = require('pluralize'),
+
+const pluralize = require('pluralize'),
   compile = require('../../lib/cmd/compile'),
   options = require('../cli-options'),
   reporter = require('../../lib/reporters'),
@@ -20,13 +19,7 @@ function builder(yargs) {
 
 function handler(argv) {
   const t1 = Date.now(),
-    plugins = _.map(argv.plugins, (pluginName) => {
-      try {
-        return require(pluginName)();
-      } catch (e) {
-        console.error(`${chalk.red('Error: Cannot init plugin "' + pluginName + '"')}\n${chalk.grey(e.message)}`);
-      }
-    }),
+    plugins = helpers.determinePostCSSPlugins(argv),
     compiled = compile.styles({
       watch: argv.watch,
       minify: argv.minify,
