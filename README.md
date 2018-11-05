@@ -268,7 +268,7 @@ body:
       must:
         -
           terms:
-            siteSlug: 
+            siteSlug:
               - intelligencer # show only pages for a specific site
         -
           match:
@@ -648,6 +648,45 @@ clay compile scripts --minify
 # note: this glob will match all '.js' files in 'global/js/' unless they end in '.test.js',
 # which is a common unit testing convention
 clay compile scripts --globs 'global/js/!(*.test).js'
+```
+
+### Project Specific Config File
+
+Not all projects are the same, and for project specific compilation changes you can add a `claycli.config.js` file to your project's root. This file must simply export an Object whose contains key/value pairs are read during compilation. Good use cases for this file include:
+
+* Adding PostCSS plugins to `styles` compilation
+* Updating options passed into Autoprefixer
+* Changing Babel browser target
+
+#### Arguments
+
+The `claycli.config.js` file currently supports the following arguments:
+
+* `plugins` (_Array_): list of PostCSS plugins that will be concatenated to the end of the list already supported by the `styles` compilation command
+* `babelTargets` (_String|Array_): the value of this property is passed to the [Babel `targets` option](https://babeljs.io/docs/en/babel-preset-env#targets) to describe the environments your compiled scripts support
+* `autoprefixerOptions` (_Object_): an Object which is [passed directly to `autoprefixer`](https://www.npmjs.com/package/autoprefixer#options) for style and Kiln plugin compilation
+
+#### Example
+
+```js
+'use strict';
+
+module.exports = {
+  plugins: [
+    require('postcss-functions')({
+      functions: {
+        em: function (pixels, browserContext) {
+          var browserContext = parseInt(browserContext, 10) || 16,
+            pixels = parseFloat(pixels);
+
+          return pixels / browserContext + 'em';
+        }
+      }
+    })
+  ],
+  babelTargets: '> 0.25%, not dead',
+  autoprefixerOptions: { browsers: ['last 2 versions', 'ie >= 9', 'ios >= 7', 'android >= 4.4.2'] }
+};
 ```
 
 # Programmatic API
