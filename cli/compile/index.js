@@ -55,7 +55,7 @@ function handler(argv) {
         minify: argv.minify,
         globs: argv.globs
       }),
-      tasks = [fonts, media, styles, templates, scripts],
+      tasks = [fonts, styles, templates, scripts],
       builders = _.map(tasks, (task) => task.build),
       watchers = _.map(tasks, (task) => task.watch).concat([media.watch]),
       isWatching = !!watchers[0];
