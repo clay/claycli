@@ -53,9 +53,10 @@ function handler(argv) {
       scripts = compile.scripts({
         watch: argv.watch,
         minify: argv.minify,
-        globs: argv.globs
+        globs: argv.globs,
+        reporter: argv.reporter
       }),
-      tasks = [fonts, media, styles, templates, scripts],
+      tasks = [fonts, styles, templates, scripts],
       builders = _.map(tasks, (task) => task.build),
       watchers = _.map(tasks, (task) => task.watch).concat([media.watch]),
       isWatching = !!watchers[0];
@@ -74,12 +75,6 @@ function handler(argv) {
           }
           return { success: true, message };
         })(results);
-
-        if (isWatching) {
-          _.each(watchers, (watcher) => {
-            watcher.on('raw', helpers.debouncedWatcher);
-          });
-        }
       });
   });
 }
