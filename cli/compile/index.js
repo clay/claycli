@@ -53,7 +53,8 @@ function handler(argv) {
       scripts = compile.scripts({
         watch: argv.watch,
         minify: argv.minify,
-        globs: argv.globs
+        globs: argv.globs,
+        reporter: argv.reporter
       }),
       tasks = [fonts, styles, templates, scripts],
       builders = _.map(tasks, (task) => task.build),
