@@ -75,12 +75,6 @@ function handler(argv) {
           }
           return { success: true, message };
         })(results);
-
-        if (isWatching) {
-          _.each(watchers, (watcher) => {
-            watcher.on('raw', helpers.debouncedWatcher);
-          });
-        }
       });
   });
 }
