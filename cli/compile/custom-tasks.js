@@ -1,10 +1,10 @@
 'use strict';
-const pluralize = require('pluralize'),
-  compile = require('../../lib/cmd/compile'),
 
+const compile = require('../../lib/cmd/compile'),
   options = require('../cli-options'),
-  reporter = require('../../lib/reporters'),
-  helpers = require('../../lib/compilation-helpers');
+  term = require('terminal-logger')('pretty');
+
+term.level = 'debug';
 
 function builder(yargs) {
   return yargs
@@ -13,13 +13,24 @@ function builder(yargs) {
     .option('r', options.reporter);
 }
 
-function handler(argv) {
-  compile.customTasks({
-    watch: argv.watch,
-    minify: argv.minify,
-    inlined: argv.inlined,
-    linked: argv.linked
-  });
+function handler() {
+  const tasks = compile.customTasks();
+
+  return tasks.build // This is a highland stream
+    .errors((error, push) => {
+      // Push the error back into the stream in a format we can use
+      push(null, { type: 'error', error });
+    })
+    .toArray(arr => {
+      // Print the status of each task
+      arr.forEach(task => {
+        if (task.type === 'success') {
+          term.status.ok(`Successfully ran task: ${task.name}`);
+        } else {
+          term.cross(`Error running task: ${task.error.stack}`)
+        }
+      })
+    });
 }
 
 module.exports = {
