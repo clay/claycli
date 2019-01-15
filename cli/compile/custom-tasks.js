@@ -9,25 +9,22 @@ const pluralize = require('pluralize'),
 function builder(yargs) {
   return yargs
     .usage('Usage: $0 custom-tasks')
-    .example('$0 custom-tasks', 'run custom gulp tasks defined in the claycli.config.js file')
+    .example('$0 custom-tasks', 'run custom tasks defined in the claycli.config.js file `customTasks` property')
     .option('r', options.reporter);
 }
 
 function handler(argv) {
-  const t1 = Date.now(),
-    compiled = compile.customTasks({
-      watch: argv.watch,
-      minify: argv.minify,
-      inlined: argv.inlined,
-      linked: argv.linked
-    });
-
-  console.log('foo')
+  compile.customTasks({
+    watch: argv.watch,
+    minify: argv.minify,
+    inlined: argv.inlined,
+    linked: argv.linked
+  });
 }
 
 module.exports = {
   command: 'custom-tasks',
-  describe: 'Run any custom tasks',
+  describe: 'Run any custom tasks. Each task will be wrapped by Gulp',
   builder,
   handler
 };
