@@ -27,7 +27,7 @@
     ],
     "testPathIgnorePatterns": [
       "/node_modules/",
-      "lib/gulp-plugins/gulp-newer/*.js"
+      "lib/gulp-plugins/gulp-newer/"
     ],
     "setupFiles": [
       "./setup-jest.js"
