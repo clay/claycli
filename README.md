@@ -665,8 +665,9 @@ Not all projects are the same, and for project specific compilation changes you 
 The `claycli.config.js` file currently supports the following arguments:
 
 * `plugins` (_Array_): list of PostCSS plugins that will be concatenated to the end of the list already supported by the `styles` compilation command
-* `babelTargets` (_String|Array_): the value of this property is passed to the [Babel `targets` option](https://babeljs.io/docs/en/babel-preset-env#targets) to describe the environments your compiled scripts support
+* `babelTargets` (_Object_): the value of this property is passed to the [Babel `targets` option](https://babeljs.io/docs/en/babel-preset-env#targets) to describe the environments your compiled scripts support
 * `autoprefixerOptions` (_Object_): an Object which is [passed directly to `autoprefixer`](https://www.npmjs.com/package/autoprefixer#options) for style and Kiln plugin compilation
+* `customTasks` (_Array_): an Array of Gulp tasks to execute with the `clay compile custom-tasks` command.
 
 #### Example
 
@@ -686,10 +687,61 @@ module.exports = {
       }
     })
   ],
-  babelTargets: '> 0.25%, not dead',
-  autoprefixerOptions: { browsers: ['last 2 versions', 'ie >= 9', 'ios >= 7', 'android >= 4.4.2'] }
+  babelTargets:  { browsers: ['> 2%'] },
+  autoprefixerOptions: { browsers: ['last 2 versions', 'ie >= 9', 'ios >= 7', 'android >= 4.4.2'] },
+  customTasks: [{
+    name: 'foobar',
+    fn: (cb) => {
+      // A gulp task to execute
+      cb();
+    }
+  }]
 };
 ```
+
+### Custom Gulp Tasks
+
+Because not every implementation of Clay is the same, not all complilation will be the same. By adding custom Gulp tasks to your `claycli.config.js` file you can execute additional compilation/processing steps with claycli. Declare a `customTasks` array in your config file with each taks being an object with two properties: `name` and `fn`. The `name` property will be the name of the step to execute and the `fn` property is the actual step to execute.
+
+#### Example
+
+For example, given the following `claycli.config.js` file:
+
+```js
+'use strict';
+
+var { gulp } = require('claycli'),
+  concat = require('gulp-concat'),
+  uglify = require('gulp-uglify'),
+  gutil = require('gulp-util'),
+  argv = require('yargs').argv,
+  gulpif = require('gulp-if');
+
+module.exports = {
+  customTasks: [
+    {
+      name: 'polyfill',
+      fn: () => {
+        return gulp.src([
+          'global/polyfills.js',
+          'global/modernizr.js'
+        ])
+        .pipe(concat('polyfills.js'))
+        .pipe(gulpif(!argv.debug, uglify())).on('error', gutil.log)
+        .pipe(gulp.dest('public/js'));
+      }
+    }
+  ]
+};
+```
+**Important Notes:**
+
+1. Claycli exposes the instance of `gulp` that it users to make sure their is consistency between internal tasks and external ones
+2. This example of a custom task is all done inline, but the objects can be organizes and managed in different files
+3. When executing commands you have access to `argv` and can test options inside your custom functions.
+4. Each task is executed in isolation. This is not a replacement for a complete Gulp pipeline, rather it is meant to patch small tasks that fall outside normal Clay compilation.
+
+Executing `clay compile custom-tasks` will execute this task to produce a `polyfills.js` file.
 
 # Programmatic API
 
@@ -818,7 +870,6 @@ Calculate script dependencies. _Note:_ when calling this from `resolveMedia`, th
 ```js
 compile.scripts.getDependencies(scripts, assetPath, { edit, minify });
 ```
-
 
 # Contributing
 
