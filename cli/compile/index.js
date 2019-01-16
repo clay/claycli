@@ -15,6 +15,7 @@ function builder(yargs) {
     .command(require('./styles'))
     .command(require('./templates'))
     .command(require('./scripts'))
+    .command(require('./custom-tasks'))
     .example('$0 compile', 'compile all assets')
     .example('$0 compile --watch', 'compile and watch all assets')
     .option('w', options.watch)
