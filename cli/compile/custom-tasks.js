@@ -27,9 +27,9 @@ function handler() {
         if (task.type === 'success') {
           term.status.ok(`Successfully ran task: ${task.name}`);
         } else {
-          term.cross(`Error running task: ${task.error.stack}`)
+          term.cross(`Error running task: ${task.error.stack}`);
         }
-      })
+      });
     });
 }
 
