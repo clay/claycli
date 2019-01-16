@@ -22,7 +22,12 @@
       "!**/cli/**",
       "!lib/cmd/compile/**",
       "!**/coverage/**",
-      "!**/index.js"
+      "!**/index.js",
+      "!lib/gulp-plugins/gulp-newer/*.js"
+    ],
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "lib/gulp-plugins/gulp-newer/"
     ],
     "setupFiles": [
       "./setup-jest.js"
@@ -86,7 +91,6 @@
     "gulp-cssmin": "^0.2.0",
     "gulp-group-concat": "^1.1.6",
     "gulp-if": "^2.0.2",
-    "gulp-newer": "git+https://github.com/nelsonpecora/gulp-newer.git",
     "gulp-postcss": "^7.0.1",
     "gulp-rename": "^1.4.0",
     "gulp-replace": "^1.0.0",
