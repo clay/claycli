@@ -22,7 +22,12 @@
       "!**/cli/**",
       "!lib/cmd/compile/**",
       "!**/coverage/**",
-      "!**/index.js"
+      "!**/index.js",
+      "!lib/gulp-plugins/gulp-newer/*.js"
+    ],
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "lib/gulp-plugins/gulp-newer/*.js"
     ],
     "setupFiles": [
       "./setup-jest.js"
