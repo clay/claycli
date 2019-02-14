@@ -14,6 +14,7 @@
   },
   "jest": {
     "automock": false,
+    "testURL": "http://localhost/",
     "collectCoverage": true,
     "collectCoverageFrom": [
       "**/*.js",
@@ -53,9 +54,10 @@
   "devDependencies": {
     "coveralls": "^3.0.0",
     "eslint": "^4.17.0",
-    "jest": "^22.4.1",
-    "jest-fetch-mock": "^1.6.5",
-    "jest-mock-console": "^0.4.0"
+    "jest": "^24.1.0",
+    "jest-fetch-mock": "^1.7.5",
+    "jest-mock-console": "^0.4.0",
+    "mock-fs": "^4.8.0"
   },
   "dependencies": {
     "@babel/core": "^7.0.1",
