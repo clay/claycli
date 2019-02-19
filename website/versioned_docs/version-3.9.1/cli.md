@@ -3,7 +3,7 @@ id: version-3.9.1-cli
 title: Claycli
 original_id: cli
 ---
-This is the `Clay` command line utility. Using `claycli` you will have some useful options for your site. Here we will provide you with documentation and examples that will help you to run all the functionalities that you need.
+This is the `Clay` command line utility. Here we will provide you with documentation and examples that will help you to run all the functionalities that you need.
 
 ## Installation
 
@@ -62,8 +62,8 @@ When running `claycli` programmatically (i.e., `import { someMethod } from 'clay
  * `warning` Shows a potentially undesired situation
  * `info` Gives the progress information of the current operation
  * `debug` Shows information of the current operation
- 
- As you can see, most of those correspond directly to log levels. Here you can check how to programmatically get the `claycli` methods on the [Programmatic API](#programmatic-api) section.
+
+ As you can see, most of those correspond directly to log levels.  On the [Programmatic API](#programmatic-api) section you can check how to programmatically use the `claycli` methods.
 
 When running `claycli` from the command line, you may specify a `reporter` argument to output logs in different formats. The default is `dots`, which will print out green and red dots showing operation success / failure. There is also `pretty` (which prints more detailed messages on each line), `json` (which prints newline-separated json logs in a format that can be passed to ELK), and `nyan` (which is mostly just for fun).
 
@@ -128,7 +128,7 @@ _components:
         twitterTitle: Article
 ```
 
-A _bootstrap_ may be piped into and out of any `claycli` commands that accept _dispatches_. To tell `claycli` that you're dealing with _bootstraps_, please use the `--yaml` argument.
+A _bootstrap_ may be piped into and out of any `claycli` commands that accepts _dispatches_. To tell `claycli` that you're dealing with _bootstraps_, please use the `--yaml` argument.
 
 ```bash
 $ clay export --yaml domain.com > article_dump.yml
@@ -176,11 +176,11 @@ $ clay config --url my-cool-article domain.com/_components/article/instances/123
 
 ## Lint
 
+Verify Clay data against standardized conventions and makes sure all child components exist.
+
 ```bash
 clay lint [--concurrency <number>] [url]
 ```
-
-Verify Clay data against standardized conventions and make sure all child components exist.
 
 Linting a page, component, or user url will verify that the data for that url exists, and (for pages and components) will (recursively) verify that all references to child components exist. The url must be a raw url, an alias specified via `clay config`, or omitted in favor of `CLAYCLI_DEFAULT_URL`. Linting a public url (or a page/component url that has a `.html` extension) will attempt to render that url with the extension and, if that fails, try to figure out which component isn't rendering correctly. You may lint other renderers by providing their extensions, e.g. `.amp` or `.rss`.
 
@@ -212,11 +212,11 @@ $ clay lint < components/article/schema.yml
 
 ## Import
 
+Imports data into Clay from `stdin`. Data may be in _dispatch_ or _bootstrap_ format. Site prefix must be a raw url, an alias specified via `clay config`, or omitted in favor of `CLAYCLI_DEFAULT_URL`. Key must be an alias specified via `clay config`, or omitted in favor of `CLAYCLI_DEFAULT_KEY`.
+
 ```bash
 clay import [--key <api key>] [--concurrency <number>] [--publish] [--yaml] [site prefix]
 ```
-
-Imports data into Clay from `stdin`. Data may be in _dispatch_ or _bootstrap_ format. Site prefix must be a raw url, an alias specified via `clay config`, or omitted in favor of `CLAYCLI_DEFAULT_URL`. Key must be an alias specified via `clay config`, or omitted in favor of `CLAYCLI_DEFAULT_KEY`.
 
 The `publish` argument will trigger a publish of the pages and/or components you're importing. Note that the generated url of an imported page might be different than its original url, depending on your Clay url generation / publishing logic.
 
@@ -258,11 +258,11 @@ $ cat **/*.yml | clay import --key local --yaml localhost:3001
 
 ## Export
 
+Exports data from Clay to `stdout`. Data may be in _dispatch_ or _bootstrap_ format. The url must be a raw url, an alias specified via `clay config`, or omitted in favor of `CLAYCLI_DEFAULT_URL`.
+
 ```bash
 clay export [--key <api key>] [--concurrency <number>] [--size <number>] [--layout] [--yaml] [url]
 ```
-
-Exports data from Clay to `stdout`. Data may be in _dispatch_ or _bootstrap_ format. The url must be a raw url, an alias specified via `clay config`, or omitted in favor of `CLAYCLI_DEFAULT_URL`.
 
 If the url points to a site prefix (i.e. it does not point to a specific type of data (a specific page, public url, component, user, list, etc)), `claycli` will query the built-in `pages` index to pull the latest 10 pages from the site. When querying the `pages` index, you must specify a `key` or have the `CLAYCLI_DEFAULT_KEY` set. The api key is only required when exporting multiple pages (by querying the `pages` index or by running custom queries, below).
 
@@ -364,11 +364,11 @@ $ clay export domnain.com/_lists/new-pages
 
 ## Compile
 
+Compile assets based on standardized Clay conventions. Assets are compiled to a `public` folder at the root of your Clay install (the directory where you run the `clay compile` command), with scripts (including templates), styles (including fonts), and media output to the `js`, `css`, and `media` folders. You may run `clay compile` to compile _all_ assets or run any of its subcommands (`media`, `fonts`, `styles`, `templates`, `scripts`) to compile a specific type of asset.
+
 ```bash
 clay compile [--watch] [--minify] [--inlined] [--linked] [--plugins <space-separated list of postcss plugins>] [--globs <space-separated glob strings>] [--reporter <reporter>]
 ```
-
-Compile assets based on standardized Clay conventions. Assets are compiled to a `public` folder at the root of your Clay install (the directory where you run the `clay compile` command), with scripts (including templates), styles (including fonts), and media output to the `js`, `css`, and `media` folders. You may run `clay compile` to compile _all_ assets or run any of its subcommands (`media`, `fonts`, `styles`, `templates`, `scripts`) to compile a specific type of asset.
 
 Specifying `--watch` on `claycli compile` or any of its subcommands will compile assets once, then watch source files (and their dependencies) for changes. Specifying `--minify` (or setting `CLAYCLI_COMPILE_MINIFIED`) will run assets through minification and bundling if applicable. The `CLAYCLI_COMPILE_ASSET_HOST` and `CLAYCLI_COMPILE_ASSET_PATH` variables are used by the `styles` and `fonts` subcommands to generate links to media and font files in the compiled CSS.
 
@@ -402,11 +402,11 @@ $ clay compile --inlined --linked
 
 ### Media
 
+Copy component, layout, style guide, and site-specific media files from their source folders to the `public` directory. Media files are images (`jpg`, `jpeg`, `png`, `gif`), `svgs`, and favicons (`ico`).
+
 ```bash
 clay compile media [--watch] [--reporter <reporter>]
 ```
-
-Copy component, layout, style guide, and site-specific media files from their source folders to the `public` directory. Media files are images (`jpg`, `jpeg`, `png`, `gif`), `svgs`, and favicons (`ico`).
 
 * `components/<name>/media/` are referenced by component templates and get copied to `public/media/components/<name>/`
 * `layouts/<name>/media/` are referenced by layout templates and get copied to `public/media/layouts/<name>/`
@@ -430,11 +430,11 @@ $ clay compile media --watch
 
 ### Fonts
 
+Compile fonts from `styleguides/<name>/fonts/` to the `public` directory. By default (and if `--linked` is specified or `CLAYCLI_COMPILE_LINKED_FONTS` is set), this will generate a `public/css/_linked-fonts.<name>.css` file with `@font-face` declarations and copy the original font file to `public/fonts/`. Note that naming collisions are possible when using fonts of the same filename across different styleguides. If `--inlined` is specified (or `CLAYCLI_COMPILE_INLINED_FONTS` is set), this will generate a `public/css/_inlined-fonts.<name>.css` file with `@font-face` declarations that include a base64-encoded copy of the font.
+
 ```bash
 clay compile fonts [--watch] [--minify] [--inlined] [--linked] [--reporter <reporter>]
 ```
-
-Compile fonts from `styleguides/<name>/fonts/` to the `public` directory. By default (and if `--linked` is specified or `CLAYCLI_COMPILE_LINKED_FONTS` is set), this will generate a `public/css/_linked-fonts.<name>.css` file with `@font-face` declarations and copy the original font file to `public/fonts/`. Note that naming collisions are possible when using fonts of the same filename across different styleguides. If `--inlined` is specified (or `CLAYCLI_COMPILE_INLINED_FONTS` is set), this will generate a `public/css/_inlined-fonts.<name>.css` file with `@font-face` declarations that include a base64-encoded copy of the font.
 
 `@font-face` declarations are generated based on the filename of the original font file, with a simple convention to support various weights and styles.
 
@@ -472,11 +472,11 @@ $ clay compile fonts --minify
 
 ### Styles
 
+Compile styleguide CSS files with PostCSS. Source files from `styleguides/<styleguide name>/components/<component name>.css` (and `styleguides/<styleguide name>/layouts/<layout name>.css`) will be compiled to `public/css/<component or layout name>.<styleguide name>.css`.
+
 ```bash
 clay compile styles [--watch] [--minify] [--plugins <space-separated list of postcss plugins>] [--reporter <reporter>]
 ```
-
-Compile styleguide CSS files with PostCSS. Source files from `styleguides/<styleguide name>/components/<component name>.css` (and `styleguides/<styleguide name>/layouts/<layout name>.css`) will be compiled to `public/css/<component or layout name>.<styleguide name>.css`.
 
 By default, styles will be compiled using the [`import`](https://github.com/postcss/postcss-import), [`autoprefixer`](https://github.com/postcss/autoprefixer), [`mixins`](https://github.com/postcss/postcss-mixins), [`nested`](https://github.com/postcss/postcss-nested), and [`simple-vars`](https://github.com/postcss/postcss-simple-vars) PostCSS plugins, but you may specify additional plugins (that you have installed with `npm`) into the `--plugins` argument.
 
@@ -517,11 +517,11 @@ $ clay compile styles --minify
 
 ### Templates
 
+Precompile handlebars template so they can be used by Kiln to re-render components (and layouts) on the client side. Note that it is strongly encouraged to enable minification even in dev environments, as specifying `--minify` (or using `CLAYCLI_COMPILE_MINIFIED` or more specifically `CLAYCLI_COMPILE_MINIFIED_TEMPLATES`) will minify the compiled templates with [UglifyJS](https://github.com/mishoo/UglifyJS) and bundle them into six files based on the component/layout name. Minifying the templates provides the best balance between file size and the number of files Kiln has to fetch on page load.
+
 ```bash
 clay compile templates [--watch] [--minify] [--reporter <reporter>]
 ```
-
-Precompile handlebars template so they can be used by Kiln to re-render components (and layouts) on the client side. Note that it is strongly encouraged to enable minification even in dev environments, as specifying `--minify` (or using `CLAYCLI_COMPILE_MINIFIED` or more specifically `CLAYCLI_COMPILE_MINIFIED_TEMPLATES`) will minify the compiled templates with [UglifyJS](https://github.com/mishoo/UglifyJS) and bundle them into six files based on the component/layout name. Minifying the templates provides the best balance between file size and the number of files Kiln has to fetch on page load.
 
 * `public/js/_templates-a-d.js`
 * `public/js/_templates-e-h.js`
@@ -666,7 +666,7 @@ $ clay compile scripts --globs 'global/js/!(*.test).js'
 
 ### Project Specific Config File
 
-Not all projects are the same, and for project specific compilation changes you can add a `claycli.config.js` file to your project's root. This file must simply export an Object whose contains key/value pairs are read during compilation. Good use cases for this file include:
+Not all projects are the same, and for project specific compilation changes you can add a `claycli.config.js` file to your project's root. This file must simply export an Object containing key/value pairs that read during compilation. Good use cases for this file include:
 
 * Adding PostCSS plugins to [`styles`](#styles) compilation
 * Updating options passed into Autoprefixer
