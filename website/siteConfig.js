@@ -40,14 +40,14 @@ const siteConfig = {
   users,
 
   /* path to images for header/footer */
-  headerIcon: 'img/docusaurus.svg',
-  footerIcon: 'img/docusaurus.svg',
-  favicon: 'img/favicon.png',
+  headerIcon: 'img/logo.svg',
+  footerIcon: '',
+  favicon: 'img/logo.svg',
 
   /* Colors for website */
   colors: {
-    primaryColor: '#2E8555',
-    secondaryColor: '#205C3B',
+    primaryColor: '#88BBD6',
+    secondaryColor: '#99D3DF',
   },
 
   /* Custom fonts for website */
@@ -81,8 +81,8 @@ const siteConfig = {
   cleanUrl: true,
 
   // Open Graph and Twitter card images.
-  ogImage: 'img/docusaurus.png',
-  twitterImage: 'img/docusaurus.png',
+  ogImage: 'img/logo.svg',
+  twitterImage: 'img/logo.svg',
 
   // Show documentation's last contributor's name.
   // enableUpdateBy: true,
