@@ -1,4 +1,10 @@
 
+---
+name: Bug report
+about: Report a problem to help us resolve it and improve
+---
+
+
 ## Description
 
 A clear and concise description of what the bug is.
