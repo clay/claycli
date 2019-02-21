@@ -1,7 +1,8 @@
-
 ---
-name: Bug report
+name: Bug Report
 about: Report a problem to help us resolve it and improve
+title: ''
+
 ---
 
 
