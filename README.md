@@ -21,12 +21,12 @@ Note that a _site prefix_ is everything before the api route, e.g. `http://domai
 
 ```
 [keys]
-  local = ha8yds9a8shdf98asdf
-  qa = 8quwqwer09ewr0w9uer
-  prod = bj34b6345k634jnk63n4
+  local=ha8yds9a8shdf98asdf
+  qa=8quwqwer09ewr0w9uer
+  prod=bj34b6345k634jnk63n4
 [urls]
-  local-site1 = https://localhost.site1.com:3001
-  local-site2 = site2.com/site-2 # http and port 80
+  local-site1=https://localhost.site1.com:3001
+  local-site2=site2.com/site-2 # http and port 80
 ```
 
 For smaller Clay installations (or, ironically, for very large teams where devs spend most of their time on individual sites), you may specify a default api key and url / site prefix by using the `CLAYCLI_DEFAULT_KEY` and `CLAYCLI_DEFAULT_URL` environment variables.
