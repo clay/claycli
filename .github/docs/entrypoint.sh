@@ -23,8 +23,8 @@ echo "StrictHostKeyChecking no" >> "$SSH_PATH/config"
 # Change into the build directory
 cd $BUILD_DIR
 
-git config --global user.name "jonwinton" && \
-git config --global user.email "jonwinton@users.noreply.github.com" && \
+git config --global user.name "$GITHUB_ACTOR" && \
+git config --global user.email "$GITHUB_ACTOR@users.noreply.github.com" && \
 npm install && \
 npm run build && \
 npx gh-pages -d build/clay-cli --repo "git@github.com:$GITHUB_REPOSITORY.git"
