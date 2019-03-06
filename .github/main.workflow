@@ -1,15 +1,15 @@
-workflow "Test ghpages" {
+workflow "Deploy to GitHub Pages" {
   on = "push"
-  resolves = ["Deploy to GitHub Pages"]
+  resolves = ["Build and push docs"]
 }
 
-action "Build Docs" {
+action "Filter branch" {
   uses = "actions/bin/filter@master"
   args = "branch master"
 }
 
-action "Deploy to GitHub Pages" {
-  needs = ["Build Docs"]
+action "Build and push docs" {
+  needs = ["Filter branch"]
   uses = "./.github/docs"
   env = {
     BUILD_DIR = "website"
