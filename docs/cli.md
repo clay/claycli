@@ -1,6 +1,6 @@
 ---
 id: version-3.9.1-cli
-title: Claycli
+title: Clay CLI
 original_id: cli
 ---
 This is the `Clay` command line utility. Here we will provide you with documentation and examples that will help you to run all the functionalities that you need.
