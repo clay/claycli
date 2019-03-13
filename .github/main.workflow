@@ -10,9 +10,6 @@ action "Filter branch" {
 
 action "Build and push docs" {
   needs = ["Filter branch"]
-  uses = "./.github/docs"
-  env = {
-    BUILD_DIR = "website"
-  }
+  uses = "clay/docusaurus-github-action@master"
   secrets = ["DEPLOY_SSH_KEY"]
 }
