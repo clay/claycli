@@ -55,7 +55,12 @@ const siteConfig = {
 
   // Open Graph and Twitter card images.
   ogImage: 'img/logo.svg',
-  twitterImage: 'img/logo.svg'
+  twitterImage: 'img/logo.svg',
+  algolia: {
+    apiKey: process.env.ALGOLIA_API_KEY,
+    indexName: 'claycli',
+    algoliaOptions: {} // Optional, if provided by Algolia
+  }
 };
 
 module.exports = siteConfig;

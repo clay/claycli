@@ -11,5 +11,5 @@ action "Filter branch" {
 action "Build and push docs" {
   needs = ["Filter branch"]
   uses = "clay/docusaurus-github-action@master"
-  secrets = ["DEPLOY_SSH_KEY"]
+  secrets = ["DEPLOY_SSH_KEY", "ALGOLIA_API_KEY"]
 }
