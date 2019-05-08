@@ -668,7 +668,7 @@ The `claycli.config.js` file currently supports the following arguments:
 * `babelTargets` (_Object_): the value of this property is passed to the [Babel `targets` option](https://babeljs.io/docs/en/babel-preset-env#targets) to describe the environments your compiled scripts support
 * `autoprefixerOptions` (_Object_): an Object which is [passed directly to `autoprefixer`](https://www.npmjs.com/package/autoprefixer#options) for style and Kiln plugin compilation
 * `customTasks` (_Array_): an Array of Gulp tasks to execute with the `clay compile custom-tasks` command.
-
+* `postcssImportPaths` (_Array_): list of paths in which to look for nested CSS file imports to be used by the `styles` compilation command. If no value is specified in the congif, the CSS compiler will default to `['./styleguides']`.
 #### Example
 
 ```js
