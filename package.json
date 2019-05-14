@@ -1,6 +1,6 @@
 {
   "name": "claycli",
-  "version": "3.10.1",
+  "version": "3.10.2",
   "description": "A command-line interface for Clay",
   "main": "index.js",
   "preferGlobal": true,
