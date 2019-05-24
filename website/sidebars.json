@@ -1,3 +1,10 @@
 {
-  "docs": {}
+  "docs": {
+    "CLI": [
+      "cli"
+    ],
+    "Q/A": [
+      "issues/compilation_docs"
+    ]
+  }
 }
