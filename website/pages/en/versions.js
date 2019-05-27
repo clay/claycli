@@ -35,10 +35,10 @@ function Versions(props) {
               <tr>
                 <th>{latestVersion}</th>
                 <td>
-                  <a href={`${siteConfig.baseUrl}docs/${latestVersion}`}>Documentation</a>
+                  <a href={`${siteConfig.baseUrl}`}>Documentation</a>
                 </td>
                 <td>
-                  <a href={`https://github.com/clay/claycli/releases/tag/${latestVersion}`}>Release Notes</a>
+                  <a href={`https://github.com/clay/claycli/releases/tag/v${latestVersion}`}>Release Notes</a>
                 </td>
               </tr>
             </tbody>
@@ -53,10 +53,10 @@ function Versions(props) {
               <tr>
                 <th>master</th>
                 <td>
-                  <a href={`${siteConfig.baseUrl}docs/${latestVersion}`}>Documentation</a>
+                  <a href={`${siteConfig.baseUrl}docs/next/cli`}>Documentation</a>
                 </td>
                 <td>
-                  <a href={`https://github.com/clay/claycli/releases/tag/${latestVersion}`}>Release Notes</a>
+                  <a href={`https://github.com/clay/claycli/releases/tag/v${latestVersion}`}>Release Notes</a>
                 </td>
               </tr>
             </tbody>
@@ -74,7 +74,7 @@ function Versions(props) {
                         <a href={`${siteConfig.baseUrl}docs/${version}/`}>Documentation</a>
                       </td>
                       <td>
-                        <a href={`https://github.com/clay/claycli/releases/tag/${version}`}>Release Notes</a>
+                        <a href={`https://github.com/clay/claycli/releases/tag/v${version}`}>Release Notes</a>
                       </td>
                     </tr>
                   ),
