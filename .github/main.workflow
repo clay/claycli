@@ -9,11 +9,12 @@ action "Filter branch" {
 }
 
 action "Update version" {
+  needs = ["Filter branch"]
   uses = "clay/docusaurus-github-action/versions@master"
 }
 
 action "Build and push docs" {
-  needs = ["Filter branch", "Update version"]
+  needs = ["Update version"]
   uses = "clay/docusaurus-github-action/build_deploy@master"
   secrets = ["DEPLOY_SSH_KEY", "ALGOLIA_API_KEY"]
 }
