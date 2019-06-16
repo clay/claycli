@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
     <id>https://your-docusaurus-test-site.com/example_docs/blog</id>
-    <title>Test Site Blog</title>
+    <title>Test Site!!! Blog</title>
     <updated>2017-10-24T06:00:00Z</updated>
     <generator>Feed for Node.js</generator>
     <link rel="alternate" href="https://your-docusaurus-test-site.com/example_docs/blog"/>
-    <subtitle>The best place to stay up-to-date with the latest Test Site news and events.</subtitle>
+    <subtitle>The best place to stay up-to-date with the latest Test Site!!! news and events.</subtitle>
     <logo>https://your-docusaurus-test-site.com/example_docs/img/favicon.ico</logo>
     <rights>Copyright © 2019 Your Name or Your Company Name</rights>
     <entry>
