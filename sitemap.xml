@@ -3,5 +3,8 @@
 <url> <loc>https://clay.github.io/claycli/versions</loc> <changefreq>weekly</changefreq> <priority>0.5</priority> <xhtml:link rel="alternate" hreflang="en" href="https://clay.github.io/claycli/en/versions" /> </url>
 <url> <loc>https://clay.github.io/claycli/docs/next/cli</loc> <changefreq>hourly</changefreq> <priority>1.0</priority> <xhtml:link rel="alternate" hreflang="en" href="https://clay.github.io/claycli/docs/next/cli" /> </url>
 <url> <loc>https://clay.github.io/claycli/docs/next/issues/compilation_docs</loc> <changefreq>hourly</changefreq> <priority>1.0</priority> <xhtml:link rel="alternate" hreflang="en" href="https://clay.github.io/claycli/docs/next/issues/compilation_docs" /> </url>
+<url> <loc>https://clay.github.io/claycli/docs/next/README</loc> <changefreq>hourly</changefreq> <priority>1.0</priority> <xhtml:link rel="alternate" hreflang="en" href="https://clay.github.io/claycli/docs/next/README" /> </url>
+<url> <loc>https://clay.github.io/claycli/docs/issues/compilation_docs</loc> <changefreq>hourly</changefreq> <priority>1.0</priority> <xhtml:link rel="alternate" hreflang="en" href="https://clay.github.io/claycli/docs/issues/compilation_docs" /> </url>
 <url> <loc>https://clay.github.io/claycli/docs/cli</loc> <changefreq>hourly</changefreq> <priority>1.0</priority> <xhtml:link rel="alternate" hreflang="en" href="https://clay.github.io/claycli/docs/cli" /> </url>
+<url> <loc>https://clay.github.io/claycli/docs/3.9.1/cli</loc> <changefreq>hourly</changefreq> <priority>1.0</priority> <xhtml:link rel="alternate" hreflang="en" href="https://clay.github.io/claycli/docs/3.9.1/cli" /> </url>
 </urlset>
