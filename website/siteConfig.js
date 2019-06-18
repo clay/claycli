@@ -2,7 +2,7 @@
 // site configuration options.
 
 const repoUrl = 'https://github.com/clay/claycli',
-  projectName = process.env.PROJECT_NAME || 'site';
+  projectName = process.env.PROJECT_NAME || 'claycli';
 
 // List of projects/orgs using your project for the users page.
 const users = [

@@ -7,7 +7,7 @@
     "write-translations": "docusaurus-write-translations",
     "version": "docusaurus-version",
     "rename-version": "docusaurus-rename-version",
-    "deploy": "gh-pages -d build/clay-cli"
+    "deploy": "gh-pages -d build/claycli"
   },
   "devDependencies": {
     "docusaurus": "^1.7.2",
