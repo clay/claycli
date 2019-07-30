@@ -4,19 +4,25 @@ workflow "Deploy to GitHub Pages" {
 }
 
 action "Filter branch" {
-  uses = "actions/bin/filter@master"
+  uses = "actions/bin/filter/@master"
   args = "branch master"
 }
 
-action "Update version" {
+action "Install" {
   needs = ["Filter branch"]
+  uses = "actions/npm@master"
+  args = "install --prefix ./website"
+}
+
+action "Update version" {
+  needs = ["Install"]
   uses = "clay/docusaurus-github-action@master"
-  args="version"
+  args = "version"
 }
 
 action "Build and push docs" {
   needs = ["Update version"]
   uses = "clay/docusaurus-github-action@master"
-  args="deploy"
+  args = "deploy"
   secrets = ["DEPLOY_SSH_KEY", "ALGOLIA_API_KEY"]
 }
