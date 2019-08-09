@@ -1,4 +1,3 @@
-
 version: 2
 ​
 # Set defaults to reuse
@@ -10,7 +9,6 @@ defaults: &defaults
 jobs:
   test:
     <<: *defaults
-    parallelism: 4
     steps:
       - checkout
 ​
@@ -23,7 +21,7 @@ jobs:
       - run: npm install
       - run:
           name: Run tests
-          command: npm test -- --maxWorkers=4
+          command: npm test
       - run:
           name: Send to Coveralls
           command: npm run coveralls
