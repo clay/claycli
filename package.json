@@ -25,7 +25,8 @@
       "!lib/cmd/compile/**",
       "!**/coverage/**",
       "!**/index.js",
-      "!lib/gulp-plugins/gulp-newer/*.js"
+      "!lib/gulp-plugins/gulp-newer/*.js",
+      "!website/**"
     ],
     "testPathIgnorePatterns": [
       "/node_modules/",
