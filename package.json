@@ -9,7 +9,8 @@
   },
   "scripts": {
     "lint": "eslint --max-warnings 0 lib cli index.js",
-    "test": "npm run lint && jest --coverage && cat ./coverage/lcov.info | coveralls",
+    "test": "npm run lint && jest",
+    "coveralls": "cat ./coverage/lcov.info | coveralls",
     "watch": "jest --watch"
   },
   "jest": {
@@ -24,7 +25,8 @@
       "!lib/cmd/compile/**",
       "!**/coverage/**",
       "!**/index.js",
-      "!lib/gulp-plugins/gulp-newer/*.js"
+      "!lib/gulp-plugins/gulp-newer/*.js",
+      "!website/**"
     ],
     "testPathIgnorePatterns": [
       "/node_modules/",
