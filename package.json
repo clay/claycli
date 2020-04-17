@@ -63,10 +63,10 @@
   },
   "dependencies": {
     "@babel/core": "^7.0.1",
-    "@babel/preset-env": "^7.0.0",
+    "@babel/preset-env": "^7.9.5",
     "@nymag/vueify": "^9.4.5",
     "amphora-fs": "^1.0.2",
-    "autoprefixer": "^9.0.2",
+    "autoprefixer": "^9.7.6",
     "babelify": "^10.0.0",
     "base-64": "^0.1.0",
     "browserify": "^16.2.2",
