@@ -8,7 +8,7 @@
     "clay": "cli/index.js"
   },
   "scripts": {
-    "lint": "eslint --max-warnings 0 lib cli index.js",
+    "lint": "eslint lib cli index.js",
     "test": "npm run lint && jest",
     "coveralls": "cat ./coverage/lcov.info | coveralls",
     "release": "./circleci/scripts/release.sh",
