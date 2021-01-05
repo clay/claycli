@@ -8,9 +8,10 @@
     "clay": "cli/index.js"
   },
   "scripts": {
-    "lint": "eslint --max-warnings 0 lib cli index.js",
+    "lint": "eslint lib cli index.js",
     "test": "npm run lint && jest",
     "coveralls": "cat ./coverage/lcov.info | coveralls",
+    "release": "./circleci/scripts/release.sh",
     "watch": "jest --watch"
   },
   "jest": {
@@ -105,7 +106,7 @@
     "js-yaml": "^3.10.0",
     "kew": "^0.7.0",
     "lodash": "^4.17.5",
-    "node-sass": "^4.9.3",
+    "node-sass": "^4.14.0",
     "nyansole": "^0.5.1",
     "plugin-error": "^1.0.1",
     "pluralize": "^7.0.0",
