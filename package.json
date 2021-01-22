@@ -11,7 +11,7 @@
     "lint": "eslint lib cli index.js",
     "test": "npm run lint && jest",
     "coveralls": "cat ./coverage/lcov.info | coveralls",
-    "release": "./circleci/scripts/release.sh",
+    "release": "./.circleci/scripts/release.sh",
     "watch": "jest --watch"
   },
   "jest": {
