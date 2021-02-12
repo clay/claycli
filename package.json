@@ -81,7 +81,7 @@
     "chokidar": "^2.0.4",
     "clay-log": "^1.3.0",
     "clayhandlebars": "5.0.2-0",
-    "clayutils": "^2.5.0",
+    "clayutils": "clay/clayutils#handlebars_peer_dependency",
     "date-fns": "^1.29.0",
     "dependency-tree": "^6.1.1",
     "detective-postcss": "^2.1.2",
