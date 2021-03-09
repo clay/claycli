@@ -16,11 +16,12 @@ const yargs = require('yargs'),
     pkg
   }),
   commands = {
+    c: 'compile',
     cfg: 'config',
-    l: 'lint',
-    i: 'import',
     e: 'export',
-    c: 'compile'
+    i: 'import',
+    l: 'lint',
+    p: 'pack'
   },
   listCommands = Object.keys(commands).concat(Object.values(commands));
 
