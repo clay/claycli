@@ -54,7 +54,7 @@ function handler(argv) {
     // if we're pointed at an elastic prefix, run a query to fetch pages
     if (isPrefix) {
       return h(getStdin()
-        .then(yaml.safeLoad)
+        .then(yaml.load)
         .then((query) => {
           return exporter.fromQuery(url, query, {
             key: argv.key,
@@ -80,7 +80,7 @@ function handler(argv) {
     .stopOnError((e) => fatalError(e, argv))
     .map((res) => {
       const rootKey = Object.keys(res)[0], // could be unprefixed uri OR type of thing (if exporting a bootstrap)
-        str = argv.yaml ? yaml.safeDump(res) : `${JSON.stringify(res)}\n`;
+        str = argv.yaml ? yaml.dump(res) : `${JSON.stringify(res)}\n`;
 
       process.stdout.write(str); // pipe stringified exported stuff to stdout
       if (argv.yaml) {
