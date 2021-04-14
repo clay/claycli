@@ -1,6 +1,6 @@
 'use strict';
 
-const getPackConfig = require('./config'),
+const { getWebpackConfig } = require('../../lib/cmd/pack'),
   webpack = require('webpack');
 
 function builder(yargs) {
@@ -9,7 +9,7 @@ function builder(yargs) {
 }
 
 async function handler() {
-  const config = getPackConfig().toConfig();
+  const config = getWebpackConfig().toConfig();
   const compiler = webpack(config);
 
   return new Promise((resolve, reject) => {
