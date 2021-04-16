@@ -109,6 +109,7 @@
     "lodash": "^4.17.5",
     "node-sass": "^5.0.0",
     "nyansole": "^0.5.1",
+    "path-browserify": "^1.0.1",
     "plugin-error": "^1.0.1",
     "pluralize": "^8.0.0",
     "postcss": "^7.0.25",
@@ -128,6 +129,7 @@
     "webpack": "^5.32.0",
     "webpack-assets-manifest": "^5.0.4",
     "webpack-chain": "^6.5.1",
+    "webpack-common-shake": "^2.1.0",
     "yargs": "^16.2.0"
   },
   "optionalDependencies": {
