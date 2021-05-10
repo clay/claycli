@@ -9,8 +9,8 @@ function builder(yargs) {
     .usage('Usage: $0 pack [asset] [globs..]')
     .example('$0 pack', 'compile all assets with webpack')
     .example('$0 pack "./components/**/client.js"', 'compile component JavaScript assets with webpack')
-    .positional(...options.asset)
-    .positional(...options.globs)
+    .positional(...options.asset)     // FIXME: Duplicative optional positional arguments.
+    .positional(...options.globs)     // FIXME: Duplicative optional positional options.
     .command(require('./scripts'));
 }
 
