@@ -1,31 +1,29 @@
 'use strict';
 
-const { getWebpackConfig } = require('../../lib/cmd/pack'),
-  webpack = require('webpack');
+const options = require('./options');
+const { handler: scriptsHandler } = require('./scripts');
+const log = require('../log').setup({ file: __filename });
 
 function builder(yargs) {
   return yargs
-    .usage('Usage: $0 pack');
+    .usage('Usage: $0 pack [asset] [globs..]')
+    .example('$0 pack', 'compile all assets with webpack')
+    .example('$0 pack "./components/**/client.js"', 'compile component JavaScript assets with webpack')
+    .positional(...options.asset)
+    .positional(...options.globs)
+    .command(require('./scripts'));
 }
 
-async function handler() {
-  const config = getWebpackConfig().toConfig();
-  const compiler = webpack(config);
-
-  return new Promise((resolve, reject) => {
-    compiler.run((err, stats) => {
-      if (err) {
-        return reject(err);
-      }
-
-      if (stats.hasErrors()) {
-        const msg = stats.toString('errors-only');
-
-        reject(new Error(msg));
-      }
-
-      resolve();
+async function handler(argv) {
+  return Promise.allSettled([
+    scriptsHandler(argv)
+  ]).catch(err => {
+    log('error', 'Asset compilation failed', {
+      message: err.message,
+      stack: err.stack
     });
+
+    throw err;
   });
 }
 
