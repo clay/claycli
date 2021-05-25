@@ -6,11 +6,8 @@ const log = require('../log').setup({ file: __filename });
 
 function builder(yargs) {
   return yargs
-    .usage('Usage: $0 pack [asset] [globs..]')
+    .usage('Usage: $0 pack')
     .example('$0 pack', 'compile all assets with webpack')
-    .example('$0 pack "./components/**/client.js"', 'compile component JavaScript assets with webpack')
-    .positional(...options.asset)     // FIXME: Duplicative optional positional arguments.
-    .positional(...options.globs)     // FIXME: Duplicative optional positional options.
     .command(require('./scripts'));
 }
 

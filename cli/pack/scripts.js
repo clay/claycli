@@ -41,6 +41,6 @@ function handler(argv) {
 }
 
 exports.command = 'scripts [globs..]';
-exports.description = 'Compile scripts with Webpack'
+exports.description = 'Compile scripts with Webpack';
 exports.builder = builder;
 exports.handler = handler;
