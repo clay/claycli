@@ -1,6 +1,5 @@
 'use strict';
 
-const options = require('./options');
 const { handler: scriptsHandler } = require('./scripts');
 const log = require('../log').setup({ file: __filename });
 
