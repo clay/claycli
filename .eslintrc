@@ -1,12 +1,13 @@
 {
   "parserOptions": {
-    "ecmaVersion": 6
+    "ecmaVersion": 2019
   },
   "env": {
     "browser": false,
     "commonjs": true,
     "mocha": true,
     "es6": true,
+    "node": true
   },
   // add global vars for chai, etc
   "globals": {
@@ -37,7 +38,13 @@
     // strict mode
     "strict": [2, "safe"],
     // variables
-    "no-unused-vars": 2,
+    "no-undef": 2,
+    "no-unused-vars": [2,
+      {
+        "ignoreRestSiblings": true,
+        "varsIgnorePattern": "^_"
+      }
+    ],
     // node.js
     "handle-callback-err": [2, "^.*(e|E)rr"],
     "no-mixed-requires": 0,
@@ -54,7 +61,7 @@
     "no-trailing-spaces": 2,
     "no-underscore-dangle": 0,
     "no-unneeded-ternary": 1,
-    "one-var": 2,
+    "one-var": 0,
     "quotes": [2, "single", "avoid-escape"],
     "semi": [2, "always"],
     "keyword-spacing": 2,
