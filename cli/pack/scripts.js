@@ -32,7 +32,9 @@ function handler(argv) {
     });
   }).then(compiler => {
     compiler.close(err => {
-      throw err;
+      if (err) {
+        throw err;
+      }
     });
   }).catch((err) => {
     log('error', 'Script compilation failed', {
