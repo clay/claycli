@@ -7,7 +7,7 @@ module.exports = {
       array: true,
       alias: ['g'],
       default: [],
-      description: 'optional list of glob patterns to compile',
+      description: 'list of glob patterns to compile',
       type: 'array'
     }
   ]
