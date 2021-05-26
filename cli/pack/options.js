@@ -6,7 +6,7 @@ module.exports = {
     {
       array: true,
       alias: ['g'],
-      default: ['./components/**/client.js'],
+      default: [],
       description: 'optional list of glob patterns to compile',
       type: 'array'
     }

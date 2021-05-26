@@ -28,7 +28,13 @@ function handler(argv) {
         reject(new Error(msg));
       }
 
-      resolve();
+      resolve(compiler);
+    });
+  }).then(compiler => {
+    compiler.close(err => {
+      if (err) {
+        throw err;
+      }
     });
   }).catch((err) => {
     log('error', 'Script compilation failed', {
