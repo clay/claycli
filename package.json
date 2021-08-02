@@ -87,7 +87,6 @@
     "clay-log": "^1.3.0",
     "clayhandlebars": "^3.3.1",
     "clayutils": "^3.0.0",
-    "clean-webpack-plugin": "^4.0.0-alpha.0",
     "css-loader": "^5.2.4",
     "date-fns": "^2.17.0",
     "dependency-tree": "^8.0.0",
