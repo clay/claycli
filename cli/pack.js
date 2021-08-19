@@ -6,15 +6,8 @@ const webpack = require('webpack');
 
 function builder(yargs) {
   return yargs
-    .usage('Usage: $0 [entries..]')
-    .example('$0 "./components/init.js" "global/index.js"', 'Compile entrypoints for components and globals.')
-    .positional('entries', {
-      array: true,
-      alias: ['e'],
-      default: [],
-      description: 'list of glob patterns to compile',
-      type: 'array'
-    });
+    .usage('Usage: $0')
+    .example('$0', 'Compile the entrypoints configured in Webpack.');
 }
 
 /**
