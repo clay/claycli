@@ -137,7 +137,7 @@
     "uglify-js": "^3.4.6",
     "uglifyify": "^5.0.2",
     "unreachable-branch-transform": "^0.5.1",
-    "update-notifier": "^5.1.0",
+    "update-notifier": "^6.0.2",
     "vue-loader": "^15.9.6",
     "webpack": "^5.32.0",
     "webpack-assets-manifest": "^5.0.4",
