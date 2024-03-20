@@ -63,8 +63,8 @@
     "mock-fs": "^4.8.0"
   },
   "dependencies": {
-    "@babel/core": "^7.0.1",
-    "@babel/preset-env": "^7.0.0",
+    "@babel/core": "^7.24.3",
+    "@babel/preset-env": "^7.24.3",
     "@nymag/vueify": "^9.4.5",
     "amphora-fs": "^2.0.0",
     "autoprefixer": "^9.0.2",
