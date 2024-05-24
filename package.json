@@ -67,7 +67,7 @@
   "dependencies": {
     "@babel/core": "^7.24.3",
     "@babel/preset-env": "^7.24.3",
-    "@nymag/vueify": "^9.4.5",
+    "@nymag/vueify": "^10.0.0-0",
     "amphora-fs": "^1.0.2",
     "autoprefixer": "^9.8.6",
     "babel-loader": "^8.2.2",
