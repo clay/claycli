@@ -35,7 +35,7 @@ function handler(argv) {
   const t1 = Date.now(),
     media = compile.media({ watch: argv.watch }); // run media task before others (specifically, templates)
 
-  return h(media.build).collect().toArray((mediaResults) => {
+  return h([]).toArray((mediaResults) => {
     const fonts = compile.fonts({
         watch: argv.watch,
         minify: argv.minify,
@@ -57,9 +57,9 @@ function handler(argv) {
         globs: argv.globs,
         reporter: argv.reporter
       }),
-      tasks = [fonts, styles, templates, scripts],
+      tasks = [scripts],
       builders = _.map(tasks, (task) => task.build),
-      watchers = _.map(tasks, (task) => task.watch).concat([media.watch]),
+      watchers = _.map(tasks, (task) => task.watch),
       isWatching = !!watchers[0];
 
     return h([h.of(mediaResults)].concat(builders))
