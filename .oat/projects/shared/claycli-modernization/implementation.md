@@ -3,7 +3,7 @@ oat_status: in_progress
 oat_ready_for: null
 oat_blockers: []
 oat_last_updated: 2026-02-25
-oat_current_task_id: p01-t04
+oat_current_task_id: p01-t05
 oat_generated: false
 ---
 
@@ -26,12 +26,12 @@ oat_generated: false
 | Phase | Status | Tasks | Completed |
 |-------|--------|-------|-----------|
 | Phase 0: Characterization Tests | completed | 3 | 3/3 |
-| Phase 1: Foundation | in_progress | 5 | 3/5 |
+| Phase 1: Foundation | in_progress | 5 | 4/5 |
 | Phase 2: Bundling Pipeline | pending | 7 | 0/7 |
 | Phase 3: Dependency Cleanup | pending | 8 | 0/8 |
 | Phase 4: TypeScript Conversion | pending | 9 | 0/9 |
 
-**Total:** 6/32 tasks completed
+**Total:** 7/32 tasks completed
 
 **Integration Test Checkpoints (HiLL gates):**
 - Checkpoint 1 (p02-t07): after P0+P1+P2 — Browserify→Webpack migration
@@ -257,11 +257,26 @@ Removed — `clay pack` was an unreleased experiment. No characterization tests 
 
 ### Task p01-t04: Update CI configuration
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** 9a4fb63
 
-**Notes:**
-- Node 20/22 matrix; requires approval per AGENTS.md
+**Outcome (required):**
+- Replaced Node 10/12/14 test matrix with Node 20/22
+- Updated docker images from deprecated `circleci/node` to `cimg/node`
+- Bumped cache key versions (v2→v3) for clean dependency installs
+- Moved Coveralls coverage reporting to Node 22 job
+- Updated deploy_docs and deploy_package to Node 22
+
+**Files changed:**
+- `.circleci/config.yml` - updated test matrix, docker images, cache keys
+
+**Verification:**
+- Run: `npm test`
+- Result: 341 tests passed (CI config validated on push)
+
+**Notes / Decisions:**
+- User approval obtained per AGENTS.md requirement
+- Used specific minor versions (20.18, 22.14) for reproducible CI builds
 
 ---
 
