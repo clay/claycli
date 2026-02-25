@@ -3,7 +3,7 @@ oat_status: in_progress
 oat_ready_for: null
 oat_blockers: []
 oat_last_updated: 2026-02-25
-oat_current_task_id: p02-t04
+oat_current_task_id: p02-t07
 oat_generated: false
 ---
 
@@ -27,11 +27,11 @@ oat_generated: false
 |-------|--------|-------|-----------|
 | Phase 0: Characterization Tests | completed | 3 | 3/3 |
 | Phase 1: Foundation | completed | 5 | 5/5 |
-| Phase 2: Bundling Pipeline | in_progress | 7 | 3/7 |
+| Phase 2: Bundling Pipeline | in_progress | 7 | 6/7 |
 | Phase 3: Dependency Cleanup | pending | 8 | 0/8 |
 | Phase 4: TypeScript Conversion | pending | 9 | 0/9 |
 
-**Total:** 11/32 tasks completed
+**Total:** 14/32 tasks completed
 
 **Integration Test Checkpoints (HiLL gates):**
 - Checkpoint 1 (p02-t07): after P0+P1+P2 — Browserify→Webpack migration
@@ -323,8 +323,8 @@ Removed — `clay pack` was an unreleased experiment. No characterization tests 
 
 ## Phase 2: Bundling Pipeline Modernization
 
-**Status:** pending
-**Started:** -
+**Status:** in_progress
+**Started:** 2026-02-25
 
 ### Task p02-t01: Upgrade PostCSS 7 to 8
 
@@ -405,22 +405,56 @@ Removed — `clay pack` was an unreleased experiment. No characterization tests 
 
 ### Task p02-t04: Update Babel browser targets
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** ae0ff97
+
+**Outcome (required):**
+- Updated default browserslist from '> 3%, not and_uc > 0' to modern targets
+- New targets: Chrome 89+, Safari 14+, Firefox 90+, Edge 89+
+- claycli.config.js override mechanism still works
+
+**Files changed:**
+- `lib/compilation-helpers.js` - updated browserslist default
+
+**Verification:**
+- Run: `npm test`
+- Result: 341 passed, 0 lint errors
 
 ---
 
 ### Task p02-t05: Evaluate and document Gulp retention
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** (no code changes)
+
+**Outcome (required):**
+- Evaluated Gulp 4 usage: templates, fonts, media, and styles compilation
+- Decision: RETAIN Gulp 4 — these are simple stream pipelines
+- Browserify→Webpack was the high-value change; Gulp replacement adds risk without benefit
+- Gulp is also used by buildKiln() and copyClientInit() in the new Webpack-based scripts.js
+
+**Notes / Decisions:**
+- Gulp 4 retained for: compile/templates, compile/styles, compile/fonts, compile/media
+- Future consideration: could replace Gulp with native Node streams or Webpack in Phase 3+
 
 ---
 
 ### Task p02-t06: Update AGENTS.md for Phase 2
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** 2e661e9
+
+**Outcome (required):**
+- Updated AGENTS.md technology stack to reflect Webpack 5 bundling pipeline (removed Browserify references)
+- Updated build tooling description to include PostCSS 8
+- Reflects current state of codebase after Phase 2 changes
+
+**Files changed:**
+- `AGENTS.md` - Updated technology stack and build tooling sections
+
+**Verification:**
+- Run: `npm test`
+- Result: pass — 341 tests, lint clean
 
 ---
 
