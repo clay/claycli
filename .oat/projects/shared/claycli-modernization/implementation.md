@@ -25,13 +25,18 @@ oat_generated: false
 
 | Phase | Status | Tasks | Completed |
 |-------|--------|-------|-----------|
-| Phase 0: Characterization Tests | pending | 4 | 0/4 |
+| Phase 0: Characterization Tests | pending | 3 | 0/3 |
 | Phase 1: Foundation | pending | 5 | 0/5 |
-| Phase 2: Bundling Pipeline | pending | 6 | 0/6 |
-| Phase 3: Dependency Cleanup | pending | 7 | 0/7 |
-| Phase 4: TypeScript Conversion | pending | 8 | 0/8 |
+| Phase 2: Bundling Pipeline | pending | 7 | 0/7 |
+| Phase 3: Dependency Cleanup | pending | 8 | 0/8 |
+| Phase 4: TypeScript Conversion | pending | 9 | 0/9 |
 
-**Total:** 0/30 tasks completed
+**Total:** 0/32 tasks completed
+
+**Integration Test Checkpoints (HiLL gates):**
+- Checkpoint 1 (p02-t07): after P0+P1+P2 — Browserify→Webpack migration
+- Checkpoint 2 (p03-t08): after P3 — Highland→async/await
+- Checkpoint 3 (p04-t09): after P4 — TypeScript conversion
 
 ---
 
@@ -88,14 +93,9 @@ oat_generated: false
 
 ---
 
-### Task p00-t04: Add characterization tests for pack/get-webpack-config.js
+### ~~Task p00-t04~~ REMOVED
 
-**Status:** pending
-**Commit:** -
-
-**Notes:**
-- 295 LOC, zero tests; may share config with new compile pipeline
-- Must capture webpack-chain Config generation and public API contract
+Removed — `clay pack` was an unreleased experiment. No characterization tests needed.
 
 ---
 
@@ -217,6 +217,18 @@ oat_generated: false
 
 ---
 
+### Task p02-t07: Integration test checkpoint 1 — nymag/sites
+
+**Status:** pending
+**Commit:** -
+
+**Notes:**
+- HiLL gate — highest-risk checkpoint (Browserify→Webpack)
+- Must pass before proceeding to Phase 3
+- Baseline: 1193 files in ~6s
+
+---
+
 ## Phase 3: Dependency Cleanup & Stream Modernization
 
 **Status:** pending
@@ -273,6 +285,17 @@ oat_generated: false
 
 **Status:** pending
 **Commit:** -
+
+---
+
+### Task p03-t08: Integration test checkpoint 2 — nymag/sites
+
+**Status:** pending
+**Commit:** -
+
+**Notes:**
+- HiLL gate — verify Highland→async/await didn't break compile
+- Must pass before proceeding to Phase 4
 
 ---
 
@@ -334,6 +357,17 @@ oat_generated: false
 
 **Status:** pending
 **Commit:** -
+
+---
+
+### Task p04-t09: Integration test checkpoint 3 — nymag/sites
+
+**Status:** pending
+**Commit:** -
+
+**Notes:**
+- Final integration gate — TypeScript-compiled output must be drop-in replacement
+- All 3 checkpoints must pass before final PR
 
 ---
 

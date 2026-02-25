@@ -5,7 +5,7 @@ oat_blockers: []
 oat_last_updated: 2026-02-25
 oat_phase: plan
 oat_phase_status: complete
-oat_plan_hill_phases: [2, 3]
+oat_plan_hill_phases: [2, 3, 4]
 oat_plan_source: imported
 oat_import_reference: references/imported-plan.md
 oat_import_source_path: /Users/thomas.stang/.claude/plans/gentle-questing-snowflake.md
@@ -25,12 +25,23 @@ oat_generated: false
 
 **Commit Convention:** `{type}({scope}): {description}` - e.g., `chore(p01-t01): update Node engine to >=20`
 
-**Integration Constraints:** See `references/imported-plan.md` § Integration Constraints for hard/soft contracts with nymag/sites. Critical: `getDependencies()` API, `getWebpackConfig()` API, `client-env.json` output, output file naming in `public/js/`, `claycli.config.js` API.
+**Integration Constraints:** See `references/imported-plan.md` § Integration Constraints for hard/soft contracts with nymag/sites. Critical: `getDependencies()` API, `client-env.json` output, output file naming in `public/js/`, `claycli.config.js` API. Note: `getWebpackConfig()` / `clay pack` is a soft contract — nymag/sites confirmed they never use `build:pack` in production. Integration testing targets `npm run build` (`clay compile`) only.
 
 ## Planning Checklist
 
-- [x] Confirmed HiLL checkpoints with user (Phases 2 and 3 — bundling rewrite + dependency modernization)
+- [x] Confirmed HiLL checkpoints with user
 - [x] Set `oat_plan_hill_phases` in frontmatter
+
+**Integration Test Checkpoints:**
+
+| Checkpoint | After Phases | Gate | What to verify |
+|---|---|---|---|
+| 1 | P0 + P1 + P2 | `npm link` → `npm run build` in nymag/sites | Browserify→Webpack migration produces identical output |
+| 2 | P3 | `npm link` → `npm run build` in nymag/sites | `clay compile` still works after Highland→async/await |
+| 3 | P4 | `npm link` → `npm run build` in nymag/sites | TypeScript-compiled output is a drop-in replacement |
+
+**nymag/sites location:** `/Users/thomas.stang/code/vox/nymag/sites`
+**Integration test command:** `npm run build` (`clay compile`) — skip `build:pack` (unused)
 
 ---
 
@@ -118,31 +129,9 @@ git commit -m "test(p00-t03): add characterization tests for compile/styles.js"
 
 ---
 
-### Task p00-t04: Add characterization tests for pack/get-webpack-config.js
+### ~~Task p00-t04~~ REMOVED
 
-**Files:**
-- Create: `lib/cmd/pack/get-webpack-config.test.js`
-
-**Step 1: Write tests (RED→GREEN)**
-
-Write tests for `get-webpack-config.js` (295 LOC). Cover:
-- Config generation returns webpack-chain Config object
-- `.toConfig()` produces valid Webpack config
-- `.entryPoints` is accessible (nymag/sites API contract)
-- Loader setup (babel, vue, css, postcss) present in output
-- Plugin configuration (DotenvPlugin, VueLoaderPlugin, etc.)
-- Custom config override via `packConfig` callback
-- Dev vs prod environment differences
-
-Run: `npx jest lib/cmd/pack/get-webpack-config.test.js`
-Expected: Tests pass, documenting config generation behavior
-
-**Step 2: Commit**
-
-```bash
-git add lib/cmd/pack/get-webpack-config.test.js
-git commit -m "test(p00-t04): add characterization tests for get-webpack-config"
-```
+Removed — `clay pack` / `get-webpack-config.js` was an incomplete experiment that never shipped to production. nymag/sites confirmed they don't use `build:pack`. No characterization tests needed for unused code. The pack command's webpack-chain patterns will be used as reference material for Phase 2, not preserved as a contract.
 
 ---
 
@@ -403,14 +392,17 @@ Expected: All tests pass
 
 **Step 4: Integration test with nymag/sites**
 
-TODO: `npm link` claycli into nymag/sites (`/Users/thomas.stang/code/vox/nymag/sites`), verify:
-- `npm run build` produces correct `public/js/` output
-- `_registry.json` and `_ids.json` are valid
-- `client-env.json` generated
-- Server starts without errors
-- `getDependencies()` returns correct script lists
-- HMR works via `npm run watch:pack`
+`npm link` claycli into nymag/sites (`/Users/thomas.stang/code/vox/nymag/sites`), verify:
+- `npm run build` (`clay compile`) completes successfully
+- `public/js/` contains expected bucket files (`_models-a-d.js`, `_deps-e-h.js`, etc.)
+- `_registry.json` is valid JSON with correct module ID → dependency ID structure
+- `_ids.json` is valid JSON with correct file path → module ID structure
+- `client-env.json` is generated with env variable names
+- `*.template.js`, `*.client.js` files exist for components
+- `_kiln-plugins.js` and `_kiln-plugins.css` are generated
 - Rebuild times <5 seconds for file changes
+
+Note: Skip `build:pack` (`clay pack`) — nymag/sites does not use it in production. It has pre-existing Webpack 5 polyfill errors unrelated to claycli.
 
 **Step 5: Commit**
 
@@ -514,6 +506,49 @@ Expected: No lint errors
 git add AGENTS.md
 git commit -m "docs(p02-t06): update AGENTS.md for Webpack 5 bundling pipeline"
 ```
+
+---
+
+### Task p02-t07: Integration test checkpoint 1 — nymag/sites
+
+**HiLL Gate:** Pause for user confirmation before proceeding to Phase 3.
+
+**Step 1: Link claycli into nymag/sites**
+
+```bash
+cd /Users/thomas.stang/Code/vox/claycli && npm link
+cd /Users/thomas.stang/code/vox/nymag/sites && npm link claycli
+```
+
+**Step 2: Run build**
+
+```bash
+cd /Users/thomas.stang/code/vox/nymag/sites && npm run build
+```
+
+Expected: `clay compile` completes successfully (baseline: 1193 files in ~6s)
+
+**Step 3: Verify output**
+
+Check `public/js/` for:
+- Bucket files exist: `_models-a-d.js`, `_deps-e-h.js`, etc.
+- `_registry.json` is valid JSON with module ID → dependency ID arrays
+- `_ids.json` is valid JSON with file path → module ID mapping
+- `client-env.json` generated with env variable names
+- `*.template.js`, `*.client.js` files exist for components
+- `_kiln-plugins.js` and `_kiln-plugins.css` are generated
+- `_prelude.js`, `_postlude.js`, `_client-init.js` present
+
+**Step 4: Unlink**
+
+```bash
+cd /Users/thomas.stang/code/vox/nymag/sites && npm unlink claycli
+cd /Users/thomas.stang/Code/vox/claycli && npm unlink
+```
+
+**Step 5: Record results and get user sign-off**
+
+Document pass/fail in implementation.md. This is the highest-risk checkpoint — the Browserify→Webpack migration must produce identical output. Do not proceed to Phase 3 without user confirmation.
 
 ---
 
@@ -765,6 +800,38 @@ git commit -m "docs(p03-t07): update AGENTS.md for async/await and modern deps"
 
 ---
 
+### Task p03-t08: Integration test checkpoint 2 — nymag/sites
+
+**HiLL Gate:** Pause for user confirmation before proceeding to Phase 4.
+
+**Step 1: Link and build**
+
+```bash
+cd /Users/thomas.stang/Code/vox/claycli && npm link
+cd /Users/thomas.stang/code/vox/nymag/sites && npm link claycli
+npm run build
+```
+
+Expected: `clay compile` completes successfully
+
+**Step 2: Smoke test**
+
+- Build output matches checkpoint 1 results
+- No regressions from Highland→async/await or dependency modernization
+
+**Step 3: Unlink**
+
+```bash
+cd /Users/thomas.stang/code/vox/nymag/sites && npm unlink claycli
+cd /Users/thomas.stang/Code/vox/claycli && npm unlink
+```
+
+**Step 4: Record results and get user sign-off**
+
+Document pass/fail in implementation.md. Do not proceed to Phase 4 without user confirmation.
+
+---
+
 ## Phase 4: TypeScript Conversion
 
 ### Task p04-t01: Set up TypeScript infrastructure
@@ -976,6 +1043,40 @@ git commit -m "docs(p04-t08): update AGENTS.md for TypeScript codebase"
 
 ---
 
+### Task p04-t09: Integration test checkpoint 3 — nymag/sites
+
+**Final integration gate.** Verify TypeScript-compiled output is a drop-in replacement.
+
+**Step 1: Link and build**
+
+```bash
+cd /Users/thomas.stang/Code/vox/claycli && npm link
+cd /Users/thomas.stang/code/vox/nymag/sites && npm link claycli
+npm run build
+```
+
+Expected: `clay compile` completes successfully
+
+**Step 2: Verify**
+
+- Build output matches checkpoint 1 and 2 results
+- No regressions from TypeScript conversion
+- `tsc --noEmit` clean in claycli
+- Published package structure correct (`npm pack --dry-run`)
+
+**Step 3: Unlink**
+
+```bash
+cd /Users/thomas.stang/code/vox/nymag/sites && npm unlink claycli
+cd /Users/thomas.stang/Code/vox/claycli && npm unlink
+```
+
+**Step 4: Record results**
+
+Document pass/fail in implementation.md. All 3 checkpoints must pass before final PR.
+
+---
+
 ## Reviews
 
 {Track reviews here after running the oat-project-review-provide and oat-project-review-receive skills.}
@@ -1009,13 +1110,13 @@ git commit -m "docs(p04-t08): update AGENTS.md for TypeScript codebase"
 When all tasks below are complete, this plan is ready for final code review and merge.
 
 **Scope:**
-- Phase 0: 4 tasks - Characterization tests (scripts, get-script-dependencies, styles, get-webpack-config)
+- Phase 0: 3 tasks - Characterization tests (scripts, get-script-dependencies, styles)
 - Phase 1: 5 tasks - Foundation (Node 20+, Jest 29, ESLint 9, CI)
-- Phase 2: 6 tasks - Bundling pipeline (PostCSS 8, Browserify→Webpack, ecosystem deps)
-- Phase 3: 7 tasks - Dependency cleanup (test expansion, Highland→async/await, native fetch, modern deps)
-- Phase 4: 8 tasks - TypeScript conversion (setup, leaf→utility→core→compile→CLI→publish)
+- Phase 2: 7 tasks - Bundling pipeline (PostCSS 8, Browserify→Webpack, ecosystem deps, **integration test checkpoint 1**)
+- Phase 3: 8 tasks - Dependency cleanup (test expansion, Highland→async/await, native fetch, modern deps, **integration test checkpoint 2**)
+- Phase 4: 9 tasks - TypeScript conversion (setup, leaf→utility→core→compile→CLI→publish, **integration test checkpoint 3**)
 
-**Total: 30 tasks**
+**Total: 32 tasks**
 
 ---
 

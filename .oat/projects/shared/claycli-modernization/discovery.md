@@ -176,6 +176,16 @@ Modernize claycli — the CLI/build tool for Clay CMS — from its current Node 
 - **moment usage:** Is `moment` used directly in claycli code or only as a dependency for consuming projects? Determines whether it can be dropped or just made optional.
 - **kew usage:** Listed as dependency but actual usage needs verification before replacement.
 
+## Resolved Questions
+
+- **`build:pack` / `clay pack` usage in nymag/sites:** Confirmed by colleague that nymag/sites **never uses `build:pack`** — it was never released. The `pack` command was an incomplete experiment by a colleague to move from Gulp to Webpack for bundling; it never shipped. Only `build` (`clay compile`) is used in production. This means:
+  - `getWebpackConfig()` API is not a real contract — nobody depends on it
+  - Integration testing only needs to verify `npm run build` (`clay compile`), not `build:pack`
+  - `build:pack` has pre-existing Webpack 5 polyfill errors (node-fetch, clay-log requiring Node core modules) — these are not blocking
+  - The `pack` command's `get-webpack-config.js` is useful as **reference material** for Phase 2 (it already has webpack-chain, vue-loader, babel-loader patterns) but doesn't need backward compatibility
+  - Characterization tests for `get-webpack-config.js` are unnecessary (removed p00-t04)
+- **Current `build` baseline:** `npm run build` succeeds on nymag/sites master as of 2026-02-25 (1193 files in 6.02s, with deprecation warning for `fs.Stats` constructor and stale browserslist data)
+
 ## Assumptions
 
 - nymag/sites is the primary (possibly only) production consumer of claycli
