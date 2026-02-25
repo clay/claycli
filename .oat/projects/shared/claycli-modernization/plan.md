@@ -252,6 +252,10 @@ git commit -m "chore(p01-t03): migrate ESLint 7 to 9 flat config"
 **Files:**
 - Modify: `.circleci/config.yml`
 
+**Step 0: Obtain approval (REQUIRED)**
+
+Per AGENTS.md: "Do not modify `.circleci/` config without approval." Ask the user for explicit approval before making any changes to `.circleci/config.yml`. If approval is not granted, mark this task as blocked and skip to p01-t05.
+
 **Step 1: Verify current state (RED)**
 
 Run: `cat .circleci/config.yml | head -30`
@@ -696,7 +700,7 @@ Expected: All tests pass
 **Step 3: Commit**
 
 ```bash
-git add -A  # TODO: specify exact files after search
+git add package.json {files-where-kew-was-replaced}
 git commit -m "refactor(p03-t05): replace kew with native Promises"
 ```
 
@@ -954,8 +958,9 @@ git commit -m "chore(p04-t07): configure TypeScript build for npm publishing"
 
 **Step 1: Implement**
 
-- Change CommonJS to TypeScript/ESM conventions
-- Update all tool versions and patterns
+- Document TypeScript + CommonJS conventions (TS source compiled to CommonJS output via `tsc`)
+- Preserve the CommonJS module contract (`require`/`module.exports` at runtime) — this is a repo non-negotiable
+- Update all tool versions and patterns (TypeScript, ts-jest/swc, @typescript-eslint)
 
 **Step 2: Verify**
 
@@ -979,6 +984,7 @@ git commit -m "docs(p04-t08): update AGENTS.md for TypeScript codebase"
 
 | Scope | Type | Status | Date | Artifact |
 |-------|------|--------|------|----------|
+| p00 | code | pending | - | - |
 | p01 | code | pending | - | - |
 | p02 | code | pending | - | - |
 | p03 | code | pending | - | - |
@@ -986,7 +992,7 @@ git commit -m "docs(p04-t08): update AGENTS.md for TypeScript codebase"
 | final | code | pending | - | - |
 | spec | artifact | pending | - | - |
 | design | artifact | pending | - | - |
-| plan | artifact | received | 2026-02-25 | reviews/artifact-plan-review-2026-02-25.md |
+| plan | artifact | fixes_completed | 2026-02-25 | reviews/artifact-plan-review-2026-02-25.md |
 
 **Status values:** `pending` → `received` → `fixes_added` → `fixes_completed` → `passed`
 
@@ -998,17 +1004,18 @@ git commit -m "docs(p04-t08): update AGENTS.md for TypeScript codebase"
 
 ---
 
-## Implementation Complete
+## Definition of Completion
 
-**Summary:**
+When all tasks below are complete, this plan is ready for final code review and merge.
+
+**Scope:**
+- Phase 0: 4 tasks - Characterization tests (scripts, get-script-dependencies, styles, get-webpack-config)
 - Phase 1: 5 tasks - Foundation (Node 20+, Jest 29, ESLint 9, CI)
 - Phase 2: 6 tasks - Bundling pipeline (PostCSS 8, Browserify→Webpack, ecosystem deps)
-- Phase 3: 6 tasks - Dependency cleanup (Highland→async/await, native fetch, modern deps)
+- Phase 3: 7 tasks - Dependency cleanup (test expansion, Highland→async/await, native fetch, modern deps)
 - Phase 4: 8 tasks - TypeScript conversion (setup, leaf→utility→core→compile→CLI→publish)
 
-**Total: 25 tasks**
-
-Ready for code review and merge.
+**Total: 30 tasks**
 
 ---
 
