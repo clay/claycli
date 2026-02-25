@@ -32,7 +32,7 @@ The project has two entry points: a CLI (`cli/index.js`) invoked via `clay <comm
 - `cli/` - Yargs-based CLI entry points; each command is a yargs module
 - `lib/` - Core library code shared between CLI and programmatic API
 - `lib/cmd/` - Command implementations (compile, config, export, import, lint, pack)
-- `lib/cmd/compile/` - Template/CSS/JS compilation pipeline using Browserify, Webpack 5, Gulp 4, Babel
+- `lib/cmd/compile/` - Template/CSS/JS compilation pipeline using Webpack 5, Gulp 4, Babel, PostCSS 8
 - `lib/cmd/pack/` - Webpack-based component packing
 - `lib/reporters/` - Output formatters
 - `lib/gulp-plugins/` - Custom Gulp plugins
@@ -42,7 +42,7 @@ The project has two entry points: a CLI (`cli/index.js`) invoked via `clay <comm
 ### Technology Stack
 - **Runtime:** Node.js >=20 (CommonJS modules, tested on Node 20/22)
 - **CLI framework:** yargs
-- **Build tooling:** Browserify, Webpack 5, Gulp 4, Babel
+- **Build tooling:** Webpack 5, Gulp 4, Babel, PostCSS 8
 - **Testing:** Jest 29 with jest-fetch-mock, mock-fs, jest-mock-console
 - **Linting:** ESLint 9 (flat config: `eslint.config.js`)
 - **CI:** CircleCI (test on Node 20/22, deploy docs, publish to npm)
