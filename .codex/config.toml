@@ -1,4 +1,10 @@
-agents = { }
+[agents.oat-codebase-mapper]
+description = "Explores codebase and writes structured analysis documents. Spawned by oat-repo-knowledge-index with a focus area (tech, arch, quality, concerns). Writes documents directly to reduce orchestrator context load."
+config_file = "agents/oat-codebase-mapper.toml"
+
+[agents.oat-reviewer]
+description = "Unified reviewer for OAT projects - mode-aware verification of requirements/design alignment and code quality. Writes review artifact to disk."
+config_file = "agents/oat-reviewer.toml"
 
 [features]
 multi_agent = true
