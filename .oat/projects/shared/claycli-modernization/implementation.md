@@ -3,7 +3,7 @@ oat_status: in_progress
 oat_ready_for: null
 oat_blockers: []
 oat_last_updated: 2026-02-25
-oat_current_task_id: p02-t03
+oat_current_task_id: p02-t04
 oat_generated: false
 ---
 
@@ -27,11 +27,11 @@ oat_generated: false
 |-------|--------|-------|-----------|
 | Phase 0: Characterization Tests | completed | 3 | 3/3 |
 | Phase 1: Foundation | completed | 5 | 5/5 |
-| Phase 2: Bundling Pipeline | in_progress | 7 | 2/7 |
+| Phase 2: Bundling Pipeline | in_progress | 7 | 3/7 |
 | Phase 3: Dependency Cleanup | pending | 8 | 0/8 |
 | Phase 4: TypeScript Conversion | pending | 9 | 0/9 |
 
-**Total:** 10/32 tasks completed
+**Total:** 11/32 tasks completed
 
 **Integration Test Checkpoints (HiLL gates):**
 - Checkpoint 1 (p02-t07): after P0+P1+P2 — Browserify→Webpack migration
@@ -385,8 +385,21 @@ Removed — `clay pack` was an unreleased experiment. No characterization tests 
 
 ### Task p02-t03: Update Webpack ecosystem dependencies
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** 18565d9
+
+**Outcome (required):**
+- Updated 7 Webpack ecosystem packages to latest versions
+- webpack 5.32→5.105, babel-loader 8→10, css-loader 5→7, style-loader 2→4
+- webpack-assets-manifest 5→6, dotenv-webpack 7→8, vue-loader 15.9→15.11
+
+**Files changed:**
+- `package.json` - updated Webpack ecosystem deps
+- `package-lock.json` - regenerated
+
+**Verification:**
+- Run: `npm test`
+- Result: 341 passed, 0 lint errors
 
 ---
 
