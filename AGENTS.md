@@ -40,12 +40,12 @@ The project has two entry points: a CLI (`cli/index.js`) invoked via `clay <comm
 - `docs/` - Documentation source files consumed by the website
 
 ### Technology Stack
-- **Runtime:** Node.js (CommonJS modules, tested on Node 10/12/14)
+- **Runtime:** Node.js >=20 (CommonJS modules, tested on Node 20/22)
 - **CLI framework:** yargs
 - **Build tooling:** Browserify, Webpack 5, Gulp 4, Babel
-- **Testing:** Jest 24 with jest-fetch-mock, mock-fs, jest-mock-console
-- **Linting:** ESLint 7 with @babel/eslint-parser
-- **CI:** CircleCI (test on Node 10/12/14, deploy docs, publish to npm)
+- **Testing:** Jest 29 with jest-fetch-mock, mock-fs, jest-mock-console
+- **Linting:** ESLint 9 (flat config: `eslint.config.js`)
+- **CI:** CircleCI (test on Node 20/22, deploy docs, publish to npm)
 
 ## Code Conventions
 
