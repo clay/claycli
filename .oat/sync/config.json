@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "defaultStrategy": "auto",
+  "providers": {
+    "claude": {
+      "enabled": true
+    },
+    "cursor": {
+      "enabled": true
+    },
+    "codex": {
+      "enabled": true
+    },
+    "copilot": {
+      "enabled": false
+    },
+    "gemini": {
+      "enabled": false
+    }
+  }
+}

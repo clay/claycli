@@ -1,0 +1,4 @@
+agents = { }
+
+[features]
+multi_agent = true
