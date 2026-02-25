@@ -3,7 +3,7 @@ oat_status: in_progress
 oat_ready_for: null
 oat_blockers: []
 oat_last_updated: 2026-02-25
-oat_current_task_id: p01-t05
+oat_current_task_id: p02-t01
 oat_generated: false
 ---
 
@@ -26,12 +26,12 @@ oat_generated: false
 | Phase | Status | Tasks | Completed |
 |-------|--------|-------|-----------|
 | Phase 0: Characterization Tests | completed | 3 | 3/3 |
-| Phase 1: Foundation | in_progress | 5 | 4/5 |
+| Phase 1: Foundation | completed | 5 | 5/5 |
 | Phase 2: Bundling Pipeline | pending | 7 | 0/7 |
 | Phase 3: Dependency Cleanup | pending | 8 | 0/8 |
 | Phase 4: TypeScript Conversion | pending | 9 | 0/9 |
 
-**Total:** 7/32 tasks completed
+**Total:** 8/32 tasks completed
 
 **Integration Test Checkpoints (HiLL gates):**
 - Checkpoint 1 (p02-t07): after P0+P1+P2 — Browserify→Webpack migration
@@ -162,7 +162,30 @@ Removed — `clay pack` was an unreleased experiment. No characterization tests 
 **Status:** in_progress
 **Started:** 2026-02-25
 
-### Phase Summary (fill when phase is complete)
+### Phase Summary
+
+**Outcome (what changed):**
+- Upgraded Node engine from 10-14 to >=20, with .nvmrc targeting Node 22
+- Upgraded Jest 24→29, jest-fetch-mock 1→3, jest-mock-console 0.4→2, mock-fs 4→5
+- Migrated ESLint 7 (.eslintrc) to ESLint 9 flat config (eslint.config.js)
+- Removed @babel/eslint-parser (native ES2022 parsing sufficient)
+- Updated CI matrix from Node 10/12/14 to Node 20/22 with modern cimg images
+- Clean baseline: 341 tests passing, 0 lint errors
+
+**Key files touched:**
+- `package.json` - engines, devDependencies, Jest config
+- `eslint.config.js` - created (flat config)
+- `.circleci/config.yml` - updated test matrix and images
+- `setup-jest.js` - updated for jest-fetch-mock v3
+- `AGENTS.md` - updated documentation
+
+**Verification:**
+- Run: `npm test`
+- Result: 341 passed, 0 lint errors
+
+**Notable decisions/deviations:**
+- Fixed 2 pre-existing Node 22 JSON error message test failures as part of Jest upgrade
+- Pre-existing complexity violation in compile() left with eslint-disable (will be addressed in Phase 2 rewrite)
 
 ### Task p01-t01: Update Node engine requirements
 
@@ -282,8 +305,19 @@ Removed — `clay pack` was an unreleased experiment. No characterization tests 
 
 ### Task p01-t05: Update AGENTS.md for Phase 1
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** 48aaa40
+
+**Outcome (required):**
+- Updated technology stack: Node >=20 (tested 20/22), Jest 29, ESLint 9 flat config
+- Updated CI section: Node 20/22
+
+**Files changed:**
+- `AGENTS.md` - updated technology stack and CI sections
+
+**Verification:**
+- Run: `npm run lint`
+- Result: Clean
 
 ---
 
