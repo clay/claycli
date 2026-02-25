@@ -3,7 +3,7 @@ oat_status: in_progress
 oat_ready_for: null
 oat_blockers: []
 oat_last_updated: 2026-02-25
-oat_current_task_id: p02-t02
+oat_current_task_id: p02-t03
 oat_generated: false
 ---
 
@@ -27,11 +27,11 @@ oat_generated: false
 |-------|--------|-------|-----------|
 | Phase 0: Characterization Tests | completed | 3 | 3/3 |
 | Phase 1: Foundation | completed | 5 | 5/5 |
-| Phase 2: Bundling Pipeline | in_progress | 7 | 1/7 |
+| Phase 2: Bundling Pipeline | in_progress | 7 | 2/7 |
 | Phase 3: Dependency Cleanup | pending | 8 | 0/8 |
 | Phase 4: TypeScript Conversion | pending | 9 | 0/9 |
 
-**Total:** 9/32 tasks completed
+**Total:** 10/32 tasks completed
 
 **Integration Test Checkpoints (HiLL gates):**
 - Checkpoint 1 (p02-t07): after P0+P1+P2 — Browserify→Webpack migration
@@ -352,12 +352,34 @@ Removed — `clay pack` was an unreleased experiment. No characterization tests 
 
 ### Task p02-t02: Replace Browserify with Webpack for script compilation
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** 58032b1
 
-**Notes:**
-- Largest single task; full rewrite of scripts.js (502 LOC)
-- Critical backward compatibility requirements for nymag/sites integration
+**Outcome (required):**
+- Rewrote buildScripts from Browserify pipeline to Webpack compiler API
+- Preserved identical global-pack output format (window.modules["id"] = [fn, deps])
+- Preserved prelude/postlude generation using same format as global-pack
+- Converted rewriteServiceRequire from Browserify transform to Webpack NormalModuleReplacementPlugin
+- Added Webpack config with vue-loader, babel-loader, postcss-loader, MiniCssExtractPlugin
+- Added filesystem cache for incremental builds (.webpack-cache)
+- Removed 12 Browserify dependencies (-8500 LOC from package-lock.json)
+- All helper functions (getModuleId, idGenerator, getOutfile, etc.) preserved unchanged
+
+**Files changed:**
+- `lib/cmd/compile/scripts.js` - full rewrite of buildScripts and compile functions
+- `lib/cmd/compile/scripts.test.js` - updated rewriteServiceRequire test for new API
+- `package.json` - removed 12 Browserify deps, added mini-css-extract-plugin
+- `package-lock.json` - regenerated
+
+**Verification:**
+- Run: `npm test`
+- Result: 341 passed, 0 lint errors
+
+**Notes / Decisions:**
+- Kept all helper functions unchanged (getModuleId, idGenerator, getOutfile, bucket logic)
+- rewriteServiceRequire changed from Browserify transform (returns through stream) to Webpack callback (mutates resource.request)
+- Full integration test with nymag/sites deferred to p02-t07 checkpoint
+- Webpack stats API used for module iteration; dependency graph extraction needs refinement during integration testing
 
 ---
 
