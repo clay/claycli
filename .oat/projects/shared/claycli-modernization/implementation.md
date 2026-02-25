@@ -3,7 +3,7 @@ oat_status: in_progress
 oat_ready_for: null
 oat_blockers: []
 oat_last_updated: 2026-02-25
-oat_current_task_id: p00-t01
+oat_current_task_id: p01-t04
 oat_generated: false
 ---
 
@@ -25,13 +25,13 @@ oat_generated: false
 
 | Phase | Status | Tasks | Completed |
 |-------|--------|-------|-----------|
-| Phase 0: Characterization Tests | pending | 3 | 0/3 |
-| Phase 1: Foundation | pending | 5 | 0/5 |
+| Phase 0: Characterization Tests | completed | 3 | 3/3 |
+| Phase 1: Foundation | in_progress | 5 | 3/5 |
 | Phase 2: Bundling Pipeline | pending | 7 | 0/7 |
 | Phase 3: Dependency Cleanup | pending | 8 | 0/8 |
 | Phase 4: TypeScript Conversion | pending | 9 | 0/9 |
 
-**Total:** 0/32 tasks completed
+**Total:** 6/32 tasks completed
 
 **Integration Test Checkpoints (HiLL gates):**
 - Checkpoint 1 (p02-t07): after P0+P1+P2 — Browserify→Webpack migration
@@ -42,54 +42,112 @@ oat_generated: false
 
 ## Phase 0: Characterization Tests
 
-**Status:** pending
-**Started:** -
+**Status:** in_progress
+**Started:** 2026-02-25
 
-### Phase Summary (fill when phase is complete)
+### Phase Summary
 
 **Outcome (what changed):**
-- {2-5 bullets describing user-visible / behavior-level changes delivered in this phase}
+- Added 104 characterization tests across 3 compile modules (scripts, get-script-dependencies, styles)
+- Captured Browserify-based module ID assignment, bucket splitting, and output file mapping contracts
+- Captured getDependencies API contract (hard contract with nymag/sites)
+- Captured PostCSS-based CSS compilation path transformation and change detection
+- Exposed internal functions via test-only exports for all 3 modules
 
 **Key files touched:**
-- `{path}` - {why}
+- `lib/cmd/compile/scripts.js` - test-only exports added
+- `lib/cmd/compile/scripts.test.js` - 48 tests created
+- `lib/cmd/compile/get-script-dependencies.js` - test-only exports added
+- `lib/cmd/compile/get-script-dependencies.test.js` - 38 tests created
+- `lib/cmd/compile/styles.js` - test-only exports added
+- `lib/cmd/compile/styles.test.js` - 18 tests created
 
 **Verification:**
-- Run: `{command(s)}`
-- Result: {pass/fail + notes}
+- Run: `npx jest lib/cmd/compile/ --no-coverage`
+- Result: 104 passed, 0 failed
 
 **Notes / Decisions:**
-- {trade-offs or deviations discovered during implementation}
+- 2 pre-existing test failures in import.test.js (Node 22 JSON error message format change)
+- Did not test full compile()/buildScripts() integration (requires Browserify pipeline)
+- Used real filesystem for view-mode registry tests (mock-fs incompatible with require())
 
 ### Task p00-t01: Add characterization tests for compile/scripts.js
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** 7bed38c
 
-**Notes:**
-- 502 LOC module with zero tests; being fully rewritten in Phase 2
-- Must capture Browserify plugin behavior, ID generation, bucket splitting, cache management
+**Outcome (required):**
+- Added 48 characterization tests covering all key internal functions
+- Exposed getModuleId, idGenerator, getOutfile, rewriteServiceRequire for testing
+- Captured module ID assignment for all 7 file types (client, model, kiln, kiln plugins, legacy, deps, other)
+- Captured bucket splitting across all 6 alphabetic ranges
+- Captured cache/ID-persistence behavior across generator instances
+
+**Files changed:**
+- `lib/cmd/compile/scripts.js` - added test-only exports for internal functions
+- `lib/cmd/compile/scripts.test.js` - created with 48 characterization tests
+
+**Verification:**
+- Run: `npx jest lib/cmd/compile/scripts.test.js --no-coverage`
+- Result: 48 passed, 0 failed
+
+**Notes / Decisions:**
+- Exposed internal functions via test-only exports (following existing pattern in compilation-helpers.js)
+- Did not test buildScripts/compile integration (requires full Browserify pipeline with real filesystem)
+- 2 pre-existing test failures in import.test.js (Node 22 JSON error message format change)
 
 ---
 
 ### Task p00-t02: Add characterization tests for get-script-dependencies.js
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** 5e84641
 
-**Notes:**
-- Hard API contract with nymag/sites; 146 LOC, zero tests
-- Must capture getDependencies() behavior for all argument combinations
+**Outcome (required):**
+- Added 38 characterization tests covering the complete getDependencies API contract
+- Exposed 7 internal functions for testing (idToPublicPath, publicPathToID, computeDep, etc.)
+- Captured edit-mode vs view-mode behavior differences
+- Captured recursive dependency resolution with cycle handling
+- Captured legacy dep auto-inclusion in view mode
+- Captured glob patterns for minified (bucket) vs unminified (individual) file discovery
+
+**Files changed:**
+- `lib/cmd/compile/get-script-dependencies.js` - added test-only exports
+- `lib/cmd/compile/get-script-dependencies.test.js` - created with 38 characterization tests
+
+**Verification:**
+- Run: `npx jest lib/cmd/compile/get-script-dependencies.test.js --no-coverage`
+- Result: 38 passed, 0 failed
+
+**Notes / Decisions:**
+- Consolidated view-mode tests into single test to avoid Node require cache collision issues
+- Used real fs-extra for registry file creation (mock-fs doesn't work with require())
 
 ---
 
 ### Task p00-t03: Add characterization tests for compile/styles.js
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** 58be005
 
-**Notes:**
-- 162 LOC, zero tests; PostCSS upgrade in Phase 2
-- Must capture hasChanged() recursive dependency checking
+**Outcome (required):**
+- Added 18 characterization tests covering CSS compilation behavior
+- Captured transformPath naming convention (component.styleguide.css)
+- Captured hasChanged dependency-aware change detection
+- Captured renameFile logic for gulp-rename
+- Captured environment variable configuration
+
+**Files changed:**
+- `lib/cmd/compile/styles.js` - added test-only exports
+- `lib/cmd/compile/styles.test.js` - created with 18 characterization tests
+
+**Verification:**
+- Run: `npx jest lib/cmd/compile/styles.test.js --no-coverage`
+- Result: 18 passed, 0 failed
+
+**Notes / Decisions:**
+- Used real filesystem (fs-extra) for hasChanged tests instead of mock-fs
+- Did not test full compile() pipeline (requires real styleguide directory structure with gulp)
 
 ---
 
@@ -101,51 +159,99 @@ Removed — `clay pack` was an unreleased experiment. No characterization tests 
 
 ## Phase 1: Foundation (Node, Test Infra, CI)
 
-**Status:** pending
-**Started:** -
+**Status:** in_progress
+**Started:** 2026-02-25
 
 ### Phase Summary (fill when phase is complete)
 
-**Outcome (what changed):**
-- {2-5 bullets describing user-visible / behavior-level changes delivered in this phase}
-
-**Key files touched:**
-- `{path}` - {why}
-
-**Verification:**
-- Run: `{command(s)}`
-- Result: {pass/fail + notes}
-
-**Notes / Decisions:**
-- {trade-offs or deviations discovered during implementation}
-
 ### Task p01-t01: Update Node engine requirements
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** e5292fd
 
-**Notes:**
-- First task — update `package.json` engines and add `.nvmrc`
+**Outcome (required):**
+- Added `"engines": { "node": ">=20" }` to package.json
+- Created `.nvmrc` with Node 22
+
+**Files changed:**
+- `package.json` - added engines field
+- `.nvmrc` - created with Node 22
+
+**Verification:**
+- Run: `npx jest --no-coverage`
+- Result: 339 passed, 2 pre-existing failures
 
 ---
 
 ### Task p01-t02: Upgrade Jest 24 to 29
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** 431af8c
 
-**Notes:**
-- Major version jump; watch for jsdom→node env default change and timer implementation changes
+**Outcome (required):**
+- Upgraded Jest 24→29, jest-fetch-mock 1→3, jest-mock-console 0.4→2, mock-fs 4→5
+- Fixed deprecated testURL config for Jest 29
+- Fixed jest-fetch-mock v3 enableMocks() API
+- Fixed jest-mock-console v2 import pattern
+- Fixed JSON error message assertions for Node 20+ compatibility
+- All 341 tests pass (0 failures, clean baseline)
+
+**Files changed:**
+- `package.json` - updated test dependencies and Jest config
+- `package-lock.json` - regenerated
+- `setup-jest.js` - updated jest-fetch-mock setup for v3
+- `lib/compilation-helpers.test.js` - fixed jest-mock-console import
+- `lib/cmd/import.test.js` - fixed JSON error message assertions
+
+**Verification:**
+- Run: `npx jest --no-coverage`
+- Result: 341 passed, 0 failed (clean baseline)
 
 ---
 
 ### Task p01-t03: Upgrade ESLint 7 to 9
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** 2508455
 
-**Notes:**
-- Requires flat config migration (.eslintrc → eslint.config.js)
+**Outcome (required):**
+- Migrated from ESLint 7 (.eslintrc) to ESLint 9 flat config (eslint.config.js)
+- Removed .eslintrc and .eslintignore (content moved to flat config)
+- Removed @babel/eslint-parser and @babel/plugin-syntax-dynamic-import (no longer needed)
+- Removed deprecated `/* eslint-env */` inline comments from 8 files
+- Added browser globals override for _client-init.js and mount-component-modules.js
+- Fixed pre-existing lint issues: unused catch vars in styles.js, export.js, import.js
+- Added eslint-disable for pre-existing complexity (9 > max 8) in scripts.js compile()
+
+**Files changed:**
+- `eslint.config.js` - created (ESLint 9 flat config)
+- `.eslintrc` - deleted
+- `.eslintignore` - deleted (ignores moved to flat config)
+- `package.json` - updated eslint ^9.0.0, added @eslint/js, globals; removed @babel/eslint-parser, @babel/plugin-syntax-dynamic-import
+- `package-lock.json` - regenerated
+- `cli/index.js` - removed unused eslint-disable directive
+- `lib/cmd/compile/_client-init.js` - removed `/* eslint-env browser */`
+- `lib/cmd/compile/scripts.js` - added eslint-disable for complexity
+- `lib/cmd/compile/scripts.test.js` - removed `/* eslint-env jest */`, fixed max-nested-callbacks
+- `lib/cmd/compile/styles.js` - renamed unused catch var
+- `lib/cmd/compile/styles.test.js` - removed `/* eslint-env jest */`
+- `lib/cmd/compile/get-script-dependencies.test.js` - removed `/* eslint-env jest */`
+- `lib/cmd/config.test.js` - removed `/* eslint-env jest */`
+- `lib/cmd/export.js` - renamed unused catch var
+- `lib/cmd/import.js` - renamed unused catch var
+- `lib/cmd/pack/get-webpack-config.js` - removed unused eslint-disable directive
+- `lib/cmd/pack/mount-component-modules.js` - removed `/* eslint-env browser */`
+- `lib/compilation-helpers.test.js` - removed `/* eslint-env jest */`
+- `lib/config-file-helpers.test.js` - removed `/* eslint-env jest */`
+
+**Verification:**
+- Run: `npx eslint lib cli index.js && npx jest --no-coverage`
+- Result: 0 lint errors, 341 tests passed
+
+**Notes / Decisions:**
+- Kept all original rules from .eslintrc verbatim (no new rules added)
+- Used `ecmaVersion: 2022` (native ES2022 parsing, no need for babel parser)
+- Pre-existing complexity issue in compile() function left as-is with eslint-disable (will be refactored in Phase 2 rewrite)
 
 ---
 
