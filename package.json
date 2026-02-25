@@ -16,7 +16,10 @@
   },
   "jest": {
     "automock": false,
-    "testURL": "http://localhost/",
+    "testEnvironment": "node",
+    "testEnvironmentOptions": {
+      "url": "http://localhost/"
+    },
     "collectCoverage": true,
     "collectCoverageFrom": [
       "**/*.js",
@@ -62,10 +65,10 @@
     "@babel/plugin-syntax-dynamic-import": "^7.8.3",
     "coveralls": "^3.0.0",
     "eslint": "^7.21.0",
-    "jest": "^24.1.0",
-    "jest-fetch-mock": "^1.7.5",
-    "jest-mock-console": "^0.4.0",
-    "mock-fs": "^4.8.0"
+    "jest": "^29.7.0",
+    "jest-fetch-mock": "^3.0.3",
+    "jest-mock-console": "^2.0.0",
+    "mock-fs": "^5.5.0"
   },
   "dependencies": {
     "@babel/core": "^7.24.3",
