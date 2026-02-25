@@ -3,7 +3,7 @@ oat_status: in_progress
 oat_ready_for: null
 oat_blockers: []
 oat_last_updated: 2026-02-25
-oat_current_task_id: p02-t01
+oat_current_task_id: p02-t02
 oat_generated: false
 ---
 
@@ -27,11 +27,11 @@ oat_generated: false
 |-------|--------|-------|-----------|
 | Phase 0: Characterization Tests | completed | 3 | 3/3 |
 | Phase 1: Foundation | completed | 5 | 5/5 |
-| Phase 2: Bundling Pipeline | pending | 7 | 0/7 |
+| Phase 2: Bundling Pipeline | in_progress | 7 | 1/7 |
 | Phase 3: Dependency Cleanup | pending | 8 | 0/8 |
 | Phase 4: TypeScript Conversion | pending | 9 | 0/9 |
 
-**Total:** 8/32 tasks completed
+**Total:** 9/32 tasks completed
 
 **Integration Test Checkpoints (HiLL gates):**
 - Checkpoint 1 (p02-t07): after P0+P1+P2 — Browserify→Webpack migration
@@ -328,8 +328,25 @@ Removed — `clay pack` was an unreleased experiment. No characterization tests 
 
 ### Task p02-t01: Upgrade PostCSS 7 to 8
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** 8f7c6fe
+
+**Outcome (required):**
+- Upgraded PostCSS 7→8 and all 7 PostCSS plugins to v8-compatible versions
+- No source code changes required (plugin APIs backward-compatible)
+- All 341 tests continue to pass
+
+**Files changed:**
+- `package.json` - updated postcss, autoprefixer, gulp-postcss, postcss-import, postcss-mixins, postcss-nested, postcss-simple-vars, postcss-loader
+- `package-lock.json` - regenerated
+
+**Verification:**
+- Run: `npm test`
+- Result: 341 passed, 0 lint errors
+
+**Notes / Decisions:**
+- Plugin APIs maintained backward compatibility; no code changes in styles.js or get-webpack-config.js
+- detective-postcss v4 continues to work with PostCSS 8
 
 ---
 
