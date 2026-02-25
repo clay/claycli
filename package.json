@@ -53,6 +53,9 @@
   "bugs": {
     "url": "https://github.com/nymag/clay-cli/issues"
   },
+  "engines": {
+    "node": ">=20"
+  },
   "homepage": "https://github.com/nymag/clay-cli#readme",
   "devDependencies": {
     "@babel/eslint-parser": "^7.14.7",
