@@ -73,11 +73,23 @@ function uriToUrl(prefix: string, uri: string): string {
 }
 
 /**
+ * safely parse a URL, prepending http:// for schemeless inputs
+ */
+function safeParseUrl(url: string): URL {
+  try {
+    return new URL(url);
+  } catch (_e) {
+    return new URL('http://' + url);
+  }
+}
+
+/**
  * convert url to uri
  * and removes extension
  */
 function urlToUri(url: string): string {
-  const parts = new URL(url);
+  const parts = safeParseUrl(url),
+    host = parts.hostname;
 
   let path: string;
 
@@ -89,14 +101,14 @@ function urlToUri(url: string): string {
     path = parts.pathname;
   }
 
-  return parts.hostname + path;
+  return host + path;
 }
 
 /**
  * get extension from url
  */
 function getExt(url: string): string | null {
-  const parts = new URL(url);
+  const parts = safeParseUrl(url);
 
   if (_.includes(parts.pathname, '.')) {
     return parts.pathname.slice(parts.pathname.indexOf('.'));
