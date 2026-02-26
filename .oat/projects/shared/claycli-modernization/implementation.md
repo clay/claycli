@@ -2,8 +2,8 @@
 oat_status: in_progress
 oat_ready_for: null
 oat_blockers: []
-oat_last_updated: 2026-02-26
-oat_current_task_id: p04-t05
+oat_last_updated: 2026-02-25
+oat_current_task_id: p04-t06
 oat_generated: false
 ---
 
@@ -29,9 +29,9 @@ oat_generated: false
 | Phase 1: Foundation | completed | 5 | 5/5 |
 | Phase 2: Bundling Pipeline | completed | 15 | 15/15 |
 | Phase 3: Dependency Cleanup | completed | 8 | 8/8 |
-| Phase 4: TypeScript Conversion | in_progress | 9 | 4/9 |
+| Phase 4: TypeScript Conversion | in_progress | 9 | 5/9 |
 
-**Total:** 35/40 tasks completed
+**Total:** 36/40 tasks completed
 
 **Integration Test Checkpoints (HiLL gates):**
 - Checkpoint 1 (p02-t07): after P0+P1+P2 — Browserify→Webpack migration
@@ -1149,8 +1149,43 @@ Removed — `clay pack` was an unreleased experiment. No characterization tests 
 
 ### Task p04-t05: Convert compile/pack modules to TypeScript
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** 12a6d40
+
+**Outcome (required):**
+- Renamed 14 files from .js to .ts across compile/ and pack/ directories
+- Kept _client-init.js as .js (client-side script read by gulp.src, not a Node module)
+- Added explicit `: any` type annotations to all function params and gulp/highland callbacks
+- Installed @types/jest for test file type checking
+- Updated eslint.config.js browser globals glob for renamed mount-component-modules.ts
+
+**Files changed:**
+- `lib/cmd/compile/index.ts` — re-export module converted to named exports
+- `lib/cmd/compile/scripts.ts` — largest file (726 lines), all function signatures typed
+- `lib/cmd/compile/fonts.ts` — typed getFontAttributes, getFontCSS, compile, callbacks
+- `lib/cmd/compile/styles.ts` — typed transformPath, hasChanged, renameFile, compile
+- `lib/cmd/compile/templates.ts` — typed inlineRead, wrapTemplate, precompile, registerTemplate, minifyTemplate, compile
+- `lib/cmd/compile/media.ts` — typed compile, createSubsiteDir, all map/reduce callbacks
+- `lib/cmd/compile/get-script-dependencies.ts` — typed all exported functions, fixed extra arg to getComputedDeps
+- `lib/cmd/compile/custom-tasks.ts` — typed Highland task callback
+- `lib/cmd/pack/index.ts` — re-export module converted to named exports
+- `lib/cmd/pack/get-webpack-config.ts` — typed buildCustomConfig, buildDevelopmentConfig, buildProductionConfig
+- `lib/cmd/pack/mount-component-modules.ts` — typed callback, DOM access casts
+- `lib/cmd/compile/scripts.test.ts` — typed callback params, added export {}
+- `lib/cmd/compile/styles.test.ts` — typed tmpDir/targetDir vars, added export {}
+- `lib/cmd/compile/get-script-dependencies.test.ts` — Record<string, any> for fsConfig, added export {}
+- `eslint.config.js` — updated browser globals glob for .ts extension
+- `package.json` — added @types/jest devDependency
+
+**Verification:**
+- Run: `npm test && npx tsc --noEmit`
+- Result: 372 passed, lint clean, types clean
+
+**Notes / Decisions:**
+- `export {}` added to test files to make TypeScript treat them as modules (fixes TS2451 redeclare errors)
+- `const x = require(...)` pattern returns `any` — used for all untyped deps (gulp, highland, webpack, etc.)
+- `export = compile` for single-export modules, `export = Object.assign(compile, {...})` for mixed
+- Fixed spurious extra arg `getComputedDeps(entryIDs, minify)` → `getComputedDeps(entryIDs)` (minify was unused)
 
 ---
 
