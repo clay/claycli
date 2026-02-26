@@ -16,7 +16,7 @@ oat_generated: false
 >
 > Conventions:
 > - `oat_current_task_id` always points at the **next plan task to do** (not the last completed task).
-> - When all plan tasks are complete, set `oat_current_task_id: null`.
+> - When all plan tasks are complete, set `oat_current_task_id: p03-t01`.
 > - Reviews are **not** plan tasks. Track review status in `plan.md` under `## Reviews` (e.g., `| final | code | passed | ... |`).
 > - Keep phase/task statuses consistent with the Progress Overview table so restarts resume correctly.
 > - Before running the `oat-project-pr-final` skill, ensure `## Final Summary (for PR/docs)` is filled with what was actually implemented.
@@ -27,11 +27,11 @@ oat_generated: false
 |-------|--------|-------|-----------|
 | Phase 0: Characterization Tests | completed | 3 | 3/3 |
 | Phase 1: Foundation | completed | 5 | 5/5 |
-| Phase 2: Bundling Pipeline | in_progress | 12 | 10/12 |
+| Phase 2: Bundling Pipeline | completed | 12 | 12/12 |
 | Phase 3: Dependency Cleanup | pending | 8 | 0/8 |
 | Phase 4: TypeScript Conversion | pending | 9 | 0/9 |
 
-**Total:** 18/37 tasks completed
+**Total:** 20/37 tasks completed
 
 **Integration Test Checkpoints (HiLL gates):**
 - Checkpoint 1 (p02-t07): after P0+P1+P2 — Browserify→Webpack migration
@@ -491,22 +491,23 @@ Removed — `clay pack` was an unreleased experiment. No characterization tests 
 
 ### Phase 2 Summary
 
-**Outcome:** Migrated script compilation from Browserify to Webpack 5, updated PostCSS from v7 to v8, updated browserslist, verified gulp retention for non-script tasks, and passed integration checkpoint with nymag/sites. Review fixes: fixed services/server rewrite path check, populated dependency graph from Webpack module stats, added 7 buildScripts contract tests.
+**Outcome:** Migrated script compilation from Browserify to Webpack 5, updated PostCSS from v7 to v8, updated browserslist, verified gulp retention for non-script tasks, and passed integration checkpoint with nymag/sites. Review fixes (2 rounds): fixed services/server rewrite path check, populated dependency graph from Webpack module stats, added 10 buildScripts contract tests, restored --minify behavior with terser post-processing, fixed failure signaling to suppress success entries on JS compile errors.
 
 **Key files touched:**
-- `lib/cmd/compile/scripts.js` (major rewrite: Browserify → Webpack, service rewrite fix, dep graph population)
-- `lib/cmd/compile/scripts.test.js` (48 characterization + 2 rewrite + 7 contract = 57 tests)
+- `lib/cmd/compile/scripts.js` (major rewrite: Browserify → Webpack, service rewrite fix, dep graph population, minify + error signaling)
+- `lib/cmd/compile/scripts.test.js` (48 characterization + 2 rewrite + 10 contract = 60 tests)
 - `lib/cmd/compile/styles.js` (PostCSS 7 → 8)
 - `package.json` / `package-lock.json` (dependency updates)
 - `AGENTS.md` (updated technology stack documentation)
 
-**Verification:** npm test (350 passed, lint clean), nymag/sites integration (1189 files compiled)
+**Verification:** npm test (353 passed, lint clean), nymag/sites integration (1189 files compiled)
 
 **Notable decisions/deviations:**
 - Build time slower than Browserify (44s vs 6s) — expected with webpack cold start; filesystem caching enabled for incremental builds
-- Non-fatal error handling added to match Browserify's behavior of not killing entire build on individual module failures
+- Non-fatal error handling: asset/resource errors (SVG/PNG/etc.) are non-fatal and allowed alongside successes; JS compile errors suppress all success entries
 - Two-pass dependency graph building uses `mod.reasons[]` from Webpack stats to reconstruct parent→child edges
 - Contract tests mock `vue-loader` and inject `babelTargets` to run webpack in test environment
+- Minification uses terser with `mangle: false` to preserve global-pack wrapper function parameter names
 
 ---
 
@@ -631,7 +632,9 @@ Removed — `clay pack` was an unreleased experiment. No characterization tests 
 
 **New tasks added:** p02-t11, p02-t12
 
-**Status:** Review row updated to `fixes_added`. Phase 2 reopened for review-fix implementation.
+**Status:** All fix tasks completed (p02-t11, p02-t12). Review row updated to `fixes_completed`.
+
+**Next:** Request re-review via `oat-project-review-provide code p02` then `oat-project-review-receive` to reach `passed`.
 
 **Deferred Findings:**
 - None
@@ -642,15 +645,53 @@ Removed — `clay pack` was an unreleased experiment. No characterization tests 
 
 ### Task p02-t11: (review) Restore --minify behavior for emitted script artifacts
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** 039da28
+
+**Outcome (required):**
+- Added terser post-processing step that compresses global-pack file contents when `--minify` is active
+- Uses `compress: true, mangle: false` to preserve `function(require,module,exports)` wrapper parameter names
+- Added `minifyFileContents()` async helper and lazy `terser` require
+- Added 2 contract tests: minified output is smaller, global-pack format preserved when minified
+
+**Files changed:**
+- `lib/cmd/compile/scripts.js` - added `terser` require, `isAssetError()`, `collectResults()`, `minifyFileContents()` helpers; async webpack callback with minify step
+- `lib/cmd/compile/scripts.test.js` - added minify tests + extracted `createFixture()` helper
+
+**Verification:**
+- Run: `npm test`
+- Result: 353 passed, lint clean
+
+**Notes / Decisions:**
+- Terser available as transitive dep of webpack (via terser-webpack-plugin); not added to package.json explicitly
+- `mangle: false` critical because terser would rename `require`, `module`, `exports` parameters otherwise
+- Terser drops quotes on numeric IDs (`window.modules["1"]` → `window.modules[1]`) which is functionally equivalent
 
 ---
 
 ### Task p02-t12: (review) Fix buildScripts failure signaling on compile errors
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** 039da28
+
+**Outcome (required):**
+- Added `isAssetError()` helper that classifies errors by file extension (SVG/PNG/GIF/etc. are non-fatal)
+- Added `collectResults()` helper: emits success entries only when all errors are asset-related or no errors
+- JS compile errors (syntax errors, missing modules) now suppress success entries entirely
+- Added 1 contract test: syntax error entry produces errors without success entries
+
+**Files changed:**
+- `lib/cmd/compile/scripts.js` - added `isAssetError()`, `collectResults()` helpers; replaced inline resolve logic
+- `lib/cmd/compile/scripts.test.js` - added failure signaling test with syntax-error fixture
+
+**Verification:**
+- Run: `npm test`
+- Result: 353 passed, lint clean
+
+**Notes / Decisions:**
+- Asset error classification uses file extension regex heuristic (covers SVG, PNG, GIF, JPEG, WebP, ICO, fonts, video, audio)
+- Non-fatal asset errors (from broken media imports in consuming projects) still produce success entries alongside error reports
+- Shared commit with p02-t11 because `isAssetError` and `collectResults` serve both tasks
 
 ---
 
