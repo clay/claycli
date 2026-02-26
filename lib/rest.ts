@@ -29,6 +29,10 @@ interface RequestOptions {
   type?: string;
 }
 
+interface FetchOptions extends RequestInit {
+  agent?: https.Agent | null;
+}
+
 /**
  * get protocol to determine if we need https agent
  */
@@ -62,8 +66,8 @@ function checkStatus(res: Response | { statusText: string }): Response | ApiErro
 /**
  * perform the http(s) call
  */
-function send(url: string, options: RequestInit): Promise<Response | ApiError> {
-  return fetch(url, options)
+function send(url: string, options: FetchOptions): Promise<Response | ApiError> {
+  return fetch(url, options as RequestInit)
     .catch(catchError)
     .then(checkStatus);
 }
@@ -80,7 +84,7 @@ async function getAsync(url: string, options?: RequestOptions): Promise<unknown>
     method: 'GET',
     headers: options.headers,
     agent: isSSL(url) ? agent : null
-  } as RequestInit);
+  });
 
   if (res instanceof Error) {
     (res as ApiError).url = url; // capture urls that we error on
@@ -125,7 +129,7 @@ function putAsync(url: string, data: unknown, options?: RequestOptions): Promise
     body: body,
     headers: headers,
     agent: isSSL(url) ? agent : null
-  } as RequestInit).then((res) => {
+  }).then((res) => {
     if (res instanceof Error) {
       return { type: 'error', details: url, message: res.message };
     }
@@ -193,7 +197,7 @@ function queryAsync(url: string, queryObj: Record<string, unknown>, options?: Re
     body: JSON.stringify(queryObj),
     headers: headers,
     agent: isSSL(url) ? agent : null
-  } as RequestInit).then((res) => processQueryResponse(res, url));
+  }).then((res) => processQueryResponse(res, url));
 }
 
 /**
@@ -215,7 +219,7 @@ function recursivelyCheckURI(
     method: 'GET',
     headers: options.headers,
     agent: isSSL(possibleUrl) ? agent : null
-  } as RequestInit).then((res) => (res as Response).text())
+  }).then((res) => (res as Response).text())
     .then((uri) => ({ uri, prefix: possiblePrefix })) // return page uri and the prefix we discovered
     .catch(() => {
       if (possiblePrefix.match(/^https?:\/\/[^\/]*$/)) {
@@ -245,7 +249,7 @@ async function isElasticPrefixAsync(url: string): Promise<boolean> {
   var res = await send(`${url}/_components`, {
     method: 'GET',
     agent: isSSL(url) ? agent : null
-  } as RequestInit);
+  });
 
   return !(res instanceof Error);
 }
