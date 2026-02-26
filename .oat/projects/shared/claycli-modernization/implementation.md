@@ -3,7 +3,7 @@ oat_status: in_progress
 oat_ready_for: null
 oat_blockers: []
 oat_last_updated: 2026-02-25
-oat_current_task_id: p04-t07
+oat_current_task_id: p04-t08
 oat_generated: false
 ---
 
@@ -29,9 +29,9 @@ oat_generated: false
 | Phase 1: Foundation | completed | 5 | 5/5 |
 | Phase 2: Bundling Pipeline | completed | 15 | 15/15 |
 | Phase 3: Dependency Cleanup | completed | 8 | 8/8 |
-| Phase 4: TypeScript Conversion | in_progress | 9 | 6/9 |
+| Phase 4: TypeScript Conversion | in_progress | 9 | 7/9 |
 
-**Total:** 37/40 tasks completed
+**Total:** 38/40 tasks completed
 
 **Integration Test Checkpoints (HiLL gates):**
 - Checkpoint 1 (p02-t07): after P0+P1+P2 — Browserify→Webpack migration
@@ -1222,8 +1222,32 @@ Removed — `clay pack` was an unreleased experiment. No characterization tests 
 
 ### Task p04-t07: Update build and publish configuration
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** cf6cee9
+
+**Outcome (required):**
+- Renamed index.js → index.ts and cli/index.js → cli/index.ts (now all source is .ts)
+- Created tsconfig.build.json for compilation to dist/ with declarations and source maps
+- Updated package.json entry points to dist/ (main, types, bin), added build/type-check/prepublishOnly scripts
+- Added dist/ to .gitignore
+- Build produces 191 files (JS + .d.ts + .d.ts.map + .js.map) in dist/
+
+**Files changed:**
+- `index.ts` — renamed from index.js, converted to `export = api` pattern
+- `cli/index.ts` — renamed from cli/index.js, removed 'use strict', typed commands Record
+- `tsconfig.build.json` — new file: extends base, noEmit false, outDir dist, declarations enabled
+- `tsconfig.json` — updated include list for renamed files
+- `package.json` — main→dist/index.js, types→dist/index.d.ts, bin→dist/cli/index.js, files→dist/, added build scripts
+- `.gitignore` — added dist/
+
+**Verification:**
+- Run: `npm test && npx tsc --noEmit && npm run build && npm pack --dry-run`
+- Result: 372 tests pass, lint clean, types clean, build produces dist/, package 191 files (102.7 kB)
+
+**Notes / Decisions:**
+- Used `export = api` in index.ts because `import` and `export` are reserved words — can't use named exports for those command names
+- Build output verified: dist/index.js, dist/cli/index.js, all .d.ts files present
+- Cleaned dist/ after verification (gitignored)
 
 ---
 
