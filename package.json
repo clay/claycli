@@ -12,7 +12,7 @@
     "dist/"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && cp package.json dist/",
     "lint": "eslint lib cli index.ts",
     "test": "npm run lint && jest",
     "type-check": "tsc --noEmit",

@@ -282,7 +282,11 @@ function createWebpackConfig(entries: string[], options: any) {
       }
     },
     resolveLoader: {
-      modules: [path.resolve(__dirname, '..', '..', '..', 'node_modules'), 'node_modules']
+      modules: [
+        path.resolve(__dirname, '..', '..', '..', 'node_modules'),
+        path.resolve(__dirname, '..', '..', '..', '..', 'node_modules'),
+        'node_modules'
+      ]
     },
     module: {
       rules: [
