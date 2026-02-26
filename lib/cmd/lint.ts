@@ -1,22 +1,26 @@
-'use strict';
-const _ = require('lodash'),
-  utils = require('clayutils'),
-  yaml = require('js-yaml'),
-  config = require('./config'),
-  prefixes = require('../prefixes'),
-  rest = require('../rest'),
-  { mapConcurrent } = require('../concurrency'),
-  refProp = '_ref';
+import _ from 'lodash';
+
+const utils = require('clayutils');
+const yaml = require('js-yaml');
+const config = require('./config');
+const prefixes = require('../prefixes');
+const rest = require('../rest');
+
+const refProp = '_ref';
+
+interface LintResult {
+  type: string;
+  message?: string;
+  details?: string;
+}
 
 /**
  * expand references in component lists
- * @param  {array} val
- * @return {array}
  */
-function expandListReferences(val) {
+function expandListReferences(val: unknown[]): string[] {
   if (_.has(_.head(val), refProp)) {
     // component list! return the references
-    return _.map(val, (item) => item[refProp]);
+    return _.map(val, (item) => (item as Record<string, unknown>)[refProp]) as string[];
   } else {
     return [];
   }
@@ -24,12 +28,10 @@ function expandListReferences(val) {
 
 /**
  * expand references in component properties
- * @param  {object} val
- * @return {array}
  */
-function expandPropReferences(val) {
+function expandPropReferences(val: Record<string, unknown>): string[] {
   if (_.has(val, refProp)) {
-    return [val[refProp]];
+    return [val[refProp] as string];
   } else {
     return [];
   }
@@ -37,15 +39,13 @@ function expandPropReferences(val) {
 
 /**
  * list all references in a component
- * @param  {object} data
- * @return {array} of uris
  */
-function listComponentReferences(data) {
-  return _.reduce(data, (result, val) => {
+function listComponentReferences(data: Record<string, unknown>): string[] {
+  return _.reduce(data, (result: string[], val) => {
     if (_.isArray(val)) {
       return result.concat(expandListReferences(val));
     } else if (_.isObject(val)) {
-      return result.concat(expandPropReferences(val));
+      return result.concat(expandPropReferences(val as Record<string, unknown>));
     } else {
       return result;
     }
@@ -54,56 +54,58 @@ function listComponentReferences(data) {
 
 /**
  * recursively check children
- * @param  {array} children
- * @param  {string} prefix
- * @param  {number} concurrency
- * @param  {string} ext
- * @return {Promise<array>}
  */
-async function checkChildren(children, prefix, concurrency, ext) {
-  var allResults = await mapConcurrent(children, concurrency, (child) => {
-    return checkComponent(child, prefix, concurrency, ext);
-  });
+async function checkChildren(
+  children: string[],
+  prefix: string,
+  concurrency: number,
+  ext: string
+): Promise<LintResult[]> {
+  var results: LintResult[] = [], i: number, childResults: LintResult[];
 
-  return _.flatten(allResults);
+  for (i = 0; i < children.length; i++) {
+    childResults = await checkComponent(children[i], prefix, concurrency, ext);
+    results = results.concat(childResults);
+  }
+  return results;
 }
 
 /**
  * check a broken component (composed json failed)
- * @param  {string} url
- * @param  {string} prefix
- * @param  {number} concurrency
- * @param  {string} ext
- * @return {Promise<array>}
  */
-async function checkBrokenComponent(url, prefix, concurrency, ext) {
-  var dataRes, children, childResults;
+async function checkBrokenComponent(
+  url: string,
+  prefix: string,
+  concurrency: number,
+  ext: string
+): Promise<LintResult[]> {
+  var dataRes: unknown, children: string[], childResults: LintResult[];
 
   dataRes = await rest.get(url);
   if (dataRes instanceof Error) {
-    return [{ type: 'error', message: dataRes.url }];
+    return [{ type: 'error', message: (dataRes as Error & { url?: string }).url || '' }];
   }
-  children = listComponentReferences(dataRes);
+  children = listComponentReferences(dataRes as Record<string, unknown>);
   childResults = await checkChildren(children, prefix, concurrency, ext);
-  return [{ type: 'success', message: url }].concat(childResults);
+  return ([{ type: 'success', message: url }] as LintResult[]).concat(childResults);
 }
 
 /**
  * check a component whose rendered version is broken
- * @param  {string} url
- * @param  {string} prefix
- * @param  {number} concurrency
- * @param  {string} ext
- * @return {Promise<array>}
  */
-async function checkBrokenRender(url, prefix, concurrency, ext) {
-  var dataRes, children, results, childResults;
+async function checkBrokenRender(
+  url: string,
+  prefix: string,
+  concurrency: number,
+  ext: string
+): Promise<LintResult[]> {
+  var dataRes: unknown, children: string[], results: LintResult[], childResults: LintResult[];
 
   dataRes = await rest.get(url);
   if (dataRes instanceof Error) {
-    return [{ type: 'error', message: dataRes.url }];
+    return [{ type: 'error', message: (dataRes as Error & { url?: string }).url || '' }];
   }
-  children = listComponentReferences(dataRes);
+  children = listComponentReferences(dataRes as Record<string, unknown>);
   results = [
     { type: 'error', message: `${url}${ext}` },
     { type: 'success', message: url }
@@ -114,13 +116,13 @@ async function checkBrokenRender(url, prefix, concurrency, ext) {
 
 /**
  * check a component whose composed json is OK but has an extension to verify
- * @param  {string} url
- * @param  {string} prefix
- * @param  {number} concurrency
- * @param  {string} ext
- * @return {Promise<array>}
  */
-async function checkRendered(url, prefix, concurrency, ext) {
+async function checkRendered(
+  url: string,
+  prefix: string,
+  concurrency: number,
+  ext: string
+): Promise<LintResult[]> {
   var renderRes = await rest.get(`${url}${ext}`, { type: 'text' });
 
   if (renderRes instanceof Error) {
@@ -131,12 +133,12 @@ async function checkRendered(url, prefix, concurrency, ext) {
 
 /**
  * normalize a url/uri input, extracting extension if present
- * @param  {*} url
- * @param  {string} prefix
- * @param  {string} ext
- * @return {object} { url, ext, passthrough }
  */
-function normalizeComponentUrl(url, prefix, ext) {
+function normalizeComponentUrl(
+  url: unknown,
+  prefix: string,
+  ext: string
+): { url?: string; ext?: string; passthrough?: unknown[] } {
   ext = ext || '';
   if (_.isObject(url)) {
     return { passthrough: [url] };
@@ -146,55 +148,55 @@ function normalizeComponentUrl(url, prefix, ext) {
 
   if (!ext.length && _.isString(url) && prefixes.getExt(url)) {
     ext = prefixes.getExt(url);
-    url = url.slice(0, url.indexOf(ext));
+    url = (url as string).slice(0, (url as string).indexOf(ext));
   }
-  return { url, ext };
+  return { url: url as string, ext };
 }
 
 /**
  * recursively check all references in a component or layout
- * @param  {*} url
- * @param {string} prefix
- * @param  {number} concurrency
- * @param {string} ext
- * @return {Promise<array>}
  */
-async function checkComponent(url, prefix, concurrency, ext) {
-  var normalized = normalizeComponentUrl(url, prefix, ext),
-    composedRes;
+async function checkComponent(
+  url: unknown,
+  prefix: string,
+  concurrency: number,
+  ext?: string
+): Promise<LintResult[]> {
+  var normalized = normalizeComponentUrl(url, prefix, ext || ''),
+    composedRes: unknown;
 
   if (normalized.passthrough) {
-    return normalized.passthrough;
+    return normalized.passthrough as LintResult[];
   }
   url = normalized.url;
   ext = normalized.ext;
 
   composedRes = await rest.get(`${url}.json`);
   if (composedRes instanceof Error) {
-    return checkBrokenComponent(url, prefix, concurrency, ext);
-  } else if (ext.length) {
-    return checkRendered(url, prefix, concurrency, ext);
+    return checkBrokenComponent(url as string, prefix, concurrency, ext!);
+  } else if (ext!.length) {
+    return checkRendered(url as string, prefix, concurrency, ext!);
   }
   return [{ type: 'success', message: `${url}${ext}` }];
 }
 
 /**
  * check broken page (composed json failed)
- * @param  {string} url
- * @param {string} prefix
- * @param  {number} concurrency
- * @param  {string} ext
- * @return {Promise<array>}
  */
-async function checkPageBroken(url, prefix, concurrency, ext) {
-  var dataRes, layout, children, results, childResults;
+async function checkPageBroken(
+  url: string,
+  prefix: string,
+  concurrency: number,
+  ext: string
+): Promise<LintResult[]> {
+  var dataRes: unknown, layout: string, children: string[], results: LintResult[], childResults: LintResult[];
 
   dataRes = await rest.get(url);
   if (dataRes instanceof Error) {
-    return [{ type: 'error', message: dataRes.url }];
+    return [{ type: 'error', message: (dataRes as Error & { url?: string }).url || '' }];
   }
-  layout = dataRes.layout;
-  children = _.reduce(dataRes, (uris, area) => _.isArray(area) ? uris.concat(area) : uris, []);
+  layout = (dataRes as Record<string, unknown>).layout as string;
+  children = _.reduce(dataRes as Record<string, unknown>, (uris: string[], area: unknown) => _.isArray(area) ? uris.concat(area) : uris, []);
   children.unshift(layout);
   results = [{ type: 'success', message: url }];
   childResults = await checkChildren(children, prefix, concurrency, ext);
@@ -203,21 +205,21 @@ async function checkPageBroken(url, prefix, concurrency, ext) {
 
 /**
  * check broken page render
- * @param  {string} url
- * @param {string} prefix
- * @param  {number} concurrency
- * @param  {string} ext
- * @return {Promise<array>}
  */
-async function checkPageBrokenRender(url, prefix, concurrency, ext) {
-  var dataRes, layout, children, results, childResults;
+async function checkPageBrokenRender(
+  url: string,
+  prefix: string,
+  concurrency: number,
+  ext: string
+): Promise<LintResult[]> {
+  var dataRes: unknown, layout: string, children: string[], results: LintResult[], childResults: LintResult[];
 
   dataRes = await rest.get(url);
   if (dataRes instanceof Error) {
-    return [{ type: 'error', message: dataRes.url }];
+    return [{ type: 'error', message: (dataRes as Error & { url?: string }).url || '' }];
   }
-  layout = dataRes.layout;
-  children = _.reduce(dataRes, (uris, area) => _.isArray(area) ? uris.concat(area) : uris, []);
+  layout = (dataRes as Record<string, unknown>).layout as string;
+  children = _.reduce(dataRes as Record<string, unknown>, (uris: string[], area: unknown) => _.isArray(area) ? uris.concat(area) : uris, []);
   children.unshift(layout);
   results = [
     { type: 'error', message: `${url}${ext}` },
@@ -229,13 +231,9 @@ async function checkPageBrokenRender(url, prefix, concurrency, ext) {
 
 /**
  * check all references in a page
- * @param  {string} url
- * @param {string} prefix
- * @param  {number} concurrency
- * @return {Promise<array>}
  */
-async function checkPage(url, prefix, concurrency) {
-  var ext = '', composedRes, renderRes;
+async function checkPage(url: string, prefix: string, concurrency: number): Promise<LintResult[]> {
+  var ext = '', composedRes: unknown, renderRes: unknown;
 
   if (_.isString(url) && prefixes.getExt(url)) {
     ext = prefixes.getExt(url);
@@ -257,31 +255,25 @@ async function checkPage(url, prefix, concurrency) {
 
 /**
  * determine the page uri, then run checks against it
- * @param  {string} url
- * @param  {number} concurrency
- * @return {Promise<array>}
  */
-async function checkPublicUrl(url, concurrency) {
-  var result, pageURL, pageResults;
+async function checkPublicUrl(url: string, concurrency: number): Promise<LintResult[]> {
+  var result: { uri: string; prefix: string }, pageURL: string, pageResults: LintResult[];
 
   try {
     result = await rest.findURI(url);
     pageURL = prefixes.uriToUrl(result.prefix, result.uri);
     pageResults = await checkPage(`${pageURL}.html`, result.prefix, concurrency);
-    return [{ type: 'success', message: url }].concat(pageResults);
-  } catch (e) {
-    return [{ type: 'error', message: e.url }];
+    return ([{ type: 'success', message: url }] as LintResult[]).concat(pageResults);
+  } catch (e: unknown) {
+    return [{ type: 'error', message: (e as { url?: string }).url || '' }];
   }
 }
 
 /**
  * lint a url, recursively determining if all components exist
- * @param  {string} rawUrl url or alias, will be run through config
- * @param  {object} options
- * @return {Promise<array>}
  */
-function lintUrl(rawUrl, options) {
-  var concurrency, url;
+function lintUrl(rawUrl: string, options?: { concurrency?: number }): Promise<LintResult[]> {
+  var concurrency: number, url: string;
 
   options = options || {};
   concurrency = options.concurrency || 10;
@@ -302,46 +294,37 @@ function lintUrl(rawUrl, options) {
 
 /**
  * determine if a schema has a description
- * @param  {object} obj
- * @return {boolean}
  */
-function noDescription(obj) {
+function noDescription(obj: Record<string, unknown>): boolean {
   return !_.has(obj, '_description');
 }
 
 /**
  * Check if a string contains non-letter, non-number, or non-underscore chars
- *
- * @param  {string} str
- * @return {boolean}
  */
-function isValidKilnDotNotation(str) {
+function isValidKilnDotNotation(str: string): boolean {
   return !/[^\w\$_]/g.test(str);
 }
 
 /**
  * determine if a schema has camelCased props
- * @param  {obj} obj
- * @return {array}
  */
-function nonCamelCasedProps(obj) {
-  return _.reduce(obj, (errors, value, key) => {
+function nonCamelCasedProps(obj: Record<string, unknown>): string[] {
+  return _.reduce(obj, (errors: string[], value: unknown, key: string) => {
     return !isValidKilnDotNotation(key) ? errors.concat(key) : errors;
   }, []);
 }
 
 /**
  * determine if a schema has groups that reference non-existant fields
- * @param  {obj} obj
- * @return {array}
  */
-function nonexistentGroupFields(obj) {
-  return _.reduce(_.get(obj, '_groups'), (errors, group, groupName) => {
+function nonexistentGroupFields(obj: Record<string, unknown>): string[] {
+  return _.reduce(_.get(obj, '_groups') as Record<string, { fields: string[] }> | undefined, (errors: string[], group, groupName) => {
     const fields = group.fields;
 
-    _.each(fields, (field) => {
+    _.each(fields, (field: string) => {
       if (!_.has(obj, field)) {
-        errors.push(`${groupName} » ${field}`);
+        errors.push(`${groupName} \u00BB ${field}`);
       }
     });
     return errors;
@@ -354,16 +337,14 @@ function nonexistentGroupFields(obj) {
  * - has _description
  * - all root-level properties are camelCase
  * - _group fields refer to existing properties
- * @param  {string} str of yaml
- * @return {Promise<array>}
  */
-function lintSchema(str) {
-  var obj, errors;
+function lintSchema(str: string): Promise<LintResult[]> {
+  var obj: Record<string, unknown>, errors: LintResult[];
 
   try {
     obj = yaml.load(str);
-  } catch (e) {
-    return Promise.resolve([{ type: 'error', message: `YAML syntax error: ${e.message.slice(0, e.message.indexOf(':'))}` }]);
+  } catch (e: unknown) {
+    return Promise.resolve([{ type: 'error', message: `YAML syntax error: ${(e as Error).message.slice(0, (e as Error).message.indexOf(':'))}` }]);
   }
 
   errors = [];
@@ -383,5 +364,4 @@ function lintSchema(str) {
   return Promise.resolve([{ type: 'success' }]);
 }
 
-module.exports.lintUrl = lintUrl;
-module.exports.lintSchema = lintSchema;
+export { lintUrl, lintSchema };

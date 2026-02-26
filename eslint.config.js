@@ -110,7 +110,8 @@ module.exports = [
       '@typescript-eslint/no-unused-vars': [2,
         {
           ignoreRestSiblings: true,
-          varsIgnorePattern: '^_'
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_'
         }
       ]
     }

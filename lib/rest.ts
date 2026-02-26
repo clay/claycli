@@ -1,57 +1,69 @@
-'use strict';
-const _ = require('lodash'),
-  nodeUrl = require('url'),
-  https = require('https'),
-  pluralize = require('pluralize'),
-  agent = new https.Agent({ rejectUnauthorized: false }), // allow self-signed certs
-  CONTENT_TYPES = {
-    json: 'application/json; charset=UTF-8',
-    text: 'text/plain; charset=UTF-8'
-  };
+import _ from 'lodash';
+import nodeUrl from 'url';
+import https from 'https';
+
+const pluralize = require('pluralize');
+
+const agent = new https.Agent({ rejectUnauthorized: false }); // allow self-signed certs
+const CONTENT_TYPES: Record<string, string> = {
+  json: 'application/json; charset=UTF-8',
+  text: 'text/plain; charset=UTF-8'
+};
+
+interface ApiError extends Error {
+  response?: Response;
+  url?: string;
+}
+
+interface ApiResult {
+  type: string;
+  message: string;
+  details?: string;
+  url?: string;
+  data?: unknown[];
+  total?: number;
+}
+
+interface RequestOptions {
+  key?: string;
+  headers?: Record<string, string>;
+  type?: string;
+}
 
 /**
  * get protocol to determine if we need https agent
- * @param {string} url
- * @returns {string}
  */
-function isSSL(url) {
+function isSSL(url: string): boolean {
   return nodeUrl.parse(url).protocol === 'https:';
 }
 
 /**
  * catch errors in api calls
- * @param  {Error} error
- * @return {object}
  */
-function catchError(error) {
+function catchError(error: Error): { statusText: string } {
   return { statusText: error.message };
 }
 
 /**
  * check status of api calls
  * note: this happens AFTER catchError, so those errors are dealt with here
- * @param  {object} res
- * @return {object}
  */
-function checkStatus(res) {
-  if (res.status && res.status >= 200 && res.status < 400) {
-    return res;
+function checkStatus(res: Response | { statusText: string }): Response | ApiError {
+  if ('status' in res && res.status >= 200 && res.status < 400) {
+    return res as Response;
   } else {
     // some other error
-    let error = new Error(res.statusText);
+    const error: ApiError = new Error((res as { statusText: string }).statusText);
 
-    error.response = res;
+    error.response = res as Response;
     return error;
   }
 }
 
 /**
  * perform the http(s) call
- * @param  {string} url
- * @param  {object} options
- * @return {Promise}
  */
-function send(url, options) {
+function send(url: string, options: RequestInit): Promise<Response | ApiError> {
   return fetch(url, options)
     .catch(catchError)
     .then(checkStatus);
@@ -59,14 +71,9 @@ function send(url, options) {
 
 /**
  * GET api call (async)
- * @param  {string} url
- * @param  {object} options
- * @param {object} [options.headers]
- * @param {string} [options.type] defaults to json, can be json or text
- * @return {Promise}
  */
-async function getAsync(url, options) {
-  var type, res;
+async function getAsync(url: string, options?: RequestOptions): Promise<unknown> {
+  var type: string, res: Response | ApiError;
 
   options = options || {};
   type = options.type || 'json';
@@ -74,42 +81,32 @@ async function getAsync(url, options) {
     method: 'GET',
     headers: options.headers,
     agent: isSSL(url) ? agent : null
-  });
+  } as RequestInit);
 
   if (res instanceof Error) {
-    res.url = url; // capture urls that we error on
+    (res as ApiError).url = url; // capture urls that we error on
     return res;
   }
-  return res[type]();
+  return (res as unknown as Record<string, () => Promise<unknown>>)[type]();
 }
 
 /**
- * PUT api call (async)
- * @param  {string} url
- * @param {object} data
- * @param  {object} options
- * @param {string} options.key api key
- * @param {object} [options.headers]
- * @param {string} [options.type] defaults to json, can be json or text
- * @return {Promise}
- */
-/**
  * determine body for PUT request
- * @param {*} data
- * @param {string} type
- * @return {string|undefined}
  */
-function formatPutBody(data, type) {
+function formatPutBody(data: unknown, type: string): string | undefined {
   if (data && type === 'json') {
     return JSON.stringify(data);
   } else if (data) {
-    return data;
+    return data as string;
   }
   return undefined;
 }
 
-function putAsync(url, data, options) {
-  var headers, body;
+/**
+ * PUT api call (async)
+ */
+function putAsync(url: string, data: unknown, options?: RequestOptions): Promise<ApiResult> {
+  var headers: Record<string, string>, body: string | undefined;
 
   options = options || {};
 
@@ -129,7 +126,7 @@ function putAsync(url, data, options) {
     body: body,
     headers: headers,
     agent: isSSL(url) ? agent : null
-  }).then((res) => {
+  } as RequestInit).then((res) => {
     if (res instanceof Error) {
       return { type: 'error', details: url, message: res.message };
     }
@@ -138,28 +135,16 @@ function putAsync(url, data, options) {
 }
 
 /**
- * POST to an elastic endpoint with a query (async)
- * @param  {string} url of the endpoint
- * @param  {object} queryObj
- * @param  {object} options
- * @param  {string} options.key
- * @param {object} [options.headers]
- * @return {Promise}
- */
-/**
  * process elastic query response
- * @param {object} res
- * @param {string} url
- * @return {Promise}
  */
-function processQueryResponse(res, url) {
+function processQueryResponse(res: Response | ApiError, url: string): Promise<ApiResult> {
   if (res instanceof Error) {
     return Promise.resolve({ type: 'error', details: url, message: res.message });
   }
 
-  if (_.includes(res.headers.get('content-type'), 'text/html')) {
+  if (_.includes((res as Response).headers.get('content-type'), 'text/html')) {
     // elastic error, returned as 200 and raw text
-    return res.text().then((str) => ({
+    return (res as Response).text().then((str) => ({
       type: 'error',
       message: str.slice(0, str.indexOf(' ::')),
       details: url,
@@ -167,14 +152,14 @@ function processQueryResponse(res, url) {
     }));
   }
 
-  return res.json().then((obj) => {
+  return (res as Response).json().then((obj: Record<string, unknown>) => {
     if (_.get(obj, 'hits.total')) {
       return {
         type: 'success',
         message: pluralize('result', _.get(obj, 'hits.total'), true),
         details: url,
-        data: _.map(_.get(obj, 'hits.hits', []), (hit) => _.assign(hit._source, { _id: hit._id })),
-        total: _.get(obj, 'hits.total')
+        data: _.map(_.get(obj, 'hits.hits', []) as unknown[], (hit: Record<string, unknown>) => _.assign(hit._source, { _id: hit._id })),
+        total: _.get(obj, 'hits.total') as number
       };
     }
     // no results!
@@ -187,8 +172,11 @@ function processQueryResponse(res, url) {
   });
 }
 
-function queryAsync(url, queryObj, options) {
-  var headers;
+/**
+ * POST to an elastic endpoint with a query (async)
+ */
+function queryAsync(url: string, queryObj: Record<string, unknown>, options?: RequestOptions): Promise<ApiResult> {
+  var headers: Record<string, string>;
 
   options = options || {};
 
@@ -206,19 +194,19 @@ function queryAsync(url, queryObj, options) {
     body: JSON.stringify(queryObj),
     headers: headers,
     agent: isSSL(url) ? agent : null
-  }).then((res) => processQueryResponse(res, url));
+  } as RequestInit).then((res) => processQueryResponse(res, url));
 }
 
 /**
  * try fetching <some prefix>/_uris until it works (or it reaches the bare hostname)
- * @param  {string} currentURL to check
- * @param  {string} publicURI  that corresponds with a page uri
- * @param  {object} options
- * @return {Promise}
  */
-function recursivelyCheckURI(currentURL, publicURI, options) {
-  let urlArray = currentURL.split('/'),
-    possiblePrefix, possibleUrl;
+function recursivelyCheckURI(
+  currentURL: string,
+  publicURI: string,
+  options: RequestOptions
+): Promise<{ uri: string; prefix: string }> {
+  var urlArray = currentURL.split('/'),
+    possiblePrefix: string, possibleUrl: string;
 
   urlArray.pop();
   possiblePrefix = urlArray.join('/');
@@ -228,7 +216,7 @@ function recursivelyCheckURI(currentURL, publicURI, options) {
     method: 'GET',
     headers: options.headers,
     agent: isSSL(possibleUrl) ? agent : null
-  }).then((res) => res.text())
+  } as RequestInit).then((res) => (res as Response).text())
     .then((uri) => ({ uri, prefix: possiblePrefix })) // return page uri and the prefix we discovered
     .catch(() => {
       if (possiblePrefix.match(/^https?:\/\/[^\/]*$/)) {
@@ -242,15 +230,10 @@ function recursivelyCheckURI(currentURL, publicURI, options) {
 /**
  * given a public url, do GET requests against possible api endpoints until <prefix>/_uris is found,
  * then do requests against that until a page uri is resolved
- * note: because of the way Clay mounts sites on top of other sites,
- * this begins with the longest possible path and cuts it down (via /) until <path>/_uris is found
- * @param  {string} url
- * @param {object} [options]
- * @return {Promise}
  */
-function findURIAsync(url, options) {
+function findURIAsync(url: string, options?: RequestOptions): Promise<{ uri: string; prefix: string }> {
   var parts = nodeUrl.parse(url),
-    publicURI = parts.hostname + parts.pathname;
+    publicURI = parts.hostname! + parts.pathname!;
 
   options = options || {};
   return recursivelyCheckURI(url, publicURI, options);
@@ -258,20 +241,20 @@ function findURIAsync(url, options) {
 
 /**
  * determine if url is a proper elastic endpoint prefix (async)
- * @param  {string} url
- * @return {Promise}
  */
-async function isElasticPrefixAsync(url) {
+async function isElasticPrefixAsync(url: string): Promise<boolean> {
   var res = await send(`${url}/_components`, {
     method: 'GET',
     agent: isSSL(url) ? agent : null
-  });
+  } as RequestInit);
 
   return !(res instanceof Error);
 }
 
-module.exports.get = getAsync;
-module.exports.put = putAsync;
-module.exports.query = queryAsync;
-module.exports.findURI = findURIAsync;
-module.exports.isElasticPrefix = isElasticPrefixAsync;
+export {
+  getAsync as get,
+  putAsync as put,
+  queryAsync as query,
+  findURIAsync as findURI,
+  isElasticPrefixAsync as isElasticPrefix
+};

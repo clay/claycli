@@ -1,16 +1,14 @@
-'use strict';
-const config = require('home-config'),
-  _ = require('lodash'),
-  configName = '.clayconfig';
+import _ from 'lodash';
+
+const config = require('home-config');
+const configName = '.clayconfig';
 
 // note: all of the methods this exports are synchronous
 
 /**
  * clean urls that are coming from config, CLAYCLI_DEFAULT_URL, or passed through
- * @param  {string} url
- * @return {string}
  */
-function sanitizeUrl(url) {
+function sanitizeUrl(url: string): string {
   // assume http if they haven't specified https
   if (url && !_.includes(url, 'https://')) {
     url = `http://${url.replace(/^(?:http:\/\/|\/\/)/i, '')}`;
@@ -26,11 +24,8 @@ function sanitizeUrl(url) {
 
 /**
  * get value from config
- * @param  {string} type
- * @param  {string} alias
- * @return {string}
  */
-function getConfig(type, alias) {
+function getConfig(type: string, alias?: string): string {
   const fullConfig = config.load(configName);
 
   switch (type) {
@@ -42,19 +37,15 @@ function getConfig(type, alias) {
 
 /**
  * get all config options
- * @return {object}
  */
-function getAll() {
+function getAll(): Record<string, unknown> {
   return config.load(configName);
 }
 
 /**
  * set value in config
- * @param  {string} type
- * @param  {string} alias
- * @param {string} value
  */
-function setConfig(type, alias, value) {
+function setConfig(type: string, alias: string, value: string): void {
   const fullConfig = config.load(configName);
 
   switch (type) {
@@ -66,6 +57,8 @@ function setConfig(type, alias, value) {
   }
 }
 
-module.exports.get = getConfig;
-module.exports.getAll = getAll;
-module.exports.set = setConfig;
+export {
+  getConfig as get,
+  getAll,
+  setConfig as set
+};
