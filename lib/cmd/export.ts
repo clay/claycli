@@ -5,11 +5,13 @@ const formatting = require('../formatting');
 const prefixes = require('../prefixes');
 const config = require('./config');
 const rest = require('../rest');
+const { mapConcurrent } = require('../concurrency');
 
 type Dispatch = Record<string, unknown>;
 
 interface ExportOptions {
   key?: string;
+  concurrency?: number;
   layout?: boolean;
   yaml?: boolean;
   size?: number;
@@ -52,49 +54,46 @@ async function exportSingleURI(url: string): Promise<Dispatch> {
 /**
  * export all instances of a component or layout
  */
-async function exportInstances(url: string, prefix: string): Promise<Dispatch[]> {
-  var res = await rest.get(url), i: number, results: Dispatch[] = [];
+async function exportInstances(url: string, prefix: string, concurrency: number): Promise<Dispatch[]> {
+  var res = await rest.get(url);
 
   toError(res);
-  for (i = 0; i < res.length; i++) {
-    results.push(await exportSingleItem(`${prefixes.uriToUrl(prefix, res[i])}.json`));
-  }
-  return results;
+  return mapConcurrent(res, concurrency, (item: string) => {
+    return exportSingleItem(`${prefixes.uriToUrl(prefix, item)}.json`);
+  });
 }
 
 /**
  * export all instances of all components
  */
-async function exportAllComponents(url: string, prefix: string): Promise<Dispatch[]> {
-  var res = await rest.get(url), i: number, results: Dispatch[] = [], instances: Dispatch[];
+async function exportAllComponents(url: string, prefix: string, concurrency: number): Promise<Dispatch[]> {
+  var res = await rest.get(url), allResults: Dispatch[][];
 
   toError(res);
-  for (i = 0; i < res.length; i++) {
-    instances = await exportInstances(`${prefix}/_components/${res[i]}/instances`, prefix);
-    results = results.concat(instances);
-  }
-  return results;
+  allResults = await mapConcurrent(res, concurrency, (item: string) => {
+    return exportInstances(`${prefix}/_components/${item}/instances`, prefix, concurrency);
+  });
+  return _.flatten(allResults);
 }
 
 /**
  * export all instances of all layouts
  */
-async function exportAllLayouts(url: string, prefix: string): Promise<Dispatch[]> {
-  var res = await rest.get(url), i: number, results: Dispatch[] = [], instances: Dispatch[];
+async function exportAllLayouts(url: string, prefix: string, concurrency: number): Promise<Dispatch[]> {
+  var res = await rest.get(url), allResults: Dispatch[][];
 
   toError(res);
-  for (i = 0; i < res.length; i++) {
-    instances = await exportInstances(`${prefix}/_layouts/${res[i]}/instances`, prefix);
-    results = results.concat(instances);
-  }
-  return results;
+  allResults = await mapConcurrent(res, concurrency, (item: string) => {
+    return exportInstances(`${prefix}/_layouts/${item}/instances`, prefix, concurrency);
+  });
+  return _.flatten(allResults);
 }
 
 /**
  * export single page
  */
-async function exportSinglePage(url: string, prefix: string, includeLayout: boolean): Promise<Dispatch[]> {
-  var res = await rest.get(url), i: number, results: Dispatch[] = [], children: string[];
+async function exportSinglePage(url: string, prefix: string, includeLayout: boolean, concurrency: number): Promise<Dispatch[]> {
+  var res = await rest.get(url), children: string[], results: Dispatch[];
 
   toError(res);
   children = _.reduce(res as Record<string, unknown>, (uris: string[], area: unknown) => _.isArray(area) ? uris.concat(area) : uris, []);
@@ -104,9 +103,9 @@ async function exportSinglePage(url: string, prefix: string, includeLayout: bool
     layouts.push(res.layout);
   }
 
-  for (i = 0; i < children.length; i++) {
-    results.push(await exportSingleItem(`${prefixes.uriToUrl(prefix, children[i])}.json`));
-  }
+  results = await mapConcurrent(children, concurrency, (child: string) => {
+    return exportSingleItem(`${prefixes.uriToUrl(prefix, child)}.json`);
+  });
   results.push({ [prefixes.urlToUri(url)]: res });
   return results;
 }
@@ -115,85 +114,81 @@ async function exportSinglePage(url: string, prefix: string, includeLayout: bool
  * export all bits of arbitrary data
  * e.g. lists or users
  */
-async function exportMultipleItems(url: string, prefix: string): Promise<Dispatch[]> {
-  var res = await rest.get(url), i: number, results: Dispatch[] = [];
+async function exportMultipleItems(url: string, prefix: string, concurrency: number): Promise<Dispatch[]> {
+  var res = await rest.get(url);
 
   toError(res);
-  for (i = 0; i < res.length; i++) {
-    results.push(await exportSingleItem(prefixes.uriToUrl(prefix, res[i])));
-  }
-  return results;
+  return mapConcurrent(res, concurrency, (item: string) => {
+    return exportSingleItem(prefixes.uriToUrl(prefix, item));
+  });
 }
 
 /**
  * export all pages
  */
-async function exportAllPages(url: string, prefix: string, includeLayout: boolean): Promise<Dispatch[]> {
-  var res = await rest.get(url), i: number, results: Dispatch[] = [], pageResults: Dispatch[];
+async function exportAllPages(url: string, prefix: string, includeLayout: boolean, concurrency: number): Promise<Dispatch[]> {
+  var res = await rest.get(url), allResults: Dispatch[][];
 
   toError(res);
-  for (i = 0; i < res.length; i++) {
-    pageResults = await exportSinglePage(prefixes.uriToUrl(prefix, res[i]), prefix, includeLayout);
-    results = results.concat(pageResults);
-  }
-  return results;
+  allResults = await mapConcurrent(res, concurrency, (item: string) => {
+    return exportSinglePage(prefixes.uriToUrl(prefix, item), prefix, includeLayout, concurrency);
+  });
+  return _.flatten(allResults);
 }
 
 /**
  * export all _uris
  */
-async function exportMultipleURIs(url: string, prefix: string): Promise<Dispatch[]> {
-  var res = await rest.get(url), i: number, results: Dispatch[] = [];
+async function exportMultipleURIs(url: string, prefix: string, concurrency: number): Promise<Dispatch[]> {
+  var res = await rest.get(url);
 
   toError(res);
-  for (i = 0; i < res.length; i++) {
-    results.push(await exportSingleURI(prefixes.uriToUrl(prefix, res[i])));
-  }
-  return results;
+  return mapConcurrent(res, concurrency, (item: string) => {
+    return exportSingleURI(prefixes.uriToUrl(prefix, item));
+  });
 }
 
 /**
  * export public url
  */
-async function exportPublicURL(url: string, includeLayout: boolean): Promise<Dispatch[]> {
-  var result = await rest.findURI(url), i: number, pageURL: string, pageDispatches: Dispatch[], unprefixed: Dispatch[] = [];
+async function exportPublicURL(url: string, includeLayout: boolean, concurrency: number): Promise<Dispatch[]> {
+  var result = await rest.findURI(url), pageURL: string, pageDispatches: Dispatch[];
 
   toError(result);
   pageURL = prefixes.uriToUrl(result.prefix, result.uri);
-  pageDispatches = await exportSinglePage(pageURL, result.prefix, includeLayout);
+  pageDispatches = await exportSinglePage(pageURL, result.prefix, includeLayout, concurrency);
 
-  for (i = 0; i < pageDispatches.length; i++) {
-    unprefixed.push(await prefixes.remove(pageDispatches[i], result.prefix));
-  }
-  return unprefixed;
+  return mapConcurrent(pageDispatches, concurrency, (dispatch: Dispatch) => {
+    return prefixes.remove(dispatch, result.prefix);
+  });
 }
 
 /**
  * generate dispatches from a single url
  */
-function generateExportDispatches(url: string, prefix: string, includeLayout: boolean): Promise<Dispatch[]> { // eslint-disable-line
+function generateExportDispatches(url: string, prefix: string, includeLayout: boolean, concurrency: number): Promise<Dispatch[]> { // eslint-disable-line
   if (utils.isLayout(url) && utils.getLayoutName(url) && (utils.getLayoutInstance(url) || utils.isDefaultLayout(url)) || utils.isComponent(url) && utils.getComponentName(url) && (utils.getComponentInstance(url) || utils.isDefaultComponent(url))) {
     return exportSingleItem(`${url}.json`).then((d: Dispatch) => [d]);
   } else if (utils.getLayoutName(url) && !utils.getLayoutInstance(url) || utils.getComponentName(url) && !utils.getComponentInstance(url)) {
-    return exportInstances(url, prefix);
+    return exportInstances(url, prefix, concurrency);
   } else if (_.includes(url, '_components')) {
-    return exportAllComponents(url, prefix);
+    return exportAllComponents(url, prefix, concurrency);
   } else if (_.includes(url, '_layouts')) {
-    return exportAllLayouts(url, prefix);
+    return exportAllLayouts(url, prefix, concurrency);
   } else if (utils.isPage(url) && utils.getPageInstance(url)) {
-    return exportSinglePage(url, prefix, includeLayout);
+    return exportSinglePage(url, prefix, includeLayout, concurrency);
   } else if (_.includes(url, '_pages')) {
-    return exportAllPages(url, prefix, includeLayout);
+    return exportAllPages(url, prefix, includeLayout, concurrency);
   } else if (url.match(/\/_?(uris)\/(.+)/)) {
     return exportSingleURI(url).then((d: Dispatch) => [d]);
   } else if (url.match(/\/_?(uris)$/)) {
-    return exportMultipleURIs(url, prefix);
+    return exportMultipleURIs(url, prefix, concurrency);
   } else if (url.match(/\/_?(lists|users)\/(.+)/)) {
     return exportSingleItem(url).then((d: Dispatch) => [d]);
   } else if (url.match(/\/_?(lists|users)/)) {
-    return exportMultipleItems(url, prefix);
+    return exportMultipleItems(url, prefix, concurrency);
   } else {
-    return exportPublicURL(url, includeLayout);
+    return exportPublicURL(url, includeLayout, concurrency);
   }
 }
 
@@ -201,9 +196,10 @@ function generateExportDispatches(url: string, prefix: string, includeLayout: bo
  * export specific items from a single url
  */
 async function fromURL(rawUrl: string, options?: ExportOptions): Promise<Dispatch[]> {
-  var url: string, prefix: string | null, dispatches: Dispatch[], i: number, unprefixed: Dispatch[];
+  var url: string, prefix: string | null, dispatches: Dispatch[], concurrency: number, unprefixed: Dispatch[];
 
   options = options || {};
+  concurrency = options.concurrency || 10;
   url = config.get('url', rawUrl);
 
   if (!url) {
@@ -219,11 +215,10 @@ async function fromURL(rawUrl: string, options?: ExportOptions): Promise<Dispatc
     prefix = null;
   }
 
-  dispatches = await generateExportDispatches(url, prefix!, options.layout || false);
-  unprefixed = [];
-  for (i = 0; i < dispatches.length; i++) {
-    unprefixed.push(await prefixes.remove(dispatches[i], prefix));
-  }
+  dispatches = await generateExportDispatches(url, prefix!, options.layout || false, concurrency);
+  unprefixed = await mapConcurrent(dispatches, concurrency, (dispatch: Dispatch) => {
+    return prefixes.remove(dispatch, prefix);
+  });
 
   if (options.yaml) {
     return [formatting.toBootstrap(unprefixed)];
@@ -235,11 +230,12 @@ async function fromURL(rawUrl: string, options?: ExportOptions): Promise<Dispatc
  * export items based on elastic query
  */
 function fromQuery(rawUrl: string, query?: Record<string, unknown>, options?: ExportOptions): Promise<Dispatch[]> {
-  var key: string, prefix: string, fullQuery: Record<string, unknown>;
+  var key: string, prefix: string, fullQuery: Record<string, unknown>, concurrency: number;
 
   query = query || {};
   options = options || {};
   key = config.get('key', options.key);
+  concurrency = options.concurrency || 10;
   prefix = config.get('url', rawUrl);
 
   if (!prefix) {
@@ -264,16 +260,16 @@ function fromQuery(rawUrl: string, query?: Record<string, unknown>, options?: Ex
   // rest.query throws synchronously if no key
   return rest.query(`${prefix}/_search`, fullQuery, { key })
     .then(async (res: Record<string, unknown>) => {
-      var i: number, dispatches: Dispatch[] = [], unprefixed: Dispatch[] = [], itemDispatches: Dispatch[];
+      var allDispatches: Dispatch[][], dispatches: Dispatch[], unprefixed: Dispatch[];
 
       toError(res);
-      for (i = 0; i < (res.data as unknown[]).length; i++) {
-        itemDispatches = await generateExportDispatches(prefixes.uriToUrl(prefix, (res.data as Record<string, unknown>[])[i]._id), prefix, options!.layout || false);
-        dispatches = dispatches.concat(itemDispatches);
-      }
-      for (i = 0; i < dispatches.length; i++) {
-        unprefixed.push(await prefixes.remove(dispatches[i], prefix));
-      }
+      allDispatches = await mapConcurrent(res.data as Record<string, unknown>[], concurrency, (item: Record<string, unknown>) => {
+        return generateExportDispatches(prefixes.uriToUrl(prefix, item._id), prefix, options!.layout || false, concurrency);
+      });
+      dispatches = _.flatten(allDispatches);
+      unprefixed = await mapConcurrent(dispatches, concurrency, (dispatch: Dispatch) => {
+        return prefixes.remove(dispatch, prefix);
+      });
       if (options!.yaml) {
         return [formatting.toBootstrap(unprefixed)];
       }

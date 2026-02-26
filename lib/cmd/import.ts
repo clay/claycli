@@ -6,11 +6,13 @@ const formatting = require('../formatting');
 const prefixes = require('../prefixes');
 const config = require('./config');
 const rest = require('../rest');
+const { mapConcurrent } = require('../concurrency');
 
 type Dispatch = Record<string, unknown>;
 
 interface ImportOptions {
   key?: string;
+  concurrency?: number;
   yaml?: boolean;
   publish?: boolean;
 }
@@ -65,17 +67,16 @@ async function importBootstrap(
   obj: Record<string, unknown>,
   prefix: string,
   key: string,
-  options: ImportOptions
+  options: ImportOptions & { concurrency: number }
 ): Promise<ImportResult[]> {
-  var dispatches = formatting.toDispatch([obj]) as Dispatch[],
-    results: ImportResult[] = [], i: number, prefixed: Dispatch, dispatchResults: ImportResult[];
+  var dispatches = formatting.toDispatch([obj]) as Dispatch[], allResults: ImportResult[][];
 
-  for (i = 0; i < dispatches.length; i++) {
-    prefixed = await prefixes.add(dispatches[i], prefix);
-    dispatchResults = await sendDispatchToClay(prefixed, prefix, key, options);
-    results = results.concat(dispatchResults);
-  }
-  return results;
+  allResults = await mapConcurrent(dispatches, options.concurrency, async (dispatch: Dispatch) => {
+    var prefixed = await prefixes.add(dispatch, prefix);
+
+    return sendDispatchToClay(prefixed, prefix, key, options);
+  });
+  return _.flatten(allResults);
 }
 
 /**
@@ -141,7 +142,7 @@ async function importYaml(
   str: string,
   prefix: string,
   key: string,
-  options: ImportOptions
+  options: ImportOptions & { concurrency: number }
 ): Promise<ImportResult[]> {
   var chunks: string[], results: ImportResult[] = [], i: number, bootstraps: string[],
     j: number, obj: Record<string, unknown>, bootstrapResults: ImportResult[];
@@ -176,35 +177,32 @@ async function importJson(
   source: string | Buffer | Record<string, unknown>,
   prefix: string,
   key: string,
-  options: ImportOptions
+  options: ImportOptions & { concurrency: number }
 ): Promise<ImportResult[]> {
-  var items = parseDispatchSource(source),
-    results: ImportResult[] = [], i: number, obj: unknown, dispatchResults: ImportResult[];
+  var items = parseDispatchSource(source), allResults: ImportResult[][];
 
-  for (i = 0; i < items.length; i++) {
-    obj = items[i];
+  allResults = await mapConcurrent(items, options.concurrency, async (item: unknown) => {
+    var obj: unknown = item, dispatchResults: ImportResult[];
+
     if (_.isString(obj)) {
       try {
         obj = JSON.parse(obj);
       } catch (e: unknown) {
         try {
           yaml.load(obj as string);
-          results.push({ type: 'error', message: 'Cannot import dispatch from yaml', details: 'Please use the --yaml argument to import from bootstraps' });
-          continue;
+          return [{ type: 'error', message: 'Cannot import dispatch from yaml', details: 'Please use the --yaml argument to import from bootstraps' }];
         } catch (_otherE) {
-          results.push({ type: 'error', message: `JSON syntax error: ${(e as Error).message}`, details: _.truncate(obj as string) });
-          continue;
+          return [{ type: 'error', message: `JSON syntax error: ${(e as Error).message}`, details: _.truncate(obj as string) }];
         }
       }
     }
     if ((obj as Record<string, unknown>).type && (obj as Record<string, unknown>).type === 'error') {
-      results.push(obj as ImportResult);
-    } else {
-      dispatchResults = await importDispatch(obj as Dispatch, prefix, key, options);
-      results = results.concat(dispatchResults);
+      return [obj as ImportResult];
     }
-  }
-  return results;
+    dispatchResults = await importDispatch(obj as Dispatch, prefix, key, options);
+    return dispatchResults;
+  });
+  return _.flatten(allResults);
 }
 
 /**
@@ -215,20 +213,21 @@ function importItems(
   url: string,
   options?: ImportOptions
 ): Promise<ImportResult[]> {
-  var key: string, prefix: string;
+  var key: string, prefix: string, opts: ImportOptions & { concurrency: number };
 
   options = options || {};
   key = config.get('key', options.key);
+  opts = Object.assign({}, options, { concurrency: options.concurrency || 10 });
   prefix = config.get('url', url);
 
   if (!prefix) {
     return Promise.resolve([{ type: 'error', message: 'URL is not defined! Please specify a site prefix to import to' }]);
   }
 
-  if (options.yaml) {
-    return importYaml(_.isString(str) ? str : String(str), prefix, key, options);
+  if (opts.yaml) {
+    return importYaml(_.isString(str) ? str : String(str), prefix, key, opts);
   }
-  return importJson(str, prefix, key, options);
+  return importJson(str, prefix, key, opts);
 }
 
 /**

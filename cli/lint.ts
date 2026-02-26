@@ -32,7 +32,7 @@ function handler(argv: any) {
         }));
     } else { // lint url
       log('Linting url...');
-      return linter.lintUrl(argv.url)
+      return linter.lintUrl(argv.url, { concurrency: argv.concurrency })
         .then((results: any) => {
           results.forEach(reporter.logAction(argv.reporter, 'lint'));
           reporter.logSummary(argv.reporter, 'lint', (successes: any, errors: any) => {

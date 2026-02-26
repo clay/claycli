@@ -5,6 +5,7 @@ const yaml = require('js-yaml');
 const config = require('./config');
 const prefixes = require('../prefixes');
 const rest = require('../rest');
+const { mapConcurrent } = require('../concurrency');
 
 const refProp = '_ref';
 
@@ -61,13 +62,11 @@ async function checkChildren(
   concurrency: number,
   ext: string
 ): Promise<LintResult[]> {
-  var results: LintResult[] = [], i: number, childResults: LintResult[];
+  var allResults: LintResult[][] = await mapConcurrent(children, concurrency, (child: string) => {
+    return checkComponent(child, prefix, concurrency, ext);
+  });
 
-  for (i = 0; i < children.length; i++) {
-    childResults = await checkComponent(children[i], prefix, concurrency, ext);
-    results = results.concat(childResults);
-  }
-  return results;
+  return _.flatten(allResults);
 }
 
 /**
