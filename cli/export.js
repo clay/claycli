@@ -1,7 +1,6 @@
 'use strict';
 const _ = require('lodash'),
   pluralize = require('pluralize'),
-  h = require('highland'),
   yaml = require('js-yaml'),
   getStdin = require('get-stdin'),
   options = require('./cli-options'),
@@ -41,19 +40,19 @@ function fatalError(e, argv) {
 function handler(argv) {
   const log = reporter.log(argv.reporter, 'export');
 
-  let url = config.get('url', argv.url),
-    isElasticPrefix, stream;
+  var url = config.get('url', argv.url),
+    isElasticPrefix;
 
   if (!url) {
     fatalError({ url: 'URL is not defined!', message: 'Please specify a url to export from'}, argv);
   }
 
   log('Exporting items...');
-  stream = rest.isElasticPrefix(url).flatMap((isPrefix) => {
+  return rest.isElasticPrefix(url).then((isPrefix) => {
     isElasticPrefix = isPrefix;
     // if we're pointed at an elastic prefix, run a query to fetch pages
     if (isPrefix) {
-      return h(getStdin()
+      return getStdin()
         .then(yaml.load)
         .then((query) => {
           return exporter.fromQuery(url, query, {
@@ -63,7 +62,7 @@ function handler(argv) {
             layout: argv.layout,
             yaml: argv.yaml
           });
-        })).flatten();
+        });
     } else {
       // export a single url
       return exporter.fromURL(url, {
@@ -74,12 +73,12 @@ function handler(argv) {
         yaml: argv.yaml
       });
     }
-  });
+  }).then((results) => {
+    var logActionFn = reporter.logAction(argv.reporter, 'export'),
+      actions;
 
-  stream
-    .stopOnError((e) => fatalError(e, argv))
-    .map((res) => {
-      const rootKey = Object.keys(res)[0], // could be unprefixed uri OR type of thing (if exporting a bootstrap)
+    actions = results.map((res) => {
+      var rootKey = Object.keys(res)[0],
         str = argv.yaml ? yaml.dump(res) : `${JSON.stringify(res)}\n`;
 
       process.stdout.write(str); // pipe stringified exported stuff to stdout
@@ -90,20 +89,18 @@ function handler(argv) {
       } else {
         return { type: 'success', message: `${prefixes.getFromUrl(url)}${rootKey}` }; // e.g. http://domain.com/_pages/foo
       }
-    })
-    .errors((err, push) => {
-      push(null, { type: 'error', message: err.url, details: err.message }); // every url that errors out should be captured
-    })
-    .map(reporter.logAction(argv.reporter, 'export'))
-    .toArray(reporter.logSummary(argv.reporter, 'export', (successes) => {
-      const thing = argv.yaml ? 'bootstrap' : 'dispatch';
+    });
+    actions.forEach(logActionFn);
+    reporter.logSummary(argv.reporter, 'export', (successes) => {
+      var thing = argv.yaml ? 'bootstrap' : 'dispatch';
 
       if (successes) {
         return { success: true, message: `Exported ${pluralize(thing, successes, true)}` };
       } else {
         return { success: false, message: `Exported 0 ${thing}s (´°ω°\`)` };
       }
-    }));
+    })(actions);
+  }).catch((e) => fatalError(e, argv));
 }
 
 module.exports = {
