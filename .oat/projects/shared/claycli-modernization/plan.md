@@ -1289,7 +1289,7 @@ Document pass/fail in implementation.md. All 3 checkpoints must pass before fina
 |-------|------|--------|------|----------|
 | p00 | code | pending | - | - |
 | p01 | code | pending | - | - |
-| p02 | code | fixes_completed | 2026-02-25 | reviews/p02-review-2026-02-25-v2.md |
+| p02 | code | received | 2026-02-26 | reviews/p02-review-2026-02-26.md |
 | p03 | code | pending | - | - |
 | p04 | code | pending | - | - |
 | final | code | pending | - | - |
