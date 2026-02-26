@@ -1,11 +1,10 @@
-'use strict';
 const pluralize = require('pluralize'),
   compile = require('../../lib/cmd/compile'),
   options = require('../cli-options'),
   reporter = require('../../lib/reporters'),
   helpers = require('../../lib/compilation-helpers');
 
-function builder(yargs) {
+function builder(yargs: any) {
   return yargs
     .usage('Usage: $0 media')
     .example('$0 media', 'compile media files')
@@ -14,16 +13,16 @@ function builder(yargs) {
     .option('r', options.reporter);
 }
 
-function handler(argv) {
+function handler(argv: any) {
   const t1 = Date.now(),
     compiled = compile.media({ watch: argv.watch });
 
   return compiled.build
     .map(reporter.logAction(argv.reporter, 'media'))
-    .toArray((results) => {
+    .toArray((results: any) => {
       const t2 = Date.now();
 
-      reporter.logSummary(argv.reporter, 'media', (successes) => {
+      reporter.logSummary(argv.reporter, 'media', (successes: any) => {
         let message = `Compiled ${pluralize('file', successes, true)} in ${helpers.time(t2, t1)}`;
 
         if (compiled.watch) {
@@ -38,7 +37,7 @@ function handler(argv) {
     });
 }
 
-module.exports = {
+export = {
   command: 'media',
   describe: 'Compile component, layout, styleguide, and site media files',
   builder,

@@ -1,38 +1,35 @@
-'use strict';
-
 const pluralize = require('pluralize'),
   compile = require('../../lib/cmd/compile'),
   options = require('../cli-options'),
   reporter = require('../../lib/reporters'),
   helpers = require('../../lib/compilation-helpers');
 
-function builder(yargs) {
+function builder(yargs: any) {
   return yargs
-    .usage('Usage: $0 styles')
-    .example('$0 styles', 'compile css files with postcss')
-    .example('$0 styles --watch', 'compile and watch css files')
+    .usage('Usage: $0 scripts')
+    .example('$0 scripts', 'compile js files')
+    .example('$0 scripts --watch', 'compile and watch js files')
     .option('w', options.watch)
     .option('m', options.minify)
-    .option('p', options.plugins)
+    .option('g', options.globs)
     .option('r', options.reporter);
 }
 
-function handler(argv) {
+function handler(argv: any) {
   const t1 = Date.now(),
-    plugins = helpers.determinePostCSSPlugins(argv),
-    compiled = compile.styles({
+    compiled = compile.scripts({
       watch: argv.watch,
       minify: argv.minify,
-      plugins
+      globs: argv.globs
     });
 
   return compiled.build
-    .map(reporter.logAction(argv.reporter, 'styles'))
-    .toArray((results) => {
+    .map(reporter.logAction(argv.reporter, 'scripts'))
+    .toArray((results: any) => {
       const t2 = Date.now();
 
-      reporter.logSummary(argv.reporter, 'styles', (successes) => {
-        let message = `Compiled ${argv.minify ? 'and minified ' : '' }${pluralize('css file', successes, true)} in ${helpers.time(t2, t1)}`;
+      reporter.logSummary(argv.reporter, 'scripts', (successes: any) => {
+        let message = `Compiled ${argv.minify ? 'and minified ' : '' }${pluralize('script', successes, true)} in ${helpers.time(t2, t1)}`;
 
         if (compiled.watch) {
           message += '\nWatching for changes...';
@@ -46,9 +43,9 @@ function handler(argv) {
     });
 }
 
-module.exports = {
-  command: 'styles',
-  describe: 'Compile styles',
+export = {
+  command: 'scripts',
+  describe: 'Compile scripts',
   builder,
   handler
 };

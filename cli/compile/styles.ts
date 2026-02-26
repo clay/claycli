@@ -1,34 +1,36 @@
-'use strict';
 const pluralize = require('pluralize'),
   compile = require('../../lib/cmd/compile'),
   options = require('../cli-options'),
   reporter = require('../../lib/reporters'),
   helpers = require('../../lib/compilation-helpers');
 
-function builder(yargs) {
+function builder(yargs: any) {
   return yargs
-    .usage('Usage: $0 templates')
-    .example('$0 templates', 'compile handlebars templates')
-    .example('$0 templates --watch', 'compile and watch handlebars templates')
+    .usage('Usage: $0 styles')
+    .example('$0 styles', 'compile css files with postcss')
+    .example('$0 styles --watch', 'compile and watch css files')
     .option('w', options.watch)
     .option('m', options.minify)
+    .option('p', options.plugins)
     .option('r', options.reporter);
 }
 
-function handler(argv) {
+function handler(argv: any) {
   const t1 = Date.now(),
-    compiled = compile.templates({
+    plugins = helpers.determinePostCSSPlugins(argv),
+    compiled = compile.styles({
       watch: argv.watch,
-      minify: argv.minify
+      minify: argv.minify,
+      plugins
     });
 
   return compiled.build
-    .map(reporter.logAction(argv.reporter, 'templates'))
-    .toArray((results) => {
+    .map(reporter.logAction(argv.reporter, 'styles'))
+    .toArray((results: any) => {
       const t2 = Date.now();
 
-      reporter.logSummary(argv.reporter, 'templates', (successes) => {
-        let message = `Compiled ${argv.minify ? 'and minified ' : '' }${pluralize('template', successes, true)} in ${helpers.time(t2, t1)}`;
+      reporter.logSummary(argv.reporter, 'styles', (successes: any) => {
+        let message = `Compiled ${argv.minify ? 'and minified ' : '' }${pluralize('css file', successes, true)} in ${helpers.time(t2, t1)}`;
 
         if (compiled.watch) {
           message += '\nWatching for changes...';
@@ -42,9 +44,9 @@ function handler(argv) {
     });
 }
 
-module.exports = {
-  command: 'templates',
-  describe: 'Compile templates',
+export = {
+  command: 'styles',
+  describe: 'Compile styles',
   builder,
   handler
 };

@@ -1,4 +1,3 @@
-'use strict';
 const h = require('highland'),
   _ = require('lodash'),
   pluralize = require('pluralize'),
@@ -7,7 +6,7 @@ const h = require('highland'),
   reporter = require('../../lib/reporters'),
   helpers = require('../../lib/compilation-helpers');
 
-function builder(yargs) {
+function builder(yargs: any) {
   return yargs
     .usage('Usage: $0 compile [asset type]')
     .command(require('./media'))
@@ -31,11 +30,11 @@ function builder(yargs) {
     .option('r', options.reporter);
 }
 
-function handler(argv) {
+function handler(argv: any) {
   const t1 = Date.now(),
     media = compile.media({ watch: argv.watch }); // run media task before others (specifically, templates)
 
-  return h(media.build).collect().toArray((mediaResults) => {
+  return h(media.build).collect().toArray((mediaResults: any) => {
     const fonts = compile.fonts({
         watch: argv.watch,
         minify: argv.minify,
@@ -58,17 +57,17 @@ function handler(argv) {
         reporter: argv.reporter
       }),
       tasks = [fonts, styles, templates, scripts],
-      builders = _.map(tasks, (task) => task.build),
-      watchers = _.map(tasks, (task) => task.watch).concat([media.watch]),
+      builders = _.map(tasks, (task: any) => task.build),
+      watchers = _.map(tasks, (task: any) => task.watch).concat([media.watch]),
       isWatching = !!watchers[0];
 
     return h([h.of(mediaResults)].concat(builders))
       .merge()
       .map(reporter.logAction(argv.reporter, 'compile'))
-      .toArray((results) => {
+      .toArray((results: any) => {
         const t2 = Date.now();
 
-        reporter.logSummary(argv.reporter, 'compile', (successes) => {
+        reporter.logSummary(argv.reporter, 'compile', (successes: any) => {
           let message = `Compiled ${argv.minify ? 'and minified ' : '' }${pluralize('file', successes, true)} in ${helpers.time(t2, t1)}`;
 
           if (isWatching) {
@@ -80,7 +79,7 @@ function handler(argv) {
   });
 }
 
-module.exports = {
+export = {
   command: 'compile [asset type]',
   describe: 'Compile fonts, media, styles, scripts, and templates',
   aliases: ['compiler', 'c'],

@@ -1,36 +1,33 @@
-'use strict';
 const pluralize = require('pluralize'),
   compile = require('../../lib/cmd/compile'),
   options = require('../cli-options'),
   reporter = require('../../lib/reporters'),
   helpers = require('../../lib/compilation-helpers');
 
-function builder(yargs) {
+function builder(yargs: any) {
   return yargs
-    .usage('Usage: $0 scripts')
-    .example('$0 scripts', 'compile js files')
-    .example('$0 scripts --watch', 'compile and watch js files')
+    .usage('Usage: $0 templates')
+    .example('$0 templates', 'compile handlebars templates')
+    .example('$0 templates --watch', 'compile and watch handlebars templates')
     .option('w', options.watch)
     .option('m', options.minify)
-    .option('g', options.globs)
     .option('r', options.reporter);
 }
 
-function handler(argv) {
+function handler(argv: any) {
   const t1 = Date.now(),
-    compiled = compile.scripts({
+    compiled = compile.templates({
       watch: argv.watch,
-      minify: argv.minify,
-      globs: argv.globs
+      minify: argv.minify
     });
 
   return compiled.build
-    .map(reporter.logAction(argv.reporter, 'scripts'))
-    .toArray((results) => {
+    .map(reporter.logAction(argv.reporter, 'templates'))
+    .toArray((results: any) => {
       const t2 = Date.now();
 
-      reporter.logSummary(argv.reporter, 'scripts', (successes) => {
-        let message = `Compiled ${argv.minify ? 'and minified ' : '' }${pluralize('script', successes, true)} in ${helpers.time(t2, t1)}`;
+      reporter.logSummary(argv.reporter, 'templates', (successes: any) => {
+        let message = `Compiled ${argv.minify ? 'and minified ' : '' }${pluralize('template', successes, true)} in ${helpers.time(t2, t1)}`;
 
         if (compiled.watch) {
           message += '\nWatching for changes...';
@@ -44,9 +41,9 @@ function handler(argv) {
     });
 }
 
-module.exports = {
-  command: 'scripts',
-  describe: 'Compile scripts',
+export = {
+  command: 'templates',
+  describe: 'Compile templates',
   builder,
   handler
 };
