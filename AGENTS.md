@@ -61,9 +61,10 @@ The project has two entry points: a CLI (`cli/index.js`) invoked via `clay <comm
 ### Patterns
 - CommonJS `require`/`module.exports` throughout (NOT ESM)
 - Lodash for utilities (babel-plugin-lodash optimizes imports)
-- `isomorphic-fetch` for HTTP requests (mocked in tests via `jest-fetch-mock`)
-- Highland.js streams for data processing pipelines
-- Promises via `kew` library in some modules
+- Native `fetch` for HTTP requests (Node 20+; mocked in tests via `jest-fetch-mock`)
+- `async`/`await` and Promises for async control flow
+- Highland.js streams retained in compile pipeline only (`lib/cmd/compile/`)
+- Native `Buffer` for base64 encoding/decoding
 
 ### Complexity Limits (enforced by ESLint)
 - Max cyclomatic complexity: 8
