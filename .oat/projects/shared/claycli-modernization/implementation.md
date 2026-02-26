@@ -3,7 +3,7 @@ oat_status: in_progress
 oat_ready_for: null
 oat_blockers: []
 oat_last_updated: 2026-02-26
-oat_current_task_id: p04-t10
+oat_current_task_id: null
 oat_generated: false
 ---
 
@@ -29,9 +29,9 @@ oat_generated: false
 | Phase 1: Foundation | completed | 5 | 5/5 |
 | Phase 2: Bundling Pipeline | completed | 15 | 15/15 |
 | Phase 3: Dependency Cleanup | completed | 8 | 8/8 |
-| Phase 4: TypeScript Conversion | in_progress | 17 | 9/17 |
+| Phase 4: TypeScript Conversion | completed | 17 | 17/17 |
 
-**Total:** 40/48 tasks completed
+**Total:** 48/48 tasks completed
 
 **Integration Test Checkpoints (HiLL gates):**
 - Checkpoint 1 (p02-t07): after P0+P1+P2 — Browserify→Webpack migration
@@ -1320,67 +1320,171 @@ Removed — `clay pack` was an unreleased experiment. No characterization tests 
 
 **Non-issues (no action):** m1 (dist/ gitignored), m2 (prerelease version correct), m3 (event-stream pin intentional), m5 (coverage exclusions valid)
 
-**Next:** Execute fix tasks via the `oat-project-implement` skill.
+**Next:** All 8 fix tasks completed. Request re-review to reach `passed` status.
 
-After the fix tasks are complete:
-- Update the review row status to `fixes_completed`
 - Re-run `oat-project-review-provide code final` then `oat-project-review-receive` to reach `passed`
 
 ---
 
 ### Task p04-t10: (review) Convert cli/compile/*.js to TypeScript
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** 655c5d8
+
+**Outcome:**
+- Converted 7 cli/compile files from .js to .ts (custom-tasks, fonts, index, media, scripts, styles, templates)
+- Removed `'use strict'` directives, added `: any` type annotations
+- Converted `module.exports` to `export =` pattern
+- All source files now .ts except setup-jest.js and eslint.config.js
+
+**Files changed:**
+- `cli/compile/custom-tasks.ts` - JS→TS conversion
+- `cli/compile/fonts.ts` - JS→TS conversion
+- `cli/compile/index.ts` - JS→TS conversion (Highland stream orchestration preserved)
+- `cli/compile/media.ts` - JS→TS conversion
+- `cli/compile/scripts.ts` - JS→TS conversion
+- `cli/compile/styles.ts` - JS→TS conversion
+- `cli/compile/templates.ts` - JS→TS conversion
+
+**Verification:**
+- Run: `npx tsc --noEmit && npx jest --no-coverage && npm run build`
+- Result: pass — types clean, 372 tests pass, build succeeds
 
 ---
 
 ### Task p04-t11: (review) Replace deprecated new Buffer() with Buffer.from()
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** 3bd2909
+
+**Outcome:**
+- Replaced 5 instances of `new Buffer()` with `Buffer.from()` across 2 files
+- Eliminates Node.js deprecation warning DEP0005
+
+**Files changed:**
+- `lib/cmd/compile/fonts.ts` - 1 instance replaced
+- `lib/cmd/compile/templates.ts` - 4 instances replaced
+
+**Verification:**
+- Run: `npx tsc --noEmit && npx jest --no-coverage`
+- Result: pass
 
 ---
 
 ### Task p04-t12: (review) Remove unused production dependencies
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** 5967537
+
+**Outcome:**
+- Removed 3 unused production dependencies: dependency-tree, exports-loader, imports-loader
+- No source code references these packages
+
+**Files changed:**
+- `package.json` - removed 3 dependency entries
+- `package-lock.json` - updated
+
+**Verification:**
+- Run: `npx jest --no-coverage && npm run build`
+- Result: pass — no breakage
 
 ---
 
 ### Task p04-t13: (review) Add proper types to getDependencies() API contract
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** 0a038eb
+
+**Outcome:**
+- Added `GetDependenciesOptions` interface for the hard API contract with nymag/sites
+- Typed all exported functions: getDependencies, getAllDeps, getAllModels, getAllKilnjs, getAllTemplates, computeDep, idToPublicPath, publicPathToID
+- Used `boolean | undefined` for options with `!!` coercion at call sites
+
+**Files changed:**
+- `lib/cmd/compile/get-script-dependencies.ts` - full type annotations
+
+**Verification:**
+- Run: `npx tsc --noEmit && npx jest --no-coverage`
+- Result: pass — 372 tests, types clean
 
 ---
 
 ### Task p04-t14: (review) Replace deprecated nodeUrl.parse() with new URL()
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** 3735add
+
+**Outcome:**
+- Replaced 4 `nodeUrl.parse()` calls with `new URL()` across 2 files
+- Removed `import nodeUrl from 'url'` from both files
+- WHATWG URL API provides better security and correctness guarantees
+
+**Files changed:**
+- `lib/rest.ts` - 2 replacements (isSSL, findURIAsync)
+- `lib/prefixes.ts` - 2 replacements (urlToUri, getExt)
+
+**Verification:**
+- Run: `npx tsc --noEmit && npx jest --no-coverage`
+- Result: pass
 
 ---
 
 ### Task p04-t15: (review) Fix RequestInit type assertion in rest.ts
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** 91723de
+
+**Outcome:**
+- Added `FetchOptions` interface extending `RequestInit` with `agent` property
+- Changed `send()` parameter type from `RequestInit` to `FetchOptions`
+- Removed 5 `as RequestInit` type assertions from callers
+- Single `as RequestInit` cast retained inside `send()` for the `fetch()` call
+
+**Files changed:**
+- `lib/rest.ts` - FetchOptions interface, updated send() signature, removed assertions
+
+**Verification:**
+- Run: `npx tsc --noEmit && npx jest --no-coverage`
+- Result: pass
 
 ---
 
 ### Task p04-t16: (review) Clean up tsconfig.build.json include/exclude
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** 956d9b4
+
+**Outcome:**
+- Removed `setup-jest.js` from both include and exclude arrays in tsconfig.build.json
+- It was confusing to have it in both; base tsconfig.json retains it for type-checking
+- Build config doesn't emit setup-jest.js to dist/
+
+**Files changed:**
+- `tsconfig.build.json` - removed setup-jest.js from include and exclude
+
+**Verification:**
+- Run: `npm run build && npx jest --no-coverage`
+- Result: pass — setup-jest.js not in dist/
 
 ---
 
 ### Task p04-t17: (review) Verify and remove path-browserify if unused
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** 77493e7
+
+**Outcome:**
+- Confirmed path-browserify not imported/required anywhere in source
+- Webpack 5 config uses `resolve.fallback: { path: false }` — polyfill not loaded
+- Removed from production dependencies
+
+**Files changed:**
+- `package.json` - removed path-browserify dependency
+- `package-lock.json` - updated
+
+**Verification:**
+- Run: `npx jest --no-coverage && npm run build`
+- Result: pass
 
 ---
 

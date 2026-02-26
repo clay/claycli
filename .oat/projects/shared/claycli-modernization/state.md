@@ -1,6 +1,6 @@
 ---
-oat_current_task: p04-t10
-oat_last_commit: 7b4785b
+oat_current_task: null
+oat_last_commit: 77493e7
 oat_blockers: []
 oat_hill_checkpoints: ["discovery", "spec", "design"]
 oat_hill_completed: []
@@ -15,13 +15,13 @@ oat_generated: false
 
 # Project State: claycli-modernization
 
-**Status:** Implementation In Progress — Final Review Fixes
+**Status:** Implementation — Tasks complete; awaiting final re-review
 **Started:** 2026-02-25
 **Last Updated:** 2026-02-26
 
 ## Current Phase
 
-Implementation — Phase 4 review fixes in progress (9/17 tasks).
+Implementation — All 48 tasks complete; awaiting final re-review.
 
 ## Artifacts
 
@@ -29,7 +29,7 @@ Implementation — Phase 4 review fixes in progress (9/17 tasks).
 - **Spec:** Not applicable (imported plan)
 - **Design:** Not applicable (imported plan)
 - **Plan:** `plan.md` (complete — imported from Claude plan)
-- **Implementation:** `implementation.md` (40/48 tasks — review fixes in progress)
+- **Implementation:** `implementation.md` (48/48 tasks complete)
 - **Imported Source:** `references/imported-plan.md`
 
 ## Progress
@@ -38,7 +38,8 @@ Implementation — Phase 4 review fixes in progress (9/17 tasks).
 - ✓ Phase 1: Foundation (5/5 tasks)
 - ✓ Phase 2: Bundling Pipeline (15/15 tasks)
 - ✓ Phase 3: Dependency Cleanup (8/8 tasks)
-- ○ Phase 4: TypeScript Conversion (9/17 tasks — review fixes pending)
+- ✓ Phase 4: TypeScript Conversion (17/17 tasks)
+- ⧗ Awaiting final re-review
 
 ## Blockers
 
@@ -46,4 +47,4 @@ None
 
 ## Next Milestone
 
-Execute 8 review fix tasks (p04-t10 through p04-t17), then re-review for final pass.
+Run final re-review (`oat-project-review-provide code final` → `oat-project-review-receive`) to reach `passed`, then create PR.
