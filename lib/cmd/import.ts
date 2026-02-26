@@ -100,6 +100,9 @@ function parseDispatchSource(source: string | Buffer | Record<string, unknown>):
     return source.split('\n').filter(Boolean);
   } else if (Buffer.isBuffer(source)) {
     return source.toString('utf8').split('\n').filter(Boolean);
+  } else if (source && typeof (source as any).pipe === 'function') {
+    // Streams are not supported in the async implementation
+    throw new Error('Stream input is not supported. Please pipe content via stdin or pass a string/Buffer.');
   } else if (_.isObject(source)) {
     return [source];
   }
