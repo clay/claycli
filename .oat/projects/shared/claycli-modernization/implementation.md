@@ -3,7 +3,7 @@ oat_status: in_progress
 oat_ready_for: null
 oat_blockers: []
 oat_last_updated: 2026-02-25
-oat_current_task_id: p04-t09
+oat_current_task_id: null
 oat_generated: false
 ---
 
@@ -29,9 +29,9 @@ oat_generated: false
 | Phase 1: Foundation | completed | 5 | 5/5 |
 | Phase 2: Bundling Pipeline | completed | 15 | 15/15 |
 | Phase 3: Dependency Cleanup | completed | 8 | 8/8 |
-| Phase 4: TypeScript Conversion | in_progress | 9 | 8/9 |
+| Phase 4: TypeScript Conversion | completed | 9 | 9/9 |
 
-**Total:** 39/40 tasks completed
+**Total:** 40/40 tasks completed
 
 **Integration Test Checkpoints (HiLL gates):**
 - Checkpoint 1 (p02-t07): after P0+P1+P2 — Browserify→Webpack migration
@@ -1276,12 +1276,51 @@ Removed — `clay pack` was an unreleased experiment. No characterization tests 
 
 ### Task p04-t09: Integration test checkpoint 3 — nymag/sites
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** 7b4785b
 
-**Notes:**
-- Final integration gate — TypeScript-compiled output must be drop-in replacement
-- All 3 checkpoints must pass before final PR
+**Outcome (required):**
+- TypeScript-compiled claycli is a drop-in replacement for nymag/sites
+- Compiled 625 template/CSS files in 33.78s
+- 4571 JS output files, 4046 registry entries (matches checkpoints 1 and 2)
+- Fixed two dist/ execution issues: resolveLoader path depth and package.json location
+
+**Files changed:**
+- `lib/cmd/compile/scripts.ts` — added 4-level __dirname traversal for dist/ resolveLoader
+- `package.json` — added `cp package.json dist/` to build script
+
+**Verification:**
+- Run: `npm link && cd nymag/sites && npm link claycli && npm run build`
+- Result: 625 files compiled, 4571 JS outputs, 4046 registry entries
+- Non-fatal errors: 8 unique asset parse failures (identical to checkpoints 1+2, nymag/sites deps)
+
+**Notes / Decisions:**
+- resolveLoader needs both 3-level (source) and 4-level (dist) __dirname paths; non-existent path silently skipped
+- package.json copied to dist/ at build time so require('../package.json') resolves from dist/cli/
+- All 3 integration checkpoints pass — TypeScript conversion is complete
+
+### Phase 4 Summary
+
+**Outcome:** Converted entire codebase from JavaScript to TypeScript. All source files are now .ts (except setup-jest.js and eslint.config.js). TypeScript compiles to CommonJS JS via tsc, with declarations and source maps. Published package ships compiled JS from dist/.
+
+**Key files touched:**
+- All `lib/**/*.js` → `.ts` (40+ files: utilities, commands, compile pipeline, pack)
+- All `cli/*.js` → `.ts` (8 files: cli-options, config, export, import, lint, log, pack, index)
+- `index.js` → `index.ts` (programmatic API entry point)
+- `tsconfig.json` (type-checking config, strict mode)
+- `tsconfig.build.json` (new: compilation config with declarations/source maps)
+- `package.json` (entry points → dist/, build/type-check scripts, files field)
+- `.gitignore` (added dist/)
+- `AGENTS.md` (TypeScript conventions documentation)
+
+**Verification:** npm test (372 passed, lint clean, types clean), npm run build (191 files), integration checkpoint 3 (625 files compiled, 4571 JS outputs, 4046 registry entries)
+
+**Notable decisions/deviations:**
+- Used `any` liberally for untyped third-party libs (lodash, gulp, highland, webpack, etc.) — gradual typing can improve later
+- `export =` pattern for CJS compatibility (not ESM `export default`)
+- Test files use `export {};` to avoid TS2451 global scope conflicts
+- resolveLoader needs dual depth paths (3-level for source, 4-level for dist/)
+- package.json copied into dist/ at build time for cli/index.ts require resolution
 
 ---
 
@@ -1369,20 +1408,40 @@ Track test execution during implementation.
 ## Final Summary (for PR/docs)
 
 **What shipped:**
-- {capability 1}
-- {capability 2}
+- Modernized claycli from Node 10-14 / Browserify / Highland.js to Node 20+ / Webpack 5 / async-await / TypeScript
+- Migrated script compilation from Browserify to Webpack 5 with filesystem caching
+- Replaced Highland.js streams with async/await in data command modules (import, export, config, lint)
+- Upgraded PostCSS from v7 to v8, updated browserslist
+- Converted entire codebase to TypeScript with strict mode
+- Replaced deprecated dependencies (isomorphic-fetch → native fetch, kew → native Promises, request → native fetch)
 
 **Behavioral changes (user-facing):**
-- {bullet}
+- `clay compile` produces identical output (verified via 3 integration checkpoints with nymag/sites)
+- Build requires `npm run build` before publishing (TypeScript compilation)
+- New commands: `npm run type-check`, `npm run build`
+- Node.js >=20 required (was >=10)
 
 **Key files / modules:**
-- `{path}` - {purpose}
+- `lib/cmd/compile/scripts.ts` - Browserify→Webpack 5 script compilation (major rewrite)
+- `lib/cmd/compile/styles.ts` - PostCSS 7→8 CSS compilation
+- `lib/cmd/compile/templates.ts`, `fonts.ts`, `media.ts` - Other compile steps (TypeScript conversion)
+- `lib/cmd/import.ts`, `lib/cmd/export.ts` - Highland.js→async/await data operations
+- `lib/rest.ts` - isomorphic-fetch→native fetch HTTP client
+- `tsconfig.json`, `tsconfig.build.json` - TypeScript configuration
+- `package.json` - Updated entry points, dependencies, scripts
+- `AGENTS.md` - Updated documentation for new tech stack
 
 **Verification performed:**
-- {tests/lint/typecheck/build/manual steps}
+- 372 tests passing (Jest 29 + ts-jest)
+- Lint clean (ESLint 9 + typescript-eslint)
+- Types clean (tsc --noEmit, strict mode)
+- Build succeeds (tsc -p tsconfig.build.json, 191 files)
+- 3 integration checkpoints with nymag/sites: 625 files compiled, 4571 JS outputs, 4046 registry entries
 
 **Design deltas (if any):**
-- {what changed vs design.md and why}
+- No design.md exists (plan was imported). Implementation follows the imported plan faithfully.
+- Added `cp package.json dist/` to build script (not in original plan — discovered during integration testing)
+- Added dual resolveLoader paths for source/dist execution (not in original plan)
 
 ## References
 
