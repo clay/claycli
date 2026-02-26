@@ -7,5 +7,3 @@ jest.doMock('home-config', () => ({
 
 // global version of fetch that's properly mocked
 require('jest-fetch-mock').enableMocks();
-
-jest.setMock('isomorphic-fetch', fetch);
