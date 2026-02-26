@@ -3,7 +3,7 @@ oat_status: in_progress
 oat_ready_for: null
 oat_blockers: []
 oat_last_updated: 2026-02-26
-oat_current_task_id: p03-t09
+oat_current_task_id: p04-t01
 oat_generated: false
 ---
 
@@ -28,10 +28,10 @@ oat_generated: false
 | Phase 0: Characterization Tests | completed | 3 | 3/3 |
 | Phase 1: Foundation | completed | 5 | 5/5 |
 | Phase 2: Bundling Pipeline | completed | 15 | 15/15 |
-| Phase 3: Dependency Cleanup | in_progress | 11 | 8/11 |
+| Phase 3: Dependency Cleanup | completed | 11 | 11/11 |
 | Phase 4: TypeScript Conversion | pending | 9 | 0/9 |
 
-**Total:** 31/43 tasks completed
+**Total:** 34/43 tasks completed
 
 **Integration Test Checkpoints (HiLL gates):**
 - Checkpoint 1 (p02-t07): after P0+P1+P2 — Browserify→Webpack migration
@@ -1055,32 +1055,78 @@ Removed — `clay pack` was an unreleased experiment. No characterization tests 
 - I2 (import stream/stdin regression) → p03-t10: fix parseDispatchSource to reject streams, fix CLI stdin fallback
 - I3 (gulp-newer error swallowing) → p03-t11: only suppress ENOENT in dest stat catch
 
-**Next:** Execute fix tasks via the `oat-project-implement` skill.
-
-After the fix tasks are complete:
-- Update the review row status to `fixes_completed`
-- Re-run `oat-project-review-provide code p03` then `oat-project-review-receive` to reach `passed`
+**Next:** All p03 fix tasks complete. Request re-review via `oat-project-review-provide code p03` then `oat-project-review-receive` to reach `passed`.
 
 ---
 
 ### Task p03-t09: (review) Restore bounded concurrency in export/import/lint
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** f55de29
+
+**Outcome (required):**
+- Created `lib/concurrency.js` with CJS-compatible `pLimit` and `mapConcurrent` helpers (p-limit v5+ is ESM-only)
+- Threaded concurrency parameter through all export/import/lint command functions (9 functions in export.js, 2 in import.js, 1 in lint.js)
+- `--concurrency` CLI option is no longer a no-op after the Highland→async/await migration
+- Added `lib/concurrency.test.js` with 5 tests verifying bounded execution, order preservation, and error handling
+- Changed test concurrency from 1000→1 in mock-order-dependent test files (export/import/lint)
+
+**Files changed:**
+- `lib/concurrency.js` - new bounded concurrency utilities
+- `lib/concurrency.test.js` - tests for pLimit and mapConcurrent
+- `lib/cmd/export.js` - use mapConcurrent in all export functions
+- `lib/cmd/import.js` - use mapConcurrent in importBootstrap, importJson
+- `lib/cmd/lint.js` - use mapConcurrent in checkChildren
+- `lib/cmd/export.test.js` - concurrency=1 for mock-order tests
+- `lib/cmd/import.test.js` - concurrency=1 for mock-order tests
+- `lib/cmd/lint.test.js` - concurrency=1 for mock-order tests
+
+**Verification:**
+- Run: `npm test`
+- Result: pass — 377 tests, lint clean
+
+**Notes / Decisions:**
+- Implemented inline pLimit instead of importing ESM-only p-limit package (CJS non-negotiable per AGENTS.md)
+- Test files use concurrency=1 because jest-fetch-mock's mockResponseOnce is FIFO and incompatible with concurrent execution; concurrent behavior verified independently in concurrency.test.js
 
 ---
 
 ### Task p03-t10: (review) Fix import stream/stdin handling regression
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** 783dd01
+
+**Outcome (required):**
+- Added stream detection in `parseDispatchSource` — throws clear error for stream-like objects
+- Fixed CLI stdin fallback to error when get-stdin returns empty instead of passing process.stdin
+- Added 3 regression tests: stream rejection, Buffer input, empty string
+
+**Files changed:**
+- `lib/cmd/import.js` - stream detection before object fallback
+- `lib/cmd/import.test.js` - 3 new regression tests
+- `cli/import.js` - error on empty stdin instead of passing process.stdin
+
+**Verification:**
+- Run: `npx jest lib/cmd/import.test.js --no-coverage`
+- Result: pass — 32 tests
 
 ---
 
 ### Task p03-t11: (review) Fix gulp-newer to only suppress ENOENT stat errors
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** 25285fd
+
+**Outcome (required):**
+- Changed `.catch(() => null)` to only suppress ENOENT, re-throwing real I/O errors
+- Prevents build from silently continuing on permission or hardware I/O failures
+
+**Files changed:**
+- `lib/gulp-plugins/gulp-newer/index.js` - ENOENT-only catch in dest stat
+
+**Verification:**
+- Run: `npm test`
+- Result: pass — 380 tests, lint clean
 
 ---
 
