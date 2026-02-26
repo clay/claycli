@@ -2,15 +2,15 @@
 oat_status: in_progress
 oat_ready_for: null
 oat_blockers: []
-oat_last_updated: 2026-02-25
-oat_current_task_id: null
+oat_last_updated: 2026-02-26
+oat_current_task_id: p02-t11
 oat_generated: false
 ---
 
 # Implementation: claycli-modernization
 
 **Started:** 2026-02-25
-**Last Updated:** 2026-02-25
+**Last Updated:** 2026-02-26
 
 > This document is used to resume interrupted implementation sessions.
 >
@@ -27,11 +27,11 @@ oat_generated: false
 |-------|--------|-------|-----------|
 | Phase 0: Characterization Tests | completed | 3 | 3/3 |
 | Phase 1: Foundation | completed | 5 | 5/5 |
-| Phase 2: Bundling Pipeline | completed | 10 | 10/10 |
+| Phase 2: Bundling Pipeline | in_progress | 12 | 10/12 |
 | Phase 3: Dependency Cleanup | pending | 8 | 0/8 |
 | Phase 4: TypeScript Conversion | pending | 9 | 0/9 |
 
-**Total:** 18/35 tasks completed
+**Total:** 18/37 tasks completed
 
 **Integration Test Checkpoints (HiLL gates):**
 - Checkpoint 1 (p02-t07): after P0+P1+P2 — Browserify→Webpack migration
@@ -611,6 +611,46 @@ Removed — `clay pack` was an unreleased experiment. No characterization tests 
 - `vue-loader` mock uses jest.mock hoisting to intercept before `scripts.js` loads the module
 - `babelTargets` injected via `configFileHelpers.setConfigFile()` — in production, consuming projects provide this via `claycli.config.js`
 - Fixture uses real webpack compilation (not mocked) to validate the full pipeline
+
+---
+
+### Review Received: p02 (re-review v2)
+
+**Date:** 2026-02-26
+**Review artifact:** reviews/p02-review-2026-02-25-v2.md
+
+**Findings:**
+- Critical: 1
+- Important: 1
+- Medium: 0
+- Minor: 0
+
+**Finding details:**
+- C1: `--minify` no longer affects emitted script artifacts — global-pack output is written from unminified module source, so `minify: true` and `minify: false` emit identical files
+- I1: `buildScripts()` returns success entries even when Webpack compilation fails — failure signaling is weakened and can misreport broken builds as successful
+
+**New tasks added:** p02-t11, p02-t12
+
+**Status:** Review row updated to `fixes_added`. Phase 2 reopened for review-fix implementation.
+
+**Deferred Findings:**
+- None
+
+**Next:** Execute fix tasks via `oat-project-implement` starting at `p02-t11`. After both tasks are complete, mark the review row `fixes_completed` and request another `code p02` re-review.
+
+---
+
+### Task p02-t11: (review) Restore --minify behavior for emitted script artifacts
+
+**Status:** pending
+**Commit:** -
+
+---
+
+### Task p02-t12: (review) Fix buildScripts failure signaling on compile errors
+
+**Status:** pending
+**Commit:** -
 
 ---
 

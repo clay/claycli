@@ -678,6 +678,82 @@ git commit -m "test(p02-t10): add buildScripts contract tests for output artifac
 
 ---
 
+### Task p02-t11: (review) Restore --minify behavior for emitted script artifacts
+
+**Files:**
+- Modify: `lib/cmd/compile/scripts.js`
+- Modify: `lib/cmd/compile/scripts.test.js`
+
+**Step 1: Understand the issue**
+
+Review finding: `options.minify` currently only toggles Webpack optimization, but claycli writes global-pack artifacts from `stats.modules[].source` / `mod.source`, so emitted `public/js/*.js` output is unchanged between minified and non-minified builds.
+Location: `lib/cmd/compile/scripts.js:477`
+
+**Step 2: Implement fix**
+
+Restore user-visible `compile --minify` semantics for the emitted global-pack files. Either:
+1. Minify the source string written by `formatModule()` when `options.minify` is true, or
+2. Refactor output generation to consume Webpack's optimized/minified output for the modules/chunks claycli actually serves.
+
+The chosen approach must preserve the existing global-pack wrapper format and `_registry.json` / `_ids.json` contracts.
+
+**Step 3: Verify**
+
+Run: `npx jest lib/cmd/compile/scripts.test.js --no-coverage`
+Expected: Tests pass
+
+Run: `npm test`
+Expected: Lint + tests pass
+
+Run a targeted minify contract check (per review artifact repro) to confirm emitted `public/js/*.js` content differs between `minify: false` and `minify: true`.
+
+**Step 4: Commit**
+
+```bash
+git add lib/cmd/compile/scripts.js lib/cmd/compile/scripts.test.js
+git commit -m "fix(p02-t11): restore minify behavior for emitted script artifacts"
+```
+
+---
+
+### Task p02-t12: (review) Fix buildScripts failure signaling on compile errors
+
+**Files:**
+- Modify: `lib/cmd/compile/scripts.js`
+- Modify: `lib/cmd/compile/scripts.test.js`
+
+**Step 1: Understand the issue**
+
+Review finding: `buildScripts()` collects Webpack compile errors but still emits per-entry success results, allowing a failed compile to be reported as partially successful.
+Location: `lib/cmd/compile/scripts.js:544`
+
+**Step 2: Implement fix**
+
+Tighten failure signaling so JavaScript/module compilation errors do not produce success results for the same failed entry. Acceptable approaches:
+- fail fast when `stats.toJson().errors` contains real compile errors, or
+- preserve non-fatal behavior only for an explicit allowlist of tolerated asset/resource issues while suppressing success entries for failed JS inputs.
+
+Keep the result contract consistent for callers/reporters and avoid writing misleading success outcomes.
+
+**Step 3: Verify**
+
+Run: `npx jest lib/cmd/compile/scripts.test.js --no-coverage`
+Expected: Tests pass, including syntax-error failure-path coverage
+
+Run: `npm test`
+Expected: Lint + tests pass
+
+Run a targeted syntax-error repro (per review artifact) to confirm `buildScripts()` returns error results without success entries for the same failed build.
+
+**Step 4: Commit**
+
+```bash
+git add lib/cmd/compile/scripts.js lib/cmd/compile/scripts.test.js
+git commit -m "fix(p02-t12): fix buildScripts failure signaling on compile errors"
+```
+
+---
+
 ## Phase 3: Dependency Cleanup & Stream Modernization
 
 ### Task p03-t01: Expand tests for Highland-based modules before replacement
@@ -1213,7 +1289,7 @@ Document pass/fail in implementation.md. All 3 checkpoints must pass before fina
 |-------|------|--------|------|----------|
 | p00 | code | pending | - | - |
 | p01 | code | pending | - | - |
-| p02 | code | received | 2026-02-26 | reviews/p02-review-2026-02-25-v2.md |
+| p02 | code | fixes_added | 2026-02-26 | reviews/p02-review-2026-02-25-v2.md |
 | p03 | code | pending | - | - |
 | p04 | code | pending | - | - |
 | final | code | pending | - | - |
@@ -1238,11 +1314,11 @@ When all tasks below are complete, this plan is ready for final code review and 
 **Scope:**
 - Phase 0: 3 tasks - Characterization tests (scripts, get-script-dependencies, styles)
 - Phase 1: 5 tasks - Foundation (Node 20+, Jest 29, ESLint 9, CI)
-- Phase 2: 10 tasks - Bundling pipeline (PostCSS 8, Browserify→Webpack, ecosystem deps, **integration test checkpoint 1**, review fixes: service rewrite, dep graph, contract tests)
+- Phase 2: 12 tasks - Bundling pipeline (PostCSS 8, Browserify→Webpack, ecosystem deps, **integration test checkpoint 1**, review fixes: service rewrite, dep graph, contract tests, minify behavior, failure signaling)
 - Phase 3: 8 tasks - Dependency cleanup (test expansion, Highland→async/await, native fetch, modern deps, **integration test checkpoint 2**)
 - Phase 4: 9 tasks - TypeScript conversion (setup, leaf→utility→core→compile→CLI→publish, **integration test checkpoint 3**)
 
-**Total: 35 tasks**
+**Total: 37 tasks**
 
 ---
 
