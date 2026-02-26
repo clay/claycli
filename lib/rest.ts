@@ -1,5 +1,4 @@
 import _ from 'lodash';
-import nodeUrl from 'url';
 import https from 'https';
 
 const pluralize = require('pluralize');
@@ -34,7 +33,7 @@ interface RequestOptions {
  * get protocol to determine if we need https agent
  */
 function isSSL(url: string): boolean {
-  return nodeUrl.parse(url).protocol === 'https:';
+  return new URL(url).protocol === 'https:';
 }
 
 /**
@@ -232,8 +231,8 @@ function recursivelyCheckURI(
  * then do requests against that until a page uri is resolved
  */
 function findURIAsync(url: string, options?: RequestOptions): Promise<{ uri: string; prefix: string }> {
-  var parts = nodeUrl.parse(url),
-    publicURI = parts.hostname! + parts.pathname!;
+  var parts = new URL(url),
+    publicURI = parts.hostname + parts.pathname;
 
   options = options || {};
   return recursivelyCheckURI(url, publicURI, options);

@@ -1,5 +1,4 @@
 import _ from 'lodash';
-import nodeUrl from 'url';
 
 const replace = require('string-replace-async');
 import types = require('./types');
@@ -78,16 +77,16 @@ function uriToUrl(prefix: string, uri: string): string {
  * and removes extension
  */
 function urlToUri(url: string): string {
-  const parts = nodeUrl.parse(url);
+  const parts = new URL(url);
 
   let path: string;
 
   if (parts.pathname === '/') {
     path = '';
   } else if (_.includes(parts.pathname, '.')) {
-    path = parts.pathname!.slice(0, parts.pathname!.indexOf('.'));
+    path = parts.pathname.slice(0, parts.pathname.indexOf('.'));
   } else {
-    path = parts.pathname!;
+    path = parts.pathname;
   }
 
   return parts.hostname + path;
@@ -97,10 +96,10 @@ function urlToUri(url: string): string {
  * get extension from url
  */
 function getExt(url: string): string | null {
-  const parts = nodeUrl.parse(url);
+  const parts = new URL(url);
 
   if (_.includes(parts.pathname, '.')) {
-    return parts.pathname!.slice(parts.pathname!.indexOf('.'));
+    return parts.pathname.slice(parts.pathname.indexOf('.'));
   } else {
     return null;
   }
