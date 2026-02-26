@@ -1,5 +1,5 @@
 ---
-oat_current_task: null
+oat_current_task: p04-t19
 oat_last_commit: bbf4bab
 oat_blockers: []
 oat_hill_checkpoints: ["discovery", "spec", "design"]
@@ -15,13 +15,13 @@ oat_generated: false
 
 # Project State: claycli-modernization
 
-**Status:** Implementation — All tasks complete, awaiting final review
+**Status:** Implementation — Final review v2 fix tasks pending
 **Started:** 2026-02-25
 **Last Updated:** 2026-02-26
 
 ## Current Phase
 
-All 52 tasks complete. Awaiting p03/p04 re-reviews and final review before PR.
+52/54 tasks complete. 2 final review fix tasks pending (p04-t19, p04-t20).
 
 ## Artifacts
 
@@ -29,7 +29,7 @@ All 52 tasks complete. Awaiting p03/p04 re-reviews and final review before PR.
 - **Spec:** Not applicable (imported plan)
 - **Design:** Not applicable (imported plan)
 - **Plan:** `plan.md` (complete — imported from Claude plan)
-- **Implementation:** `implementation.md` (52/52 tasks complete)
+- **Implementation:** `implementation.md` (52/54 tasks — 2 fix tasks pending)
 - **Imported Source:** `references/imported-plan.md`
 
 ## Progress
@@ -38,8 +38,7 @@ All 52 tasks complete. Awaiting p03/p04 re-reviews and final review before PR.
 - ✓ Phase 1: Foundation (5/5 tasks)
 - ✓ Phase 2: Bundling Pipeline (15/15 tasks)
 - ✓ Phase 3: Dependency Cleanup (11/11 tasks, incl. review fixes)
-- ✓ Phase 4: TypeScript Conversion (18/18 tasks)
-- ⧗ p03/p04 re-reviews pending, then final review
+- ○ Phase 4: TypeScript Conversion (18/20 tasks — 2 fix tasks pending)
 
 ## Blockers
 
@@ -47,4 +46,4 @@ None
 
 ## Next Milestone
 
-Re-review p03 and p04 to reach `passed`, then final review before PR.
+Execute p04-t19 (concurrency) and p04-t20 (gulp-newer guard). At cycle limit — no further automated re-review.

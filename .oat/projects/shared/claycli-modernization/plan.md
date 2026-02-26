@@ -1706,6 +1706,80 @@ git commit -m "fix(p04-t18): handle schemeless URLs in prefixes urlToUri/getExt"
 
 ---
 
+### Task p04-t19: (review) Re-apply bounded concurrency in TypeScript command modules
+
+**Files:**
+- Modify: `lib/cmd/export.ts`
+- Modify: `lib/cmd/import.ts`
+- Modify: `lib/cmd/lint.ts`
+- Modify: `cli/lint.ts`
+
+**Step 1: Understand the issue**
+
+Review finding: The p03-t09 fix restored bounded concurrency via `mapConcurrent` in the `.js` command files, but the p04 TypeScript conversion (p04-t04) was based on the pre-fix `.js` versions and reintroduced sequential `for...await` loops. `lib/concurrency.js` exists and is tested but is not imported by the `.ts` files. Additionally, `cli/lint.ts` advertises `--concurrency` but doesn't pass it to the lint function.
+
+Locations: `lib/cmd/export.ts:55`, `lib/cmd/import.ts:73`, `lib/cmd/lint.ts:66`, `cli/lint.ts:14`
+
+**Step 2: Implement fix**
+
+Re-apply the same `mapConcurrent` pattern from the `.js` versions:
+
+1. Import `mapConcurrent` from `../concurrency` (or `../../concurrency` for CLI) in each `.ts` file
+2. Replace sequential `for...await` loops with `mapConcurrent(items, concurrency, fn)` calls
+3. Thread `concurrency` parameter through `ExportOptions`, `ImportOptions` interfaces and function signatures where missing
+4. Fix `cli/lint.ts` to pass `concurrency` from argv to the lint command
+
+Use the committed `.js` versions (on `yolo-update`) as reference for which loops to convert.
+
+**Step 3: Verify**
+
+Run: `npx jest lib/cmd/export.test.js lib/cmd/import.test.js lib/cmd/lint.test.js lib/concurrency.test.js --no-coverage`
+Expected: All tests pass
+
+Run: `npm test && npx tsc --noEmit`
+Expected: Full suite passes, types clean
+
+**Step 4: Commit**
+
+```bash
+git add lib/cmd/export.ts lib/cmd/import.ts lib/cmd/lint.ts cli/lint.ts
+git commit -m "fix(p04-t19): re-apply bounded concurrency in TypeScript command modules"
+```
+
+---
+
+### Task p04-t20: (review) Guard gulp-newer extra-file comparison for missing dest
+
+**Files:**
+- Modify: `lib/gulp-plugins/gulp-newer/index.js`
+
+**Step 1: Understand the issue**
+
+Review finding: The p03-t11 ENOENT fix normalizes missing destination stats to `null`, but at line 227 the `extra` comparison path dereferences `destFileStats[timestamp]` without null-guarding `destFileStats`. On first-run builds (dest missing) with `options.extra`, this throws `TypeError`.
+
+Location: `lib/gulp-plugins/gulp-newer/index.js:227`
+
+**Step 2: Implement fix**
+
+Guard the extra-file comparison:
+```js
+if (extraFileStats && (!destFileStats || extraFileStats[timestamp] > destFileStats[timestamp])) {
+```
+
+**Step 3: Verify**
+
+Run: `npm test`
+Expected: All tests pass
+
+**Step 4: Commit**
+
+```bash
+git add lib/gulp-plugins/gulp-newer/index.js
+git commit -m "fix(p04-t20): guard gulp-newer extra comparison for missing dest"
+```
+
+---
+
 ## Deferred Items (Future Improvements)
 
 Items deliberately deferred from this modernization with documented rationale.
@@ -1738,7 +1812,7 @@ Items deliberately deferred from this modernization with documented rationale.
 | p02 | code | fixes_completed | 2026-02-26 | reviews/p02-review-2026-02-26.md |
 | p03 | code | fixes_completed | 2026-02-26 | reviews/p03-review-2026-02-26.md |
 | p04 | code | fixes_completed | 2026-02-26 | reviews/p04-review-2026-02-26.md |
-| final | code | received | 2026-02-26 | reviews/final-review-2026-02-26-v2.md |
+| final | code | fixes_added | 2026-02-26 | reviews/final-review-2026-02-26-v2.md |
 | spec | artifact | pending | - | - |
 | design | artifact | pending | - | - |
 | plan | artifact | fixes_completed | 2026-02-25 | reviews/artifact-plan-review-2026-02-25.md |
@@ -1762,9 +1836,9 @@ When all tasks below are complete, this plan is ready for final code review and 
 - Phase 1: 5 tasks - Foundation (Node 20+, Jest 29, ESLint 9, CI)
 - Phase 2: 15 tasks - Bundling pipeline (PostCSS 8, Browserify→Webpack, ecosystem deps, **integration test checkpoint 1**, review fixes: service rewrite, dep graph, contract tests, minify behavior, failure signaling, entry keys, skip writes on error, terser dep)
 - Phase 3: 11 tasks - Dependency cleanup (test expansion, Highland→async/await, native fetch, modern deps, **integration test checkpoint 2**, review fixes: bounded concurrency, import stream handling, gulp-newer ENOENT)
-- Phase 4: 18 tasks - TypeScript conversion (setup, leaf→utility→core→compile→CLI→publish, **integration test checkpoint 3**, review fixes: cli/compile TS conversion, Buffer.from, unused deps, getDependencies types, URL.parse, RequestInit type, tsconfig cleanup, path-browserify, schemeless URL fix)
+- Phase 4: 20 tasks - TypeScript conversion (setup, leaf→utility→core→compile→CLI→publish, **integration test checkpoint 3**, review fixes: cli/compile TS conversion, Buffer.from, unused deps, getDependencies types, URL.parse, RequestInit type, tsconfig cleanup, path-browserify, schemeless URL fix, bounded concurrency re-apply, gulp-newer extra guard)
 
-**Total: 52 tasks**
+**Total: 54 tasks**
 
 ---
 

@@ -3,7 +3,7 @@ oat_status: in_progress
 oat_ready_for: null
 oat_blockers: []
 oat_last_updated: 2026-02-26
-oat_current_task_id: null
+oat_current_task_id: p04-t19
 oat_generated: false
 ---
 
@@ -29,9 +29,9 @@ oat_generated: false
 | Phase 1: Foundation | completed | 5 | 5/5 |
 | Phase 2: Bundling Pipeline | completed | 15 | 15/15 |
 | Phase 3: Dependency Cleanup | completed | 11 | 11/11 |
-| Phase 4: TypeScript Conversion | completed | 18 | 18/18 |
+| Phase 4: TypeScript Conversion | in_progress | 20 | 18/20 |
 
-**Total:** 52/52 tasks completed
+**Total:** 52/54 tasks completed
 
 **Integration Test Checkpoints (HiLL gates):**
 - Checkpoint 1 (p02-t07): after P0+P1+P2 — Browserify→Webpack migration
@@ -1649,6 +1649,45 @@ Removed — `clay pack` was an unreleased experiment. No characterization tests 
 **Verification:**
 - Run: `npm test && npm run type-check`
 - Result: pass — 384 tests, lint clean, types clean
+
+---
+
+### Review Received: final (v2 — re-review)
+
+**Date:** 2026-02-26
+**Review artifact:** reviews/final-review-2026-02-26-v2.md
+
+**Findings:**
+- Critical: 0
+- Important: 1
+- Medium: 1
+- Minor: 0
+
+**New tasks added:** p04-t19, p04-t20
+
+**Finding disposition:**
+- I1 (concurrency re-regressed in TS modules) → p04-t19: re-apply mapConcurrent in export.ts, import.ts, lint.ts, fix cli/lint.ts passthrough
+- M1 (gulp-newer extra+missing dest null dereference) → p04-t20: guard destFileStats null in extra comparison
+
+**Deferred-medium resurfacing (final scope):**
+- M1 (Highland retention): ACCEPT DEFER — requires separate Gulp stream rewrite, documented in AGENTS.md
+- m4 (babel-plugin-lodash warning): ACCEPT DEFER — upstream issue, no claycli-side fix
+
+**Next:** Execute fix tasks p04-t19 and p04-t20 via `oat-project-implement`.
+
+---
+
+### Task p04-t19: (review) Re-apply bounded concurrency in TypeScript command modules
+
+**Status:** pending
+**Commit:** -
+
+---
+
+### Task p04-t20: (review) Guard gulp-newer extra-file comparison for missing dest
+
+**Status:** pending
+**Commit:** -
 
 ---
 
