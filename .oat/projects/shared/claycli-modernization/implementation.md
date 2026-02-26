@@ -3,7 +3,7 @@ oat_status: in_progress
 oat_ready_for: null
 oat_blockers: []
 oat_last_updated: 2026-02-26
-oat_current_task_id: p04-t19
+oat_current_task_id: null
 oat_generated: false
 ---
 
@@ -29,9 +29,9 @@ oat_generated: false
 | Phase 1: Foundation | completed | 5 | 5/5 |
 | Phase 2: Bundling Pipeline | completed | 15 | 15/15 |
 | Phase 3: Dependency Cleanup | completed | 11 | 11/11 |
-| Phase 4: TypeScript Conversion | in_progress | 20 | 18/20 |
+| Phase 4: TypeScript Conversion | completed | 20 | 20/20 |
 
-**Total:** 52/54 tasks completed
+**Total:** 54/54 tasks completed
 
 **Integration Test Checkpoints (HiLL gates):**
 - Checkpoint 1 (p02-t07): after P0+P1+P2 — Browserify→Webpack migration
@@ -1673,21 +1673,54 @@ Removed — `clay pack` was an unreleased experiment. No characterization tests 
 - M1 (Highland retention): ACCEPT DEFER — requires separate Gulp stream rewrite, documented in AGENTS.md
 - m4 (babel-plugin-lodash warning): ACCEPT DEFER — upstream issue, no claycli-side fix
 
-**Next:** Execute fix tasks p04-t19 and p04-t20 via `oat-project-implement`.
+**Next:** Fix tasks p04-t19 and p04-t20 complete. At review cycle limit (3/3) — no further automated re-review.
 
 ---
 
 ### Task p04-t19: (review) Re-apply bounded concurrency in TypeScript command modules
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** 0c0dfff
+
+**Outcome:**
+- Restored `mapConcurrent` usage in export.ts, import.ts, lint.ts, and cli/lint.ts
+- Replaced all sequential `for...await` loops with bounded-concurrency `mapConcurrent` calls
+- Threaded concurrency through options objects (intersection types) to comply with max-params ESLint rule
+- cli/lint.ts now passes `{ concurrency: argv.concurrency }` to `lintUrl`
+
+**Files changed:**
+- `lib/cmd/export.ts` - Added mapConcurrent import; updated 9 functions to accept/use concurrency param
+- `lib/cmd/import.ts` - Added mapConcurrent import; restructured importBootstrap/importYaml/importJson to receive concurrency via options object
+- `lib/cmd/lint.ts` - Added mapConcurrent import; replaced sequential loop in checkChildren
+- `cli/lint.ts` - Pass concurrency option through to lintUrl
+
+**Verification:**
+- Run: `npm test` — 384 tests passed, lint clean
+- Run: `npx tsc --noEmit` — type-check clean
+
+**Notes / Decisions:**
+- Used `ImportOptions & { concurrency: number }` intersection type to thread concurrency via options object instead of adding a 5th positional parameter (ESLint max-params: 4)
+- Matched patterns from the working JS versions on yolo-update branch
 
 ---
 
 ### Task p04-t20: (review) Guard gulp-newer extra-file comparison for missing dest
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** a45fded
+
+**Outcome:**
+- Added null guard for `destFileStats` in extra-file comparison path (line 227)
+- Prevents TypeError on first-run builds when dest directory is missing and `options.extra` is set
+
+**Files changed:**
+- `lib/gulp-plugins/gulp-newer/index.js` - Added `!destFileStats ||` guard to extra comparison condition
+
+**Verification:**
+- Run: `npm test` — 384 tests passed, lint clean
+
+**Notes / Decisions:**
+- One-line fix matching the null-guard pattern already used on line 223 for the main `newer` check
 
 ---
 
