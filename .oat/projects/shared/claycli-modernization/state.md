@@ -1,6 +1,6 @@
 ---
-oat_current_task: p04-t18
-oat_last_commit: 5ad2b0b
+oat_current_task: null
+oat_last_commit: bbf4bab
 oat_blockers: []
 oat_hill_checkpoints: ["discovery", "spec", "design"]
 oat_hill_completed: []
@@ -15,13 +15,13 @@ oat_generated: false
 
 # Project State: claycli-modernization
 
-**Status:** Implementation In Progress — p04 review fix pending
+**Status:** Implementation — All tasks complete, awaiting final review
 **Started:** 2026-02-25
 **Last Updated:** 2026-02-26
 
 ## Current Phase
 
-Implementation In Progress — 51/52 tasks done. p04-t18 (schemeless URL fix) pending.
+All 52 tasks complete. Awaiting p03/p04 re-reviews and final review before PR.
 
 ## Artifacts
 
@@ -29,7 +29,7 @@ Implementation In Progress — 51/52 tasks done. p04-t18 (schemeless URL fix) pe
 - **Spec:** Not applicable (imported plan)
 - **Design:** Not applicable (imported plan)
 - **Plan:** `plan.md` (complete — imported from Claude plan)
-- **Implementation:** `implementation.md` (51/52 tasks complete)
+- **Implementation:** `implementation.md` (52/52 tasks complete)
 - **Imported Source:** `references/imported-plan.md`
 
 ## Progress
@@ -38,8 +38,8 @@ Implementation In Progress — 51/52 tasks done. p04-t18 (schemeless URL fix) pe
 - ✓ Phase 1: Foundation (5/5 tasks)
 - ✓ Phase 2: Bundling Pipeline (15/15 tasks)
 - ✓ Phase 3: Dependency Cleanup (11/11 tasks, incl. review fixes)
-- ⧗ Phase 4: TypeScript Conversion (17/18 tasks, p04-t18 pending)
-- ⧗ p04 review: fixes_added (1 task)
+- ✓ Phase 4: TypeScript Conversion (18/18 tasks)
+- ⧗ p03/p04 re-reviews pending, then final review
 
 ## Blockers
 
@@ -47,4 +47,4 @@ None
 
 ## Next Milestone
 
-Execute p04-t18 fix task, then re-review p04 to reach `passed`.
+Re-review p03 and p04 to reach `passed`, then final review before PR.

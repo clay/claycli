@@ -3,7 +3,7 @@ oat_status: in_progress
 oat_ready_for: null
 oat_blockers: []
 oat_last_updated: 2026-02-26
-oat_current_task_id: p04-t18
+oat_current_task_id: null
 oat_generated: false
 ---
 
@@ -29,9 +29,9 @@ oat_generated: false
 | Phase 1: Foundation | completed | 5 | 5/5 |
 | Phase 2: Bundling Pipeline | completed | 15 | 15/15 |
 | Phase 3: Dependency Cleanup | completed | 11 | 11/11 |
-| Phase 4: TypeScript Conversion | in_progress | 18 | 17/18 |
+| Phase 4: TypeScript Conversion | completed | 18 | 18/18 |
 
-**Total:** 51/52 tasks completed
+**Total:** 52/52 tasks completed
 
 **Integration Test Checkpoints (HiLL gates):**
 - Checkpoint 1 (p02-t07): after P0+P1+P2 — Browserify→Webpack migration
@@ -1628,18 +1628,27 @@ Removed — `clay pack` was an unreleased experiment. No characterization tests 
 **Finding disposition:**
 - I1 (WHATWG URL breaks schemeless inputs) → p04-t18: fix urlToUri/getExt to handle schemeless domain.com/... inputs
 
-**Next:** Execute fix task via the `oat-project-implement` skill.
-
-After the fix task is complete:
-- Update the review row status to `fixes_completed`
-- Re-run `oat-project-review-provide code p04` then `oat-project-review-receive` to reach `passed`
+**Next:** All p04 fix tasks complete. Request re-review via `oat-project-review-provide code p04` then `oat-project-review-receive` to reach `passed`.
 
 ---
 
 ### Task p04-t18: (review) Fix WHATWG URL migration for schemeless CLI inputs
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** bbf4bab
+
+**Outcome (required):**
+- Added `safeParseUrl` helper that prepends `http://` for schemeless inputs
+- `urlToUri` and `getExt` now handle `domain.com/...` inputs without throwing
+- Added 4 regression tests for schemeless URL patterns
+
+**Files changed:**
+- `lib/prefixes.ts` - safeParseUrl helper, applied to urlToUri and getExt
+- `lib/prefixes.test.js` - 4 new regression tests
+
+**Verification:**
+- Run: `npm test && npm run type-check`
+- Result: pass — 384 tests, lint clean, types clean
 
 ---
 
