@@ -77,7 +77,6 @@
     "autoprefixer": "^10.4.27",
     "babel-loader": "^10.0.0",
     "babel-plugin-lodash": "^3.3.4",
-    "base-64": "^1.0.0",
     "case-sensitive-paths-webpack-plugin": "^2.4.0",
     "chalk": "^4.1.0",
     "chokidar": "^3.5.1",
@@ -92,7 +91,7 @@
     "escape-quotes": "^1.0.2",
     "event-stream": "4.0.1",
     "exports-loader": "^3.0.0",
-    "fs-extra": "^9.1.0",
+    "fs-extra": "^11.3.0",
     "get-stdin": "^8.0.0",
     "glob": "^7.1.6",
     "gulp": "^4.0.2",
@@ -123,7 +122,6 @@
     "postcss-mixins": "^10.0.1",
     "postcss-nested": "^6.2.0",
     "postcss-simple-vars": "^7.0.1",
-    "resolve": "^1.8.1",
     "split-lines": "^2.0.0",
     "string-replace-async": "^2.0.0",
     "style-loader": "^4.0.0",
@@ -135,7 +133,7 @@
     "webpack": "^5.105.2",
     "webpack-assets-manifest": "^6.5.0",
     "webpack-chain": "^6.5.1",
-    "yargs": "^16.2.0"
+    "yargs": "^17.7.0"
   },
   "peerDependencies": {
     "clayhandlebars": "5"
