@@ -30,7 +30,11 @@ function handler(argv) {
 
   log('Importing items...');
   return getStdin().then((str) => {
-    return importItems(str || process.stdin, argv.url, {
+    if (!str) {
+      throw new Error('No input provided. Pipe data via stdin or pass a file argument.');
+    }
+
+    return importItems(str, argv.url, {
       key: argv.key,
       concurrency: argv.concurrency,
       publish: argv.publish,
