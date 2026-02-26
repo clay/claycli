@@ -1,63 +1,65 @@
-'use strict';
-const _ = require('lodash'),
-  utils = require('clayutils'),
-  composer = require('./composer'),
-  deepReduce = require('./deep-reduce'),
-  types = require('./types');
+import _ from 'lodash';
+
+const utils = require('clayutils');
+const composer = require('./composer');
+import deepReduce = require('./deep-reduce');
+import types = require('./types');
+
+type Dispatch = Record<string, unknown>;
+
+interface BootstrapContext {
+  bootstrap: Record<string, unknown>;
+  added: Record<string, unknown>;
+}
+
+interface User {
+  username: string;
+  provider: string;
+  auth: string;
+  [key: string]: unknown;
+}
+
+interface Page {
+  url?: string;
+  customUrl?: string;
+  meta?: Record<string, unknown>;
+  [key: string]: unknown;
+}
 
 /**
  * get uri from dispatch
- * @param  {object} dispatch
- * @return {string}
  */
-function getDispatchURI(dispatch) {
+function getDispatchURI(dispatch: Dispatch): string {
   return Object.keys(dispatch)[0];
 }
-
-/* convert dispatches to bootstraps, and vice versa
- * dispatch looks like: {"/_components/article/instances/foo":{"title":"My Article","content": [{"_ref":"/_components/paragraph/instances/bar","text":"lorem ipsum"}]}}
- * bootstrap looks like:
- * _components:
- *   article:
- *     instances:
- *       foo:
- *         title: My Article
- *         content:
- *           - _ref: /_components/paragraph/instances/bar
- *   paragraph:
- *     instances:
- *       bar:
- *         text: lorem ipsum
- */
 
 /**
  * create dispatches from component defaults and instances,
  * then deduplicate if any child components have dispatches of their own already
- * @param  {array} dispatches e.g. [{ unprefixed ref: composed data }]
- * @param  {object} components
- * @param  {object} bootstrap obj to refer to
- * @param  {object} added obj to check if components have been added already
- * @return {array} of dispatches
  */
-function parseComponentBootstrap(dispatches, components, { bootstrap, added }) {
-  return _.reduce(components, (dispatches, data, name) => {
+function parseComponentBootstrap(
+  dispatches: Dispatch[],
+  components: Record<string, Record<string, unknown>>,
+  { bootstrap, added }: BootstrapContext
+): Dispatch[] {
+  return _.reduce(components, (dispatches: Dispatch[], data, name) => {
     const defaultData = _.omit(data, 'instances'),
       defaultURI = `/_components/${name}`;
 
     // first, compose and add the default data if it hasn't already been added
-    if (_.size(defaultData) && !added[defaultURI]) {
+    if (_.size(defaultData) && !(added as Record<string, boolean>)[defaultURI]) {
       dispatches.push({ [defaultURI]: composer.denormalize(defaultData, bootstrap, added) });
-      added[defaultURI] = true;
+      (added as Record<string, boolean>)[defaultURI] = true;
     }
 
     // second, compose and add instances if they haven't already been added
     if (data.instances && _.size(data.instances)) {
-      _.forOwn(data.instances, (instanceData, instance) => {
+      _.forOwn(data.instances as Record<string, unknown>, (instanceData, instance) => {
         const instanceURI = `/_components/${name}/instances/${instance}`;
 
-        if (!added[instanceURI]) {
+        if (!(added as Record<string, boolean>)[instanceURI]) {
           dispatches.push({ [instanceURI]: composer.denormalize(instanceData, bootstrap, added) });
-          added[instanceURI] = true;
+          (added as Record<string, boolean>)[instanceURI] = true;
         }
       });
     }
@@ -69,14 +71,13 @@ function parseComponentBootstrap(dispatches, components, { bootstrap, added }) {
 
 /**
  * create dispatches from layout defaults and instances
- * @param  {array} dispatches e.g. [{ unprefixed ref: composed data }]
- * @param  {object} layouts
- * @param  {object} bootstrap obj to refer to
- * @param {object} added
- * @return {array} of dispatches
  */
-function parseLayoutBootstrap(dispatches, layouts, { bootstrap, added }) {
-  return _.reduce(layouts, (dispatches, data, name) => {
+function parseLayoutBootstrap(
+  dispatches: Dispatch[],
+  layouts: Record<string, Record<string, unknown>>,
+  { bootstrap, added }: BootstrapContext
+): Dispatch[] {
+  return _.reduce(layouts, (dispatches: Dispatch[], data, name) => {
     const defaultData = _.omit(data, 'instances'),
       defaultURI = `/_layouts/${name}`;
 
@@ -87,14 +88,15 @@ function parseLayoutBootstrap(dispatches, layouts, { bootstrap, added }) {
 
     // second, compose and add instances if they haven't already been added
     if (data.instances && _.size(data.instances)) {
-      _.forOwn(data.instances, (instanceData, instance) => {
+      _.forOwn(data.instances as Record<string, unknown>, (rawInstanceData, instance) => {
         const instanceURI = `/_layouts/${name}/instances/${instance}`;
+        const instanceData = rawInstanceData as Record<string, unknown>;
 
-        let meta;
+        let meta: Record<string, unknown> | undefined;
 
         // parse out metadata
         if (instanceData.meta) {
-          meta = instanceData.meta;
+          meta = instanceData.meta as Record<string, unknown>;
           delete instanceData.meta;
         }
 
@@ -112,13 +114,10 @@ function parseLayoutBootstrap(dispatches, layouts, { bootstrap, added }) {
 /**
  * create dispatches from page data
  * note: these pages are not composed
- * @param  {array} dispatches
- * @param  {object} pages
- * @return {array}
  */
-function parsePageBootstrap(dispatches, pages) {
-  return _.reduce(pages, (dispatches, page, id) => {
-    let meta;
+function parsePageBootstrap(dispatches: Dispatch[], pages: Record<string, Page>): Dispatch[] {
+  return _.reduce(pages, (dispatches: Dispatch[], page, id) => {
+    let meta: Record<string, unknown> | undefined;
 
     if (id[0] === '/') {
       // if a page starts with a slash, remove it so we can generate the uri
@@ -148,13 +147,10 @@ function parsePageBootstrap(dispatches, pages) {
 
 /**
  * create dispatches from users
- * @param  {array} dispatches
- * @param  {array} users
- * @return {array}
  */
-function parseUsersBootstrap(dispatches, users) {
+function parseUsersBootstrap(dispatches: Dispatch[], users: User[]): Dispatch[] {
   // note: dispatches match 1:1 with users
-  return _.reduce(users, (dispatches, user) => {
+  return _.reduce(users, (dispatches: Dispatch[], user) => {
     if (!user.username || !user.provider || !user.auth) {
       throw new Error('Cannot bootstrap users without username, provider, and auth level');
     } else {
@@ -166,13 +162,13 @@ function parseUsersBootstrap(dispatches, users) {
 
 /**
  * parse uris, lists, etc arbitrary data in bootstraps
- * @param  {array} dispatches
- * @param  {object|array} items
- * @param  {string} type
- * @return {array}
  */
-function parseArbitraryBootstrapData(dispatches, items, type) {
-  return _.reduce(items, (dispatches, item, key) => {
+function parseArbitraryBootstrapData(
+  dispatches: Dispatch[],
+  items: Record<string, unknown>,
+  type: string
+): Dispatch[] {
+  return _.reduce(items, (dispatches: Dispatch[], item, key) => {
     if (key[0] === '/') {
       // fix for uris, which sometimes start with /
       key = key.slice(1);
@@ -184,18 +180,16 @@ function parseArbitraryBootstrapData(dispatches, items, type) {
 
 /**
  * compose bootstrap data
- * @param  {object} bootstrap
- * @return {Stream} of dispatches
  */
-function parseBootstrap(bootstrap) {
-  let added = { asChild: {} },
-    dispatches = _.reduce(bootstrap, (dispatches, items, type) => {
+function parseBootstrap(bootstrap: Record<string, unknown>): Dispatch[] {
+  const added: Record<string, unknown> = { asChild: {} },
+    dispatches: Dispatch[] = _.reduce(bootstrap, (dispatches: Dispatch[], items: unknown, type: string) => {
       switch (type) {
-        case '_components': return parseComponentBootstrap(dispatches, items, { bootstrap, added });
-        case '_layouts': return parseLayoutBootstrap(dispatches, items, { bootstrap, added });
-        case '_pages': return parsePageBootstrap(dispatches, items);
-        case '_users': return parseUsersBootstrap(dispatches, items);
-        default: return parseArbitraryBootstrapData(dispatches, items, type); // uris, lists
+        case '_components': return parseComponentBootstrap(dispatches, items as Record<string, Record<string, unknown>>, { bootstrap, added });
+        case '_layouts': return parseLayoutBootstrap(dispatches, items as Record<string, Record<string, unknown>>, { bootstrap, added });
+        case '_pages': return parsePageBootstrap(dispatches, items as Record<string, Page>);
+        case '_users': return parseUsersBootstrap(dispatches, items as User[]);
+        default: return parseArbitraryBootstrapData(dispatches, items as Record<string, unknown>, type); // uris, lists
       }
     }, []);
 
@@ -204,29 +198,27 @@ function parseBootstrap(bootstrap) {
 
 /**
  * convert array of bootstrap objects to dispatches
- * @param  {Array} items
- * @return {Array}
  */
-function toDispatch(items) {
+function toDispatch(items: Record<string, unknown>[]): Dispatch[] {
   return _.flatMap(items, parseBootstrap);
 }
 
 /**
  * add deep component data to a bootstrap
- * @param {string} uri
- * @param  {object} dispatch
- * @param  {object} bootstrap
- * @return {object}
  */
-function parseComponentDispatch(uri, dispatch, bootstrap) {
-  const deepData = dispatch[uri],
+function parseComponentDispatch(
+  uri: string,
+  dispatch: Dispatch,
+  bootstrap: Record<string, unknown>
+): Record<string, unknown> {
+  const deepData = dispatch[uri] as Record<string, unknown>,
     name = utils.getComponentName(uri),
     instance = utils.getComponentInstance(uri),
-    path = instance ? `_components['${name}'].instances['${instance}']` : `_components['${name}']`;
+    componentPath = instance ? `_components['${name}'].instances['${instance}']` : `_components['${name}']`;
 
-  _.set(bootstrap, path, composer.normalize(deepData));
+  _.set(bootstrap, componentPath, composer.normalize(deepData));
 
-  return deepReduce(bootstrap, deepData, (ref, val) => {
+  return deepReduce(bootstrap, deepData, (ref: string, val: Record<string, unknown>) => {
     const deepName = utils.getComponentName(ref),
       deepInstance = utils.getComponentInstance(ref),
       deepPath = deepInstance ? `_components['${deepName}'].instances['${deepInstance}']` : `_components['${deepName}']`;
@@ -237,16 +229,16 @@ function parseComponentDispatch(uri, dispatch, bootstrap) {
 
 /**
  * add deep layout data to a bootstrap
- * @param {string} uri
- * @param  {object} dispatch
- * @param  {object} bootstrap
- * @return {object}
  */
-function parseLayoutDispatch(uri, dispatch, bootstrap) {
-  const deepData = dispatch[uri],
+function parseLayoutDispatch(
+  uri: string,
+  dispatch: Dispatch,
+  bootstrap: Record<string, unknown>
+): Record<string, unknown> {
+  const deepData = dispatch[uri] as Record<string, unknown>,
     name = utils.getLayoutName(uri),
     instance = utils.getLayoutInstance(uri),
-    path = instance ? `_layouts['${name}'].instances['${instance}']` : `_layouts['${name}']`;
+    layoutPath = instance ? `_layouts['${name}'].instances['${instance}']` : `_layouts['${name}']`;
 
   if (utils.isLayoutMeta(uri)) {
     // if we're just setting metadata, return early
@@ -255,9 +247,9 @@ function parseLayoutDispatch(uri, dispatch, bootstrap) {
     return bootstrap;
   }
 
-  _.set(bootstrap, path, _.assign({}, _.get(bootstrap, path, {}), composer.normalize(deepData)));
+  _.set(bootstrap, layoutPath, _.assign({}, _.get(bootstrap, layoutPath, {}), composer.normalize(deepData)));
 
-  return deepReduce(bootstrap, deepData, (ref, val) => {
+  return deepReduce(bootstrap, deepData, (ref: string, val: Record<string, unknown>) => {
     // reduce on the child components and their instances
     const deepName = utils.getComponentName(ref),
       deepInstance = utils.getComponentInstance(ref),
@@ -269,14 +261,14 @@ function parseLayoutDispatch(uri, dispatch, bootstrap) {
 
 /**
  * add page data to a bootstrap
- * @param {string} uri
- * @param  {object} dispatch
- * @param  {object} bootstrap
- * @return {object}
  */
-function parsePageDispatch(uri, dispatch, bootstrap) {
-  let id = utils.getPageInstance(uri),
-    page = dispatch[uri];
+function parsePageDispatch(
+  uri: string,
+  dispatch: Dispatch,
+  bootstrap: Record<string, unknown>
+): Record<string, unknown> {
+  const id = utils.getPageInstance(uri),
+    page = dispatch[uri] as Page;
 
   if (utils.isPageMeta(uri)) {
     // if we're just setting metadata, return early
@@ -296,29 +288,29 @@ function parsePageDispatch(uri, dispatch, bootstrap) {
 
 /**
  * add user data to a bootstrap
- * @param {string} uri
- * @param  {object} dispatch
- * @param  {object} bootstrap
- * @return {object}
  */
-function parseUsersDispatch(uri, dispatch, bootstrap) {
+function parseUsersDispatch(
+  uri: string,
+  dispatch: Dispatch,
+  bootstrap: Record<string, unknown>
+): Record<string, unknown> {
   if (!bootstrap._users) {
     bootstrap._users = [];
   }
 
-  bootstrap._users.push(dispatch[uri]);
+  (bootstrap._users as unknown[]).push(dispatch[uri]);
   return bootstrap;
 }
 
 /**
  * add uris, lists, etc arbitrary data to a bootstrap
- * @param {string} uri
- * @param  {object} dispatch
- * @param  {object} bootstrap
- * @return {object}
  */
-function parseArbitraryDispatchData(uri, dispatch, bootstrap) {
-  let type = _.find(types, (t) => _.includes(uri, t)),
+function parseArbitraryDispatchData(
+  uri: string,
+  dispatch: Dispatch,
+  bootstrap: Record<string, unknown>
+): Record<string, unknown> {
+  let type = _.find(types, (t) => _.includes(uri, t)) as string,
     name = uri.split(`${type}/`)[1];
 
   type = type.slice(1); // remove beginning slash
@@ -333,11 +325,8 @@ function parseArbitraryDispatchData(uri, dispatch, bootstrap) {
 
 /**
  * generate a bootstrap by reducing through a stream of dispatches
- * @param  {object} bootstrap
- * @param  {object} dispatch
- * @return {object}
  */
-function generateBootstrap(bootstrap, dispatch) {
+function generateBootstrap(bootstrap: Record<string, unknown>, dispatch: Dispatch): Record<string, unknown> {
   const uri = getDispatchURI(dispatch),
     type = _.find(types, (t) => _.includes(uri, t));
 
@@ -352,12 +341,9 @@ function generateBootstrap(bootstrap, dispatch) {
 
 /**
  * convert array of dispatches to a bootstrap
- * @param  {Array} dispatches
- * @return {object}
  */
-function toBootstrap(dispatches) {
+function toBootstrap(dispatches: Dispatch[]): Record<string, unknown> {
   return dispatches.reduce(generateBootstrap, {});
 }
 
-module.exports.toDispatch = toDispatch;
-module.exports.toBootstrap = toBootstrap;
+export { toDispatch, toBootstrap };

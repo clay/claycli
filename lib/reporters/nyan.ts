@@ -1,16 +1,27 @@
-'use strict';
-const _ = require('lodash'),
-  chalk = require('chalk'),
-  NyanCat = require('nyansole'),
-  term = require('terminal-logger')('nyan');
+import _ from 'lodash';
 
-let cat;
+const chalk = require('chalk');
+const NyanCat = require('nyansole');
+const term = require('terminal-logger')('nyan');
+
+interface Action {
+  type: string;
+  action?: string;
+  message: string;
+  details?: string;
+}
+
+interface Summary {
+  success: boolean;
+  message: string;
+}
+
+let cat: InstanceType<typeof NyanCat> | undefined;
 
 /**
  * log simple messages and reset the cat
- * @param  {string} message
  */
-function log(message) {
+function log(message: string): void {
   term.status.info(message);
 
   if (!cat) {
@@ -22,9 +33,8 @@ function log(message) {
 
 /**
  * move the cat!
- * @param  {object} action
  */
-function logAction(action) {
+function logAction(action: Action): void {
   if (!cat) {
     cat = new NyanCat();
     cat.reset();
@@ -38,10 +48,11 @@ function logAction(action) {
 
 /**
  * log a summary at the end of the command, giving a list of errors and warnings
- * @param  {function} summary that returns { success, message }
- * @param  {array} results
  */
-function logSummary(summary, results) {
+function logSummary(
+  summary: (successes: number, errors: number) => Summary,
+  results: Action[]
+): void {
   const successes = _.filter(results, { action: 'success' }),
     warnings = _.filter(results, { action: 'warning' }),
     errors = _.filter(results, { action: 'error' }),
@@ -84,6 +95,4 @@ function logSummary(summary, results) {
   });
 }
 
-module.exports.log = log;
-module.exports.logAction = logAction;
-module.exports.logSummary = logSummary;
+export { log, logAction, logSummary };

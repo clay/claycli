@@ -1,19 +1,20 @@
-'use strict';
-const format = require('date-fns/format'),
-  _ = require('lodash'),
-  chalk = require('chalk'),
-  fs = require('fs-extra'),
-  path = require('path'),
-  amphoraFs = require('amphora-fs'),
-  configFile = require('./config-file-helpers');
+import _ from 'lodash';
+import path from 'path';
+
+const format = require('date-fns/format');
+const chalk = require('chalk');
+const fs = require('fs-extra');
+const amphoraFs = require('amphora-fs');
+const configFile = require('./config-file-helpers');
+
+interface BrowserslistConfig {
+  overrideBrowserslist: string[];
+}
 
 /**
  * determine how long a compilation task took
- * @param  {number} t2 unix timestamp
- * @param  {number} t1 unix timestamp
- * @return {string}
  */
-function time(t2, t1) {
+function time(t2: number, t1: number): string {
   const diff = t2 - t1;
 
   if (diff > 1000 * 60) {
@@ -28,12 +29,10 @@ function time(t2, t1) {
 /**
  * set up a watcher that logs when a file has changed
  * used by all scripts
- * @param  {string} e event type
- * @param  {string} filepath
  */
-function watcher(e, filepath) {
+function watcher(e: string, filepath: string): void {
   if (!_.includes(filepath, '.DS_Store')) {
-    console.log(chalk.green('✓ ') + chalk.grey(filepath.replace(process.cwd(), '')));
+    console.log(chalk.green('\u2713 ') + chalk.grey(filepath.replace(process.cwd(), '')));
   }
 }
 
@@ -41,10 +40,8 @@ function watcher(e, filepath) {
  * determine what bucket of the alphabet the first letter of a name falls into
  * note: six buckets is the sweet spot for filesize / file bundling on http 1.1 and http2/spdy
  * note: non-alphabetic stuff goes in the last bucket, because statistically it will be the smallest
- * @param  {string} name
- * @return {string} bucket, e.g. 'a-d', 'e-h', 'i-l', 'm-p', 'q-t', 'u-z'
  */
-function bucket(name) {
+function bucket(name: string): string {
   if (name.match(/^[a-d]/i)) {
     return 'a-d';
   } else if (name.match(/^[e-h]/i)) {
@@ -62,21 +59,16 @@ function bucket(name) {
 
 /**
  * find the matcher for a bucket
- * @param  {string} name e.g. _templates-a-d
- * @return {string}
  */
-function unbucket(name) {
+function unbucket(name: string): string | undefined {
   return _.find(['a-d', 'e-h', 'i-l', 'm-p', 'q-t', 'u-z'], (matcher) => _.includes(name, matcher));
 }
 
 /**
  * generate bundles for gulp-group-concat, based on the buckets above
- * @param  {string} prefix without ending hyphen
- * @param  {string} ext without dot
- * @return {object}
  */
-function generateBundles(prefix, ext) {
-  return _.reduce(['a-d', 'e-h', 'i-l', 'm-p', 'q-t', 'u-z'], (bundles, matcher) => {
+function generateBundles(prefix: string, ext: string): Record<string, string> {
+  return _.reduce(['a-d', 'e-h', 'i-l', 'm-p', 'q-t', 'u-z'], (bundles: Record<string, string>, matcher) => {
     bundles[`${prefix}-${matcher}.${ext}`] = `**/[${matcher}]*.${ext}`;
     return bundles;
   }, {});
@@ -85,14 +77,10 @@ function generateBundles(prefix, ext) {
 
 /**
  * determine if a file has changed based on ctimes
- * @param  {Stream}  stream
- * @param  {Vinyl}  sourceFile
- * @param  {string}  targetPath
- * @return {Promise}
  */
 /* istanbul ignore next */
-function hasChanged(stream, sourceFile, targetPath) {
-  return fs.stat(targetPath).then((targetStat) => {
+function hasChanged(stream: { push: (file: unknown) => void }, sourceFile: { stat?: { ctime: Date } }, targetPath: string): Promise<void> {
+  return fs.stat(targetPath).then((targetStat: { ctime: Date }) => {
     if (sourceFile.stat && sourceFile.stat.ctime > targetStat.ctime) {
       stream.push(sourceFile);
     }
@@ -104,16 +92,12 @@ function hasChanged(stream, sourceFile, targetPath) {
 
 /**
  * transform the filepath if we're minifying the files and putting them into bundles
- * @param  {string} prefix e.g. '_templates', '_models'
- * @param  {string} destPath path to the destination directory
- * @param  {boolean} shouldMinify
- * @return {Functio }
  */
-function transformPath(prefix, destPath, shouldMinify) {
+function transformPath(prefix: string, destPath: string, shouldMinify: boolean): (filepath: string) => string {
   return (filepath) => {
     if (shouldMinify) {
       // bundle into one of six bundle files based on the first letter of the component/template
-      const name = _.head(path.basename(filepath).toLowerCase().split('.'));
+      const name = _.head(path.basename(filepath).toLowerCase().split('.')) as string;
 
       return path.join(destPath, `${prefix}-${bucket(name)}.js`);
     } else {
@@ -127,11 +111,8 @@ function transformPath(prefix, destPath, shouldMinify) {
  * Find the additional plugins to use in PostCSS
  * compilation. Either accept the values from command
  * arguments and require them in or use the config file
- *
- * @param {Object} argv
- * @returns {Array}
  */
-function determinePostCSSPlugins(argv) {
+function determinePostCSSPlugins(argv: { plugins?: string[] }): unknown[] {
   const configPlugins = configFile.getConfigValue('plugins');
 
   if (configPlugins) {
@@ -140,9 +121,9 @@ function determinePostCSSPlugins(argv) {
     }
 
     // Return the array of plugins defined in the config file
-    return configPlugins;
+    return configPlugins as unknown[];
   } else {
-    return _.map(argv.plugins, (pluginName) => {
+    return _.map(argv.plugins, (pluginName: string) => {
       const plugin = amphoraFs.tryRequire(pluginName);
 
       // If no plugin, log it can't be found
@@ -150,8 +131,8 @@ function determinePostCSSPlugins(argv) {
 
       try { // if plugin, invoke it
         return plugin();
-      } catch (e) { // or log when it fails
-        console.error(`${chalk.red(`Error: Cannot init plugin "${pluginName}"`)}\n${chalk.grey(e.message)}`);
+      } catch (e: unknown) { // or log when it fails
+        console.error(`${chalk.red(`Error: Cannot init plugin "${pluginName}"`)}\n${chalk.grey((e as Error).message)}`);
       }
     });
   }
@@ -160,38 +141,36 @@ function determinePostCSSPlugins(argv) {
 /**
  * Given an key, grab the value from the config file
  * or pull from the browserlist that's supported
- *
- * @param {String} key
- * @returns {Object|String}
  */
-function getConfigFileOrBrowsersList(key) {
+function getConfigFileOrBrowsersList(key: string): unknown {
   const configFileValue = configFile.getConfigValue(key);
 
-  return configFileValue ? configFileValue : module.exports.browserslist;
+  return configFileValue ? configFileValue : browserslist;
 }
 
 /**
  * Given an key, grab the value from the config file
- *
- * @param {String} key
- * @returns {Object|String}
  */
-function getConfigFileValue(key) {
+function getConfigFileValue(key: string): unknown {
   return configFile.getConfigValue(key);
 }
 
+const browserslist: BrowserslistConfig = {
+  overrideBrowserslist: ['Chrome >= 89', 'Safari >= 14', 'Firefox >= 90', 'Edge >= 89']
+}; // used by styles, scripts, and babel/preset-env
 
-module.exports.time = time;
-module.exports.debouncedWatcher = _.debounce(watcher, 200);
-module.exports.bucket = bucket;
-module.exports.unbucket = unbucket;
-module.exports.generateBundles = generateBundles;
-module.exports.hasChanged = hasChanged;
-module.exports.transformPath  = transformPath;
-module.exports.browserslist = { overrideBrowserslist: ['Chrome >= 89', 'Safari >= 14', 'Firefox >= 90', 'Edge >= 89'] }; // used by styles, scripts, and babel/preset-env
-module.exports.determinePostCSSPlugins = determinePostCSSPlugins;
-module.exports.getConfigFileOrBrowsersList = getConfigFileOrBrowsersList;
-module.exports.getConfigFileValue = getConfigFileValue;
+export {
+  time,
+  bucket,
+  unbucket,
+  generateBundles,
+  hasChanged,
+  transformPath,
+  browserslist,
+  determinePostCSSPlugins,
+  getConfigFileOrBrowsersList,
+  getConfigFileValue,
+  watcher
+};
 
-// for testing
-module.exports.watcher = watcher;
+export const debouncedWatcher = _.debounce(watcher, 200);

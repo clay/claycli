@@ -1,24 +1,33 @@
-'use strict';
-const chalk = require('chalk'),
-  _ = require('lodash'),
-  term = require('terminal-logger')('pretty');
+import _ from 'lodash';
+
+const chalk = require('chalk');
+const term = require('terminal-logger')('pretty');
 
 term.level = 'debug'; // log everything
 
+interface Action {
+  type: string;
+  message: string;
+  details?: string;
+}
+
+interface Summary {
+  success: boolean;
+  message: string;
+}
+
 /**
  * log simple messages
- * @param  {string} message
  */
-function log(message) {
+function log(message: string): void {
   term.status.info(message);
 }
 
 /**
  * log each operation as it happens
- * @param  {object} action
  */
-function logAction(action) {
-  let details = action.details && _.isString(action.details) ? ` ${chalk.grey('(' + action.details + ')')}` : '',
+function logAction(action: Action): void {
+  const details = action.details && _.isString(action.details) ? ` ${chalk.grey('(' + action.details + ')')}` : '',
     message = `${action.message}${details}`;
 
   if (_.has(term.status, action.type)) {
@@ -32,10 +41,11 @@ function logAction(action) {
 
 /**
  * log a summary at the end of the command, giving a list of errors and warnings
- * @param  {function} summary that returns { success, message }
- * @param  {array} results
  */
-function logSummary(summary, results) {
+function logSummary(
+  summary: (successes: number, errors: number) => Summary,
+  results: Action[]
+): void {
   const successes = _.filter(results, { type: 'success' }),
     errors = _.filter(results, { type: 'error' }),
     sum = summary(successes.length, errors.length);
@@ -48,6 +58,4 @@ function logSummary(summary, results) {
   }
 }
 
-module.exports.log = log;
-module.exports.logAction = logAction;
-module.exports.logSummary = logSummary;
+export { log, logAction, logSummary };

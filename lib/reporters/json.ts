@@ -1,9 +1,22 @@
-'use strict';
-const _ = require('lodash'),
-  clayLog = require('clay-log'),
-  pkg = require('../../package.json');
+import _ from 'lodash';
 
-let logger = clayLog.init({
+const clayLog = require('clay-log');
+const pkg = require('../../package.json');
+
+interface Action {
+  type: string;
+  message?: string;
+  command?: string;
+  details?: string;
+  [key: string]: unknown;
+}
+
+interface Summary {
+  success: boolean;
+  message: string;
+}
+
+const logger = clayLog.init({
   name: 'claycli',
   output: process.stderr,
   meta: { claycliVersion: pkg.version }
@@ -11,19 +24,15 @@ let logger = clayLog.init({
 
 /**
  * log simple messages
- * @param  {string} message
- * @param  {string} command
  */
-function log(message, command) {
+function log(message: string, command: string): void {
   logger('info', message, { command, type: 'info' });
 }
 
 /**
  * log each operation as it happens
- * @param  {object} action
- * @param  {string} command
  */
-function logAction(action, command) {
+function logAction(action: Action, command: string): void {
   const message = action.message;
 
   delete action.message; // remove duplicate property
@@ -39,11 +48,12 @@ function logAction(action, command) {
 
 /**
  * log a summary at the end of the command, giving a list of errors and warnings
- * @param  {function} summary that returns { success, message }
- * @param  {array} results
- * @param  {string} command
  */
-function logSummary(summary, results, command) {
+function logSummary(
+  summary: (successes: number, errors: number) => Summary,
+  results: Action[],
+  command: string
+): void {
   const successes = _.filter(results, { type: 'success' }),
     errors = _.filter(results, { type: 'error' }),
     sum = summary(successes.length, errors.length);
@@ -55,6 +65,4 @@ function logSummary(summary, results, command) {
   }
 }
 
-module.exports.log = log;
-module.exports.logAction = logAction;
-module.exports.logSummary = logSummary;
+export { log, logAction, logSummary };
