@@ -1,11 +1,10 @@
-'use strict';
 const pluralize = require('pluralize'),
   getStdin = require('get-stdin'),
   options = require('./cli-options'),
   linter = require('../lib/cmd/lint'),
   reporter = require('../lib/reporters');
 
-function builder(yargs) {
+function builder(yargs: any) {
   return yargs
     .usage('Usage: $0 lint [url]')
     .example('$0 lint domain.com/_components/foo', 'Lint component')
@@ -16,15 +15,15 @@ function builder(yargs) {
     .option('r', options.reporter);
 }
 
-function handler(argv) {
+function handler(argv: any) {
   const log = reporter.log(argv.reporter, 'lint');
 
-  return getStdin().then((str) => {
+  return getStdin().then((str: any) => {
     if (str) { // lint schema from stdin
       log('Linting schema...');
       return linter.lintSchema(str)
         // no dot logging of individual schema linting, since it's just a single dot
-        .then(reporter.logSummary(argv.reporter, 'lint', (successes, errors) => {
+        .then(reporter.logSummary(argv.reporter, 'lint', (successes: any, errors: any) => {
           if (errors) {
             return { success: false, message: `Schema has ${pluralize('error', errors, true)}` };
           } else {
@@ -34,9 +33,9 @@ function handler(argv) {
     } else { // lint url
       log('Linting url...');
       return linter.lintUrl(argv.url)
-        .then((results) => {
+        .then((results: any) => {
           results.forEach(reporter.logAction(argv.reporter, 'lint'));
-          reporter.logSummary(argv.reporter, 'lint', (successes, errors) => {
+          reporter.logSummary(argv.reporter, 'lint', (successes: any, errors: any) => {
             if (errors) {
               return { success: false, message: `Missing ${pluralize('reference', errors, true)}`};
             } else {
@@ -48,7 +47,7 @@ function handler(argv) {
   });
 }
 
-module.exports = {
+export = {
   command: 'lint [url]',
   describe: 'Lint urls or schemas',
   aliases: ['linter', 'l'],

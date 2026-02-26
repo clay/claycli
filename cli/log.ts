@@ -1,10 +1,7 @@
-'use strict';
-
-const _ = require('lodash');
 const clayLog = require('clay-log');
 const pkg = require('../package.json');
 
-let instance = null;
+let instance: any = null;
 
 /**
  * Initialize the logger.
@@ -12,7 +9,7 @@ let instance = null;
  * @param {Object|Function} [customLogger]
  * @return {Function}
  */
-function init(customLogger) {
+function init(customLogger?: any) {
   if (!instance) {
     clayLog
       .init({
@@ -41,7 +38,7 @@ function init(customLogger) {
  * @param {Object|Function} meta
  * @returns {Function}
  */
-function setup(meta = {}) {
+function setup(meta: any = {}) {
   const logger = init();
 
   return clayLog.meta(meta, logger);
@@ -53,13 +50,14 @@ function setup(meta = {}) {
  *
  * @param {Object|Function} replacement
  */
-function setLogger(replacement) {
+function setLogger(replacement: any) {
   instance = replacement;
 }
 
 init();
 
-module.exports = init;
-module.exports.getLogger = init;
-module.exports.setup = setup;
-module.exports.setLogger = setLogger;
+export = Object.assign(init, {
+  getLogger: init,
+  setup,
+  setLogger
+});

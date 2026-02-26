@@ -1,11 +1,10 @@
-'use strict';
 const _ = require('lodash'),
   chalk = require('chalk'),
   options = require('./cli-options'),
   reporter = require('../lib/reporters'),
   config = require('../lib/cmd/config');
 
-function builder(yargs) {
+function builder(yargs: any) {
   return yargs
     .usage('Usage: $0 config [value]')
     .example('$0 config --key local', 'View local api key')
@@ -17,7 +16,7 @@ function builder(yargs) {
     .option('r', options.reporter);
 }
 
-function set(argv) {
+function set(argv: any) {
   if (argv.key) {
     config.set('key', argv.key, argv.value);
     reporter.logSummary(argv.reporter, 'config', () => ({ success: true, message: `set ${argv.key} ${argv.value}` }))([]);
@@ -30,7 +29,7 @@ function set(argv) {
   }
 }
 
-function get(argv) {
+function get(argv: any) {
   let type, key, val;
 
   if (argv.key) {
@@ -43,12 +42,12 @@ function get(argv) {
     val = config.get('url', argv.url);
   } else if (argv.reporter !== 'json') {
     // pretty print all config options
-    reporter.logSummary(argv.reporter, 'config', () => ({ success: true, message: `Raw Config Values:\n${_.reduce(config.getAll(), (str, items, type) => {
+    reporter.logSummary(argv.reporter, 'config', () => ({ success: true, message: `Raw Config Values:\n${_.reduce(config.getAll(), (str: any, items: any, type: any) => {
       if (type === '__filename') {
         return str;
       }
 
-      return str += `${chalk.blue(type)}:\n${_.reduce(items, (itemsStr, itemVal, itemKey) => {
+      return str += `${chalk.blue(type)}:\n${_.reduce(items, (itemsStr: any, itemVal: any, itemKey: any) => {
         return itemsStr += `${chalk.bold(itemKey)} = ${itemVal}\n`;
       }, '')}\n`;
     }, '')}`}))([]);
@@ -68,7 +67,7 @@ function get(argv) {
   }
 }
 
-function handler(argv) {
+function handler(argv: any) {
   if (argv.value) {
     // set values
     set(argv);
@@ -77,7 +76,7 @@ function handler(argv) {
   }
 }
 
-module.exports = {
+export = {
   command: 'config [value]',
   describe: 'View or set config variables',
   aliases: ['configure', 'cfg'],

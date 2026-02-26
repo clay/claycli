@@ -1,6 +1,4 @@
-'use strict';
-
-module.exports = {
+const options = {
   reporter: {
     alias: 'reporter', // -r, --reporter
     describe: 'how to print logs',
@@ -81,3 +79,5 @@ module.exports = {
     type: 'array'
   }
 };
+
+export = options;

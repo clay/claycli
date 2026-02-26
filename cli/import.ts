@@ -1,4 +1,3 @@
-'use strict';
 const _ = require('lodash'),
   pluralize = require('pluralize'),
   chalk = require('chalk'),
@@ -6,7 +5,7 @@ const _ = require('lodash'),
   reporter = require('../lib/reporters'),
   importItems = require('../lib/cmd/import');
 
-function builder(yargs) {
+function builder(yargs: any) {
   return yargs
     .usage('Usage: $0 import [url]')
     .example('$0 import --key prod domain.com < db_dump.clay', 'Import dispatch from stdin')
@@ -24,12 +23,12 @@ function builder(yargs) {
  * @param  {object} argv
  * @return {function}
  */
-function handler(argv) {
+function handler(argv: any) {
   const log = reporter.log(argv.reporter, 'import'),
     getStdin = require('get-stdin');
 
   log('Importing items...');
-  return getStdin().then((str) => {
+  return getStdin().then((str: any) => {
     if (!str) {
       throw new Error('No input provided. Pipe data via stdin or pass a file argument.');
     }
@@ -40,12 +39,12 @@ function handler(argv) {
       publish: argv.publish,
       yaml: argv.yaml
     });
-  }).then((results) => {
+  }).then((results: any) => {
     var logActionFn = reporter.logAction(argv.reporter, 'import');
 
-    var pages;
+    var pages: any;
 
-    results.forEach((item) => {
+    results.forEach((item: any) => {
       logActionFn(item);
       // catch people trying to import dispatches from yaml files
       if (item.type === 'error' && item.message === 'Cannot import dispatch from yaml') {
@@ -54,9 +53,9 @@ function handler(argv) {
       }
     });
 
-    pages = _.map(_.filter(results, (result) => result.type === 'success' && _.includes(result.message, 'pages')), (page) => `${page.message}.html`);
+    pages = _.map(_.filter(results, (result: any) => result.type === 'success' && _.includes(result.message, 'pages')), (page: any) => `${page.message}.html`);
 
-    reporter.logSummary(argv.reporter, 'import', (successes) => {
+    reporter.logSummary(argv.reporter, 'import', (successes: any) => {
       if (successes && pages.length) {
         return { success: true, message: `Imported ${pluralize('page', pages.length, true)}\n${chalk.gray(pages.join('\n'))}` };
       } else if (successes) {
@@ -68,7 +67,7 @@ function handler(argv) {
   });
 }
 
-module.exports = {
+export = {
   command: 'import [url]',
   describe: 'Import data into clay',
   aliases: ['importer', 'i'],

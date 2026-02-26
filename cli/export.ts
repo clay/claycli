@@ -1,4 +1,3 @@
-'use strict';
 const _ = require('lodash'),
   pluralize = require('pluralize'),
   yaml = require('js-yaml'),
@@ -10,7 +9,7 @@ const _ = require('lodash'),
   exporter = require('../lib/cmd/export'),
   prefixes = require('../lib/prefixes');
 
-function builder(yargs) {
+function builder(yargs: any) {
   return yargs
     .usage('Usage: $0 export [url]')
     .example('$0 export --key prod domain.com > db_dump.clay', 'Export dispatches')
@@ -28,7 +27,7 @@ function builder(yargs) {
  * @param  {Error} e
  * @param {object} argv
  */
-function fatalError(e, argv) {
+function fatalError(e: any, argv: any) {
   reporter.logSummary(argv.reporter, 'export', () => ({ success: false, message: 'Unable to export' }))([{ type: 'error', message: e.url, details: e.message }]);
   process.exit(1);
 }
@@ -37,24 +36,24 @@ function fatalError(e, argv) {
  * show progress as we export things
  * @param  {object} argv
  */
-function handler(argv) {
+function handler(argv: any) {
   const log = reporter.log(argv.reporter, 'export');
 
   var url = config.get('url', argv.url),
-    isElasticPrefix;
+    isElasticPrefix: any;
 
   if (!url) {
     fatalError({ url: 'URL is not defined!', message: 'Please specify a url to export from'}, argv);
   }
 
   log('Exporting items...');
-  return rest.isElasticPrefix(url).then((isPrefix) => {
+  return rest.isElasticPrefix(url).then((isPrefix: any) => {
     isElasticPrefix = isPrefix;
     // if we're pointed at an elastic prefix, run a query to fetch pages
     if (isPrefix) {
       return getStdin()
         .then(yaml.load)
-        .then((query) => {
+        .then((query: any) => {
           return exporter.fromQuery(url, query, {
             key: argv.key,
             concurrency: argv.concurrency,
@@ -73,11 +72,11 @@ function handler(argv) {
         yaml: argv.yaml
       });
     }
-  }).then((results) => {
+  }).then((results: any) => {
     var logActionFn = reporter.logAction(argv.reporter, 'export'),
       actions;
 
-    actions = results.map((res) => {
+    actions = results.map((res: any) => {
       var rootKey = Object.keys(res)[0],
         str = argv.yaml ? yaml.dump(res) : `${JSON.stringify(res)}\n`;
 
@@ -91,7 +90,7 @@ function handler(argv) {
       }
     });
     actions.forEach(logActionFn);
-    reporter.logSummary(argv.reporter, 'export', (successes) => {
+    reporter.logSummary(argv.reporter, 'export', (successes: any) => {
       var thing = argv.yaml ? 'bootstrap' : 'dispatch';
 
       if (successes) {
@@ -100,10 +99,10 @@ function handler(argv) {
         return { success: false, message: `Exported 0 ${thing}s (´°ω°\`)` };
       }
     })(actions);
-  }).catch((e) => fatalError(e, argv));
+  }).catch((e: any) => fatalError(e, argv));
 }
 
-module.exports = {
+export = {
   command: 'export [url]',
   describe: 'Export data from clay',
   aliases: ['exporter', 'e'],

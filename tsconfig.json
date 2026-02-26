@@ -19,7 +19,8 @@
     "lib/**/*",
     "cli/**/*",
     "index.js",
-    "setup-jest.js"
+    "setup-jest.js",
+    "cli/index.js"
   ],
   "exclude": [
     "node_modules",
