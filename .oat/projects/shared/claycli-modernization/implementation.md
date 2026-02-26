@@ -3,7 +3,7 @@ oat_status: in_progress
 oat_ready_for: null
 oat_blockers: []
 oat_last_updated: 2026-02-26
-oat_current_task_id: p04-t01
+oat_current_task_id: p03-t09
 oat_generated: false
 ---
 
@@ -28,10 +28,10 @@ oat_generated: false
 | Phase 0: Characterization Tests | completed | 3 | 3/3 |
 | Phase 1: Foundation | completed | 5 | 5/5 |
 | Phase 2: Bundling Pipeline | completed | 15 | 15/15 |
-| Phase 3: Dependency Cleanup | completed | 8 | 8/8 |
+| Phase 3: Dependency Cleanup | in_progress | 11 | 8/11 |
 | Phase 4: TypeScript Conversion | pending | 9 | 0/9 |
 
-**Total:** 31/40 tasks completed
+**Total:** 31/43 tasks completed
 
 **Integration Test Checkpoints (HiLL gates):**
 - Checkpoint 1 (p02-t07): after P0+P1+P2 — Browserify→Webpack migration
@@ -1034,6 +1034,53 @@ Removed — `clay pack` was an unreleased experiment. No characterization tests 
 - Retained moment (peer dep of moment-locales-webpack-plugin)
 - Fixed mock ordering in export tests (sequential for-loops vs Highland parallel execution)
 - Fixed unhandled Promise rejection in gulp-newer (kew vs native Promise semantics)
+
+---
+
+### Review Received: p03
+
+**Date:** 2026-02-26
+**Review artifact:** reviews/p03-review-2026-02-26.md
+
+**Findings:**
+- Critical: 0
+- Important: 3
+- Medium: 0
+- Minor: 0
+
+**New tasks added:** p03-t09, p03-t10, p03-t11
+
+**Finding disposition:**
+- I1 (concurrency no-op) → p03-t09: restore bounded concurrency via p-limit in export/import/lint
+- I2 (import stream/stdin regression) → p03-t10: fix parseDispatchSource to reject streams, fix CLI stdin fallback
+- I3 (gulp-newer error swallowing) → p03-t11: only suppress ENOENT in dest stat catch
+
+**Next:** Execute fix tasks via the `oat-project-implement` skill.
+
+After the fix tasks are complete:
+- Update the review row status to `fixes_completed`
+- Re-run `oat-project-review-provide code p03` then `oat-project-review-receive` to reach `passed`
+
+---
+
+### Task p03-t09: (review) Restore bounded concurrency in export/import/lint
+
+**Status:** pending
+**Commit:** -
+
+---
+
+### Task p03-t10: (review) Fix import stream/stdin handling regression
+
+**Status:** pending
+**Commit:** -
+
+---
+
+### Task p03-t11: (review) Fix gulp-newer to only suppress ENOENT stat errors
+
+**Status:** pending
+**Commit:** -
 
 ---
 

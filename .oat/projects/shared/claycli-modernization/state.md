@@ -1,5 +1,5 @@
 ---
-oat_current_task: p04-t01
+oat_current_task: p03-t09
 oat_last_commit: 47b57c1
 oat_blockers: []
 oat_hill_checkpoints: ["discovery", "spec", "design"]
@@ -21,7 +21,7 @@ oat_generated: false
 
 ## Current Phase
 
-Implementation — Phase 3 complete (8/8 tasks). Proceeding to Phase 4.
+Implementation — Phase 3 review fixes pending (8/11 tasks). 3 fix tasks added from p03 review.
 
 ## Artifacts
 
@@ -29,7 +29,7 @@ Implementation — Phase 3 complete (8/8 tasks). Proceeding to Phase 4.
 - **Spec:** Not applicable (imported plan)
 - **Design:** Not applicable (imported plan)
 - **Plan:** `plan.md` (complete — imported from Claude plan)
-- **Implementation:** `implementation.md` (in progress — 31/40 tasks)
+- **Implementation:** `implementation.md` (in progress — 31/43 tasks)
 - **Imported Source:** `references/imported-plan.md`
 
 ## Progress
@@ -37,7 +37,7 @@ Implementation — Phase 3 complete (8/8 tasks). Proceeding to Phase 4.
 - ✓ Phase 0: Characterization Tests (3/3 tasks)
 - ✓ Phase 1: Foundation (5/5 tasks)
 - ✓ Phase 2: Bundling Pipeline (15/15 tasks)
-- ✓ Phase 3: Dependency Cleanup (8/8 tasks)
+- ○ Phase 3: Dependency Cleanup (8/11 tasks — review fixes pending)
 - ○ Phase 4: TypeScript Conversion (0/9 tasks)
 
 ## Blockers
@@ -46,4 +46,4 @@ None
 
 ## Next Milestone
 
-Begin Phase 4: TypeScript Conversion (p04-t01 through p04-t09). Next HiLL checkpoint at end of Phase 4.
+Execute 3 review fix tasks (p03-t09 through p03-t11), then re-review p03 for pass. Then proceed to Phase 4.

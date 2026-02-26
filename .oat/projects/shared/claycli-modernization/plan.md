@@ -1129,6 +1129,216 @@ Document pass/fail in implementation.md. Do not proceed to Phase 4 without user 
 
 ---
 
+### Task p03-t09: (review) Restore bounded concurrency in export/import/lint
+
+**Files:**
+- Modify: `lib/cmd/export.js`
+- Modify: `lib/cmd/import.js`
+- Modify: `lib/cmd/lint.js`
+- Modify: `lib/cmd/export.test.js`
+- Modify: `lib/cmd/import.test.js`
+- Modify: `lib/cmd/lint.test.js`
+- Modify: `package.json` (add `p-limit` dependency)
+
+**Step 1: Understand the issue**
+
+Review finding: Phase 3 replaced Highland `flatMap`/`ratelimit`/`parallel` with sequential `for...await` loops, but the CLI still accepts `--concurrency`. The concurrency parameter is threaded through all functions but never used for parallelism, making it a silent behavioral/performance regression.
+
+Key locations:
+- `lib/cmd/lint.js:62` — `checkChildren` iterates children sequentially
+- `lib/cmd/export.js:55` — `exportInstances` iterates sequentially
+- `lib/cmd/export.js:148` — `exportAllPages` iterates sequentially
+- `lib/cmd/import.js:61` — `importBootstrap` dispatches sequentially
+- `lib/cmd/import.js:172` — `importJson` processes items sequentially
+
+**Step 2: Add p-limit dependency**
+
+```bash
+npm install p-limit@5
+```
+
+Note: `p-limit` v5 is ESM-only. If CJS compatibility is needed, use `p-limit@4` (last CJS version) or implement a simple concurrency limiter inline. Test `require('p-limit')` before committing to a version.
+
+Alternative: implement a small inline concurrency helper if p-limit doesn't work with CJS:
+```js
+function pLimit(concurrency) {
+  let active = 0;
+  const queue = [];
+  const next = () => { if (queue.length > 0 && active < concurrency) queue.shift()(); };
+  return (fn) => new Promise((resolve, reject) => {
+    const run = () => { active++; fn().then(resolve, reject).finally(() => { active--; next(); }); };
+    active < concurrency ? run() : queue.push(run);
+  });
+}
+```
+
+**Step 3: Apply bounded concurrency to hot loops**
+
+For each sequential loop, replace with concurrent execution bounded by the `concurrency` parameter:
+
+Example pattern for `exportInstances`:
+```js
+async function exportInstances(url, prefix, concurrency) {
+  var res = await rest.get(url);
+  toError(res);
+  const limit = pLimit(concurrency || 10);
+  const results = await Promise.all(
+    res.map((item) => limit(() => exportSingleItem(`${prefixes.uriToUrl(prefix, item)}.json`)))
+  );
+  return results;
+}
+```
+
+Apply similar pattern to:
+- `exportAllPages` — bounded parallel page exports
+- `exportAllComponents` / `exportAllLayouts` — bounded parallel instance listing
+- `importBootstrap` — bounded parallel dispatch sending
+- `importJson` — bounded parallel item processing
+- `checkChildren` in lint — bounded parallel child checking
+
+Thread the `concurrency` parameter through to these functions where not already present.
+
+**Step 4: Add concurrency tests**
+
+Add tests that verify concurrency affects execution overlap:
+- Test that with `concurrency: 1`, operations execute sequentially
+- Test that with `concurrency: N > 1`, operations can overlap (verify via timing or call ordering)
+
+**Step 5: Verify**
+
+Run: `npx jest lib/cmd/export.test.js lib/cmd/import.test.js lib/cmd/lint.test.js --no-coverage`
+Expected: All existing + new tests pass
+
+Run: `npm test`
+Expected: Full suite passes
+
+**Step 6: Commit**
+
+```bash
+git add lib/cmd/export.js lib/cmd/import.js lib/cmd/lint.js lib/cmd/export.test.js lib/cmd/import.test.js lib/cmd/lint.test.js package.json package-lock.json
+git commit -m "fix(p03-t09): restore bounded concurrency in export/import/lint"
+```
+
+---
+
+### Task p03-t10: (review) Fix import stream/stdin handling regression
+
+**Files:**
+- Modify: `lib/cmd/import.js`
+- Modify: `lib/cmd/import.test.js`
+- Modify: `cli/import.js`
+
+**Step 1: Understand the issue**
+
+Review finding: `parseDispatchSource()` at `lib/cmd/import.js:88` treats any object as dispatch (`return [source]`), including `Readable` streams. The CLI at `cli/import.js:32` falls back to `process.stdin` when `get-stdin` returns empty, which would pass a `Readable` object into `importItems()` → `parseDispatchSource()` → treated as a dispatch object, causing malformed imports.
+
+The original Highland-based import consumed streams via `.pipe()`, which is no longer supported.
+
+**Step 2: Fix parseDispatchSource to reject streams**
+
+Add stream detection before the object fallback:
+
+```js
+function parseDispatchSource(source) {
+  if (_.isString(source)) {
+    return source.split('\n').filter(Boolean);
+  } else if (Buffer.isBuffer(source)) {
+    return source.toString('utf8').split('\n').filter(Boolean);
+  } else if (source && typeof source.pipe === 'function') {
+    // Streams are not supported in the async implementation
+    throw new Error('Stream input is not supported. Please pipe content via stdin or pass a string/Buffer.');
+  } else if (_.isObject(source)) {
+    return [source];
+  }
+  return [];
+}
+```
+
+**Step 3: Fix CLI stdin fallback**
+
+In `cli/import.js`, change the stdin fallback to produce a clear error instead of passing the raw stream:
+
+```js
+return getStdin().then((str) => {
+  if (!str) {
+    throw new Error('No input provided. Pipe data via stdin or pass a file argument.');
+  }
+  return importItems(str, argv.url, {
+    key: argv.key,
+    concurrency: argv.concurrency,
+    publish: argv.publish,
+    yaml: argv.yaml
+  });
+})
+```
+
+**Step 4: Add regression tests**
+
+- Test that `parseDispatchSource` throws on a stream-like object
+- Test that empty string input to `importItems` returns empty results (no crash)
+- Test that Buffer input still works
+
+**Step 5: Verify**
+
+Run: `npx jest lib/cmd/import.test.js --no-coverage`
+Expected: All tests pass
+
+Run: `npm test`
+Expected: Full suite passes
+
+**Step 6: Commit**
+
+```bash
+git add lib/cmd/import.js lib/cmd/import.test.js cli/import.js
+git commit -m "fix(p03-t10): fix import stream/stdin handling regression"
+```
+
+---
+
+### Task p03-t11: (review) Fix gulp-newer to only suppress ENOENT stat errors
+
+**Files:**
+- Modify: `lib/gulp-plugins/gulp-newer/index.js`
+
+**Step 1: Understand the issue**
+
+Review finding: At `lib/gulp-plugins/gulp-newer/index.js:83`, `statAsync(this._dest).catch(() => null)` converts ALL `fs.stat` failures into "destination missing" behavior. This masks real I/O errors (EACCES, EIO) that should fail the build.
+
+**Step 2: Fix the catch to only suppress ENOENT**
+
+Replace:
+```js
+this._destStats = this._dest
+  ? statAsync(this._dest).catch(() => null)
+  : Promise.resolve(null);
+```
+
+With:
+```js
+this._destStats = this._dest
+  ? statAsync(this._dest).catch((err) => {
+      if (err.code === 'ENOENT') {
+        return null;
+      }
+      throw err;
+    })
+  : Promise.resolve(null);
+```
+
+**Step 3: Verify**
+
+Run: `npm test`
+Expected: All tests pass (existing gulp-newer tests should still work since the normal case is ENOENT)
+
+**Step 4: Commit**
+
+```bash
+git add lib/gulp-plugins/gulp-newer/index.js
+git commit -m "fix(p03-t11): only suppress ENOENT in gulp-newer dest stat"
+```
+
+---
+
 ## Phase 4: TypeScript Conversion
 
 ### Task p04-t01: Set up TypeScript infrastructure
@@ -1385,7 +1595,7 @@ Document pass/fail in implementation.md. All 3 checkpoints must pass before fina
 | p00 | code | pending | - | - |
 | p01 | code | pending | - | - |
 | p02 | code | fixes_completed | 2026-02-26 | reviews/p02-review-2026-02-26.md |
-| p03 | code | received | 2026-02-26 | reviews/p03-review-2026-02-26.md |
+| p03 | code | fixes_added | 2026-02-26 | reviews/p03-review-2026-02-26.md |
 | p04 | code | pending | - | - |
 | final | code | pending | - | - |
 | spec | artifact | pending | - | - |
@@ -1410,10 +1620,10 @@ When all tasks below are complete, this plan is ready for final code review and 
 - Phase 0: 3 tasks - Characterization tests (scripts, get-script-dependencies, styles)
 - Phase 1: 5 tasks - Foundation (Node 20+, Jest 29, ESLint 9, CI)
 - Phase 2: 15 tasks - Bundling pipeline (PostCSS 8, Browserify→Webpack, ecosystem deps, **integration test checkpoint 1**, review fixes: service rewrite, dep graph, contract tests, minify behavior, failure signaling, entry keys, skip writes on error, terser dep)
-- Phase 3: 8 tasks - Dependency cleanup (test expansion, Highland→async/await, native fetch, modern deps, **integration test checkpoint 2**)
+- Phase 3: 11 tasks - Dependency cleanup (test expansion, Highland→async/await, native fetch, modern deps, **integration test checkpoint 2**, review fixes: restore concurrency, fix import stdin, fix gulp-newer ENOENT)
 - Phase 4: 9 tasks - TypeScript conversion (setup, leaf→utility→core→compile→CLI→publish, **integration test checkpoint 3**)
 
-**Total: 40 tasks**
+**Total: 43 tasks**
 
 ---
 
