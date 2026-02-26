@@ -24,7 +24,7 @@ function handler(argv) {
       log('Linting schema...');
       return linter.lintSchema(str)
         // no dot logging of individual schema linting, since it's just a single dot
-        .toArray(reporter.logSummary(argv.reporter, 'lint', (successes, errors) => {
+        .then(reporter.logSummary(argv.reporter, 'lint', (successes, errors) => {
           if (errors) {
             return { success: false, message: `Schema has ${pluralize('error', errors, true)}` };
           } else {
@@ -34,14 +34,16 @@ function handler(argv) {
     } else { // lint url
       log('Linting url...');
       return linter.lintUrl(argv.url)
-        .map(reporter.logAction(argv.reporter, 'lint'))
-        .toArray(reporter.logSummary(argv.reporter, 'lint', (successes, errors) => {
-          if (errors) {
-            return { success: false, message: `Missing ${pluralize('reference', errors, true)}`};
-          } else {
-            return { success: true, message: `All references exist! (checked ${pluralize('uri', successes, true)})` };
-          }
-        }));
+        .then((results) => {
+          results.forEach(reporter.logAction(argv.reporter, 'lint'));
+          reporter.logSummary(argv.reporter, 'lint', (successes, errors) => {
+            if (errors) {
+              return { success: false, message: `Missing ${pluralize('reference', errors, true)}`};
+            } else {
+              return { success: true, message: `All references exist! (checked ${pluralize('uri', successes, true)})` };
+            }
+          })(results);
+        });
     }
   });
 }

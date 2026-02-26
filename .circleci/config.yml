@@ -26,86 +26,69 @@ references:
 
 jobs:
 
-  test_node10:
+  test_node20:
     docker:
-      - image: circleci/node:10
+      - image: cimg/node:20.18
     working_directory: ~/src
     steps:
       - checkout
       - restore_cache:
           keys:
-          - v2-node10-dependencies-{{ checksum "package.json" }}
-          - v2-node10-dependencies-
+          - v3-node20-dependencies-{{ checksum "package.json" }}
+          - v3-node20-dependencies-
       - run: npm install
       - save_cache:
-          key: v2-node10-dependencies-{{ checksum "package.json" }}
+          key: v3-node20-dependencies-{{ checksum "package.json" }}
           paths:
             - node_modules
       - run: npm test
 
-  test_node12:
+  test_node22:
     docker:
-      - image: circleci/node:12
+      - image: cimg/node:22.14
     working_directory: ~/src
     steps:
       - checkout
       - restore_cache:
           keys:
-          - v2-node12-dependencies-{{ checksum "package.json" }}
-          - v2-node12-dependencies-
+          - v3-node22-dependencies-{{ checksum "package.json" }}
+          - v3-node22-dependencies-
       - run: npm install
       - save_cache:
-          key: v2-node12-dependencies-{{ checksum "package.json" }}
+          key: v3-node22-dependencies-{{ checksum "package.json" }}
           paths:
             - node_modules
       - run: npm test
       - run: cat coverage/lcov.info | ./node_modules/coveralls/bin/coveralls.js
 
-  test_node14:
-    docker:
-      - image: circleci/node:14
-    working_directory: ~/src
-    steps:
-      - checkout
-      - restore_cache:
-          keys:
-          - v2-node14-dependencies-{{ checksum "package.json" }}
-          - v2-node14-dependencies-
-      - run: npm install
-      - save_cache:
-          key: v2-node14-dependencies-{{ checksum "package.json" }}
-          paths:
-            - node_modules
-      - run: npm test
-
   deploy_docs:
     docker:
-      - image: circleci/node:14
+      - image: cimg/node:22.14
     working_directory: ~/src
     steps:
       - checkout
       - restore_cache:
-          key: v1-website-dependencies-{{ checksum "website/package.json" }}
+          key: v2-website-dependencies-{{ checksum "website/package.json" }}
       - run:
           name: Build
           command: |
             sudo apt-get -y install awscli
             bash ./.circleci/scripts/deploy-docs.sh
       - save_cache:
-          key: v1-website-dependencies-{{ checksum "website/package.json" }}
+          key: v2-website-dependencies-{{ checksum "website/package.json" }}
           paths:
             - website/node_modules
 
   deploy_package:
     docker:
-      - image: circleci/node:12
+      - image: cimg/node:22.14
     working_directory: ~/repo
     steps:
       - checkout
       - restore_cache:
           keys:
-          - v2-node12-dependencies-{{ checksum "package.json" }}
-          - v2-node12-dependencies-
+          - v3-node22-dependencies-{{ checksum "package.json" }}
+          - v3-node22-dependencies-
       - run: npm install
       - run: |
           echo "$NPMRC" > ~/.npmrc
@@ -120,25 +103,21 @@ workflows:
   version: 2
   test:
     jobs:
-      - test_node10:
+      - test_node20:
           <<: *filter_all
-      - test_node12:
-          <<: *filter_all
-      - test_node14:
+      - test_node22:
           <<: *filter_all
       - deploy_docs:
           <<: *filter_head
           context:
             - Documentation
           requires:
-            - test_node10
-            - test_node12
-            - test_node14
+            - test_node20
+            - test_node22
       - deploy_package:
           <<: *filter_release
           context:
             - npm-publish
           requires:
-            - test_node10
-            - test_node12
-            - test_node14
+            - test_node20
+            - test_node22

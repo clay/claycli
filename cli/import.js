@@ -25,38 +25,47 @@ function builder(yargs) {
  * @return {function}
  */
 function handler(argv) {
-  const log = reporter.log(argv.reporter, 'import');
+  const log = reporter.log(argv.reporter, 'import'),
+    getStdin = require('get-stdin');
 
   log('Importing items...');
-  return importItems(process.stdin, argv.url, {
-    key: argv.key,
-    concurrency: argv.concurrency,
-    publish: argv.publish,
-    yaml: argv.yaml
-  })
-    .map(reporter.logAction(argv.reporter, 'import'))
-    .map((item) => {
+  return getStdin().then((str) => {
+    if (!str) {
+      throw new Error('No input provided. Pipe data via stdin or pass a file argument.');
+    }
+
+    return importItems(str, argv.url, {
+      key: argv.key,
+      concurrency: argv.concurrency,
+      publish: argv.publish,
+      yaml: argv.yaml
+    });
+  }).then((results) => {
+    var logActionFn = reporter.logAction(argv.reporter, 'import');
+
+    var pages;
+
+    results.forEach((item) => {
+      logActionFn(item);
       // catch people trying to import dispatches from yaml files
       if (item.type === 'error' && item.message === 'Cannot import dispatch from yaml') {
         reporter.logSummary(argv.reporter, 'import', () => ({ success: false, message: 'Unable to import' }))([item]);
         process.exit(1);
-      } else {
-        return item;
       }
-    })
-    .toArray((results) => {
-      const pages = _.map(_.filter(results, (result) => result.type === 'success' && _.includes(result.message, 'pages')), (page) => `${page.message}.html`);
-
-      reporter.logSummary(argv.reporter, 'import', (successes) => {
-        if (successes && pages.length) {
-          return { success: true, message: `Imported ${pluralize('page', pages.length, true)}\n${chalk.gray(pages.join('\n'))}` };
-        } else if (successes) {
-          return { success: true, message: `Imported ${pluralize('uri', successes, true)}` };
-        } else {
-          return { success: false, message: 'Imported 0 uris (´°ω°`)' };
-        }
-      })(results);
     });
+
+    pages = _.map(_.filter(results, (result) => result.type === 'success' && _.includes(result.message, 'pages')), (page) => `${page.message}.html`);
+
+    reporter.logSummary(argv.reporter, 'import', (successes) => {
+      if (successes && pages.length) {
+        return { success: true, message: `Imported ${pluralize('page', pages.length, true)}\n${chalk.gray(pages.join('\n'))}` };
+      } else if (successes) {
+        return { success: true, message: `Imported ${pluralize('uri', successes, true)}` };
+      } else {
+        return { success: false, message: 'Imported 0 uris (´°ω°`)' };
+      }
+    })(results);
+  });
 }
 
 module.exports = {

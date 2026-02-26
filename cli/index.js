@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-'use strict'; // eslint-disable-line
+'use strict';
 
 // force colors.js to use colors when exporting
 // by passing a SECRET HIDDEN FLAG into claycli, which triggers

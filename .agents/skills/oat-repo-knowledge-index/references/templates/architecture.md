@@ -1,0 +1,77 @@
+---
+oat_generated: false
+oat_template: true
+oat_template_name: architecture
+---
+
+<!--
+Vendored from: https://github.com/glittercowboy/get-shit-done
+License: MIT
+Original: agents/gsd-codebase-mapper.md (embedded template)
+Modified: 2026-01-27 - Adapted for OAT (added frontmatter)
+-->
+
+# Architecture
+
+**Analysis Date:** [YYYY-MM-DD]
+
+## Pattern Overview
+
+**Overall:** [Pattern name]
+
+**Key Characteristics:**
+- [Characteristic 1]
+- [Characteristic 2]
+- [Characteristic 3]
+
+## Layers
+
+**[Layer Name]:**
+- Purpose: [What this layer does]
+- Location: `[path]`
+- Contains: [Types of code]
+- Depends on: [What it uses]
+- Used by: [What uses it]
+
+## Data Flow
+
+**[Flow Name]:**
+
+1. [Step 1]
+2. [Step 2]
+3. [Step 3]
+
+**State Management:**
+- [How state is handled]
+
+## Key Abstractions
+
+**[Abstraction Name]:**
+- Purpose: [What it represents]
+- Examples: `[file paths]`
+- Pattern: [Pattern used]
+
+## Entry Points
+
+**[Entry Point]:**
+- Location: `[path]`
+- Triggers: [What invokes it]
+- Responsibilities: [What it does]
+
+## Error Handling
+
+**Strategy:** [Approach]
+
+**Patterns:**
+- [Pattern 1]
+- [Pattern 2]
+
+## Cross-Cutting Concerns
+
+**Logging:** [Approach]
+**Validation:** [Approach]
+**Authentication:** [Approach]
+
+---
+
+*Architecture analysis: [date]*
