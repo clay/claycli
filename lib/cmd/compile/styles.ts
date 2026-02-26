@@ -1,0 +1,169 @@
+import _ from 'lodash';
+import path from 'path';
+
+const fs = require('fs-extra'),
+  h = require('highland'),
+  es = require('event-stream'),
+  gulp = require('gulp'),
+  rename = require('gulp-rename'),
+  changed = require('gulp-changed'),
+  cssmin = require('gulp-cssmin'),
+  gulpIf = require('gulp-if'),
+  detective = require('detective-postcss'),
+  autoprefixer = require('autoprefixer'),
+  postcss = require('gulp-postcss'),
+  cssImport = require('postcss-import'),
+  mixins = require('postcss-mixins'),
+  nested = require('postcss-nested'),
+  simpleVars  = require('postcss-simple-vars'),
+  reporters = require('../../reporters'),
+  helpers = require('../../compilation-helpers'),
+  componentsSrc = path.join(process.cwd(), 'styleguides', '**', 'components', '*.css'),
+  layoutsSrc = path.join(process.cwd(), 'styleguides', '**', 'layouts', '*.css'),
+  destPath = path.join(process.cwd(), 'public', 'css'),
+  variables = {
+    // asset host and path are set in different environments when using separate servers/subdomains for assets
+    'asset-host': process.env.CLAYCLI_COMPILE_ASSET_HOST ? process.env.CLAYCLI_COMPILE_ASSET_HOST.replace(/\/$/, '') : '',
+    'asset-path': process.env.CLAYCLI_COMPILE_ASSET_PATH || '',
+    // these arguments allow setting default env variables
+    minify:  process.env.CLAYCLI_COMPILE_MINIFIED || process.env.CLAYCLI_COMPILE_MINIFIED_STYLES || ''
+  };
+
+/**
+ * determine filepath for compiled css, based on the source filepath
+ * used to test if a css file has changed
+ * @param  {string} filepath
+ * @return {string}
+ */
+function transformPath(filepath: any) {
+  const component = path.basename(filepath, '.css'), // component name, plus variation if applicable
+    pathArray = path.dirname(filepath).split(path.sep),
+    styleguide = pathArray[pathArray.length - 2]; // parses 'styleguides/<styleguide>/components' for the name of the styleguide
+
+  return path.join(destPath, `${component}.${styleguide}.css`);
+}
+
+/**
+ * determine if a file (or its dependencies) has changed
+ * note: this only checks ONE level of dependencies, as that covers most
+ * current use cases and eliminates the need for complicated dependency-checking logic.
+ * If there is a need to check n-number of dependencies, please open a ticket and we can re-evaluate!
+ * @param  {Stream}  stream
+ * @param  {Vinyl}  sourceFile
+ * @param  {string}  targetPath
+ * @return {Promise}
+ */
+function hasChanged(stream: any, sourceFile: any, targetPath: any) {
+  let deps;
+
+  try {
+    deps = detective(sourceFile.contents.toString());
+  } catch (_e) {
+    // detective handles most postcss syntax, but doesn't know about plugins
+    // if it hits something that confuses it, fail gracefully (disregard any potential dependencies)
+    deps = [];
+  }
+
+  return fs.stat(targetPath).then((targetStat: any) => {
+    const hasUpdatedDeps = _.some(deps, (dep) => {
+      const depStat = fs.statSync(path.join(process.cwd(), 'styleguides', dep));
+
+      return depStat && depStat.ctime > targetStat.ctime;
+    });
+
+    if (hasUpdatedDeps || sourceFile.stat && sourceFile.stat.ctime > targetStat.ctime) {
+      stream.push(sourceFile);
+    }
+  }).catch(() => {
+    // targetPath doesn't exist! gotta compile the source
+    stream.push(sourceFile);
+  });
+}
+
+/**
+ * rename css files
+ * styleguide/<styleguide>/components/<component>.css
+ * becomes public/css/<component>.<styleguide>.css
+ * @param  {object} filepath
+ */
+function renameFile(filepath: any) {
+  const component = filepath.basename,
+    styleguide = filepath.dirname.split('/')[0];
+
+  filepath.dirname = '';
+  filepath.basename = `${component}.${styleguide}`;
+}
+
+/**
+ * compile postcss styles to public/css
+ * @param {object} [options]
+ * @param {boolean} [options.minify] minify resulting css
+ * @param {boolean} [options.watch] watch mode
+ * @param {array} [options.plugins] postcss plugin functions
+ * @return {Object} with build (Highland Stream) and watch (Chokidar instance)
+ */
+function compile(options: any = {}) {
+  let minify = options.minify || variables.minify || false,
+    watch = options.watch || false,
+    plugins = options.plugins || [],
+    reporter = options.reporter || 'pretty';
+
+  function buildPipeline() {
+    return gulp.src([componentsSrc, layoutsSrc])
+      .pipe(changed(destPath, {
+        transformPath,
+        hasChanged
+      }))
+      .pipe(rename(renameFile))
+      .pipe(postcss([
+        cssImport({
+          path: helpers.getConfigFileValue('postcssImportPaths') || ['./styleguides']
+        }),
+        autoprefixer(helpers.getConfigFileOrBrowsersList('autoprefixerOptions')),
+        mixins(),
+        // Simple vars must come before `nested` so that string interpolation of variables occurs before
+        // the nesting is parsed. This ensures being able to use variables in class names of nested selectors
+        simpleVars({ variables }),
+        nested()
+      ].concat(plugins)))
+      .pipe(gulpIf(Boolean(minify), cssmin()))
+      .pipe(gulp.dest(destPath))
+      .pipe(es.mapSync((file: any) => ({ type: 'success', message: path.basename(file.path) })));
+  }
+
+  gulp.task('styles', () => {
+    return h(buildPipeline());
+  });
+
+  gulp.task('styles:watch', (cb: any) => {
+    return h(buildPipeline())
+      .each((item: any) => {
+        _.map([item], reporters.logAction(reporter, 'compile'));
+      })
+      .done(cb);
+  });
+
+  if (watch) {
+    return {
+      build: gulp.task('styles')(),
+      watch: gulp.watch(
+        [componentsSrc, layoutsSrc],
+        gulp.task('styles:watch')
+      )
+    };
+  } else {
+    return {
+      build: gulp.task('styles')(),
+      watch: null
+    };
+  }
+}
+
+// Mixed default + named export pattern
+export = Object.assign(compile, {
+  transformPath,
+  hasChanged,
+  renameFile,
+  _destPath: destPath,
+  _variables: variables
+});

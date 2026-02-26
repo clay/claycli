@@ -1,0 +1,159 @@
+import _ from 'lodash';
+import path from 'path';
+
+const glob = require('glob'),
+  // destination paths
+  destPath = path.resolve(process.cwd(), 'public', 'js'),
+  registryPath = path.resolve(destPath, '_registry.json');
+
+interface GetDependenciesOptions {
+  edit?: boolean;
+  minify?: boolean;
+}
+
+/**
+ * get all dependencies (for edit mode)
+ * @param  {boolean} minify
+ * @return {array}
+ */
+function getAllDeps(minify: boolean): string[] {
+  const fileName = minify ? '_deps-?-?.js' : '+([0-9]).js';
+
+  return glob.sync(path.join(destPath, fileName)).map((filepath: string) => path.parse(filepath).name);
+}
+
+
+
+/**
+ * get all models (for edit mode)
+ * @param  {boolean} minify
+ * @return {array}
+ */
+function getAllModels(minify: boolean): string[] {
+  const fileName = minify ? '_models-?-?.js' : '*.model.js';
+
+  return glob.sync(path.join(destPath, fileName)).map((filepath: string) => path.parse(filepath).name);
+}
+
+/**
+ * get all kiln.js (for edit mode)
+ * @param  {boolean} minify
+ * @return {array}
+ */
+function getAllKilnjs(minify: boolean): string[] {
+  const fileName = minify ? '_kiln-?-?.js' : '*.kiln.js';
+
+  return glob.sync(path.join(destPath, fileName)).map((filepath: string) => path.parse(filepath).name);
+}
+
+/**
+ * get all component templates (for edit mode)
+ * @param  {boolean} minify
+ * @return {array}
+ */
+function getAllTemplates(minify: boolean): string[] {
+  const fileName = minify ? '_templates-?-?.js' : '*.template.js';
+
+  return glob.sync(path.join(destPath, fileName)).map((filepath: string) => path.parse(filepath).name);
+}
+
+/**
+ * convert a module ID to a public path
+ * @param  {string} moduleId  e.g. 'foo'
+ * @param  {string} assetPath e.g. '/site-path/'
+ * @return {string} e.g. '/site-path/js/foo.js'
+ */
+function idToPublicPath(moduleId: string, assetPath = ''): string {
+  return `${assetPath}/js/${moduleId}.js`;
+}
+
+/**
+ * convert a public asset path to a module ID
+ * @param {string} publicPath e.g. https://localhost.cache.com/media/js/tags.client.js
+ * @return {string} e.g. tags.client
+ */
+function publicPathToID(publicPath: string): string {
+  return publicPath.split('/').pop()!.replace('.js', '');
+}
+
+/**
+ * recursively compute deps, mutating the 'out' object
+ * @param  {string} dep
+ * @param  {object} out
+ * @param  {object} registry
+ * @return {undefined}
+ */
+function computeDep(dep: string, out: Record<string, boolean>, registry: Record<string, string[]>): void {
+  if (!out[dep]) {
+    out[dep] = true;
+    if (registry && registry[dep]) {
+      registry[dep].forEach((regDep: string) => computeDep(regDep, out, registry));
+    } else {
+      throw new Error(`Dependency Error: "${dep}" not found in registry. Please clear your public/js directory and recompile scripts`);
+    }
+  }
+}
+
+/**
+ * compute an array of dependency IDs from specified module IDs (plus legacy _global.js)
+ * @param  {array} entryIDs
+ * @return {array}
+ */
+function getComputedDeps(entryIDs: string[]): string[] {
+  const registry: Record<string, string[]> = require(registryPath) || {},
+    legacyIDs = Object.keys(registry).filter((key) => _.endsWith(key, '.legacy')),
+    out: Record<string, boolean> = {};
+
+  // compute deps for client.js files
+  entryIDs.forEach((entry: string) => computeDep(entry, out, registry));
+  // compute deps for legacy _global.js if they exist
+  legacyIDs.forEach((id) => computeDep(id, out, registry));
+  return Object.keys(out);
+}
+
+/**
+ * from an array of js files, return an array of dependencies
+ * note: this should be called by your Clay instance's `resolveMedia` function/service
+ * @param  {arrray}  scripts from resolveMedia's 'media.scripts'
+ * @param  {string}  assetPath to generate the filepaths from
+ * @param  {object}  [options]
+ * @param  {boolean} [options.edit] if we're in edit mode or not
+ * @param  {boolean} [options.minify] if we should send bundles or individual files
+ * @return {array}
+ */
+function getDependencies(scripts: string[], assetPath: string, options: GetDependenciesOptions = {}): string[] {
+  const edit = options.edit,
+    minify = options.minify;
+
+  if (edit) {
+    return _.flatten([
+      '_prelude',
+      getAllDeps(!!minify), // dependencies for model.js and kiln plugins
+      getAllModels(!!minify), // model.js files
+      getAllKilnjs(!!minify), // kiln.js files
+      getAllTemplates(!!minify),
+      '_kiln-plugins', // kiln plugins
+      '_postlude'
+    ]).map((id) => idToPublicPath(id, assetPath));
+  } else {
+    const entryIDs = scripts.map(publicPathToID);
+
+    return _.flatten([
+      '_prelude',
+      getComputedDeps(entryIDs), // dependencies for client.js and legacy js
+      '_postlude',
+      '_client-init'
+    ]).map((id) => idToPublicPath(id, assetPath));
+  }
+}
+
+export {
+  getDependencies,
+  idToPublicPath,
+  publicPathToID,
+  computeDep,
+  getAllDeps,
+  getAllModels,
+  getAllKilnjs,
+  getAllTemplates
+};
