@@ -109,7 +109,7 @@ function inlineRead(source: any, filepath: any) {
 function wrapTemplate(file: any) {
   let source = _.includes(file.path, 'clay-kiln') ? file.contents.toString('utf8') : inlineRead(file.contents.toString('utf8'), file.path);
 
-  file.contents = new Buffer(clayHbs.wrapPartial(_.last(path.dirname(file.path).split(path.sep)), source));
+  file.contents = Buffer.from(clayHbs.wrapPartial(_.last(path.dirname(file.path).split(path.sep)), source));
   return file;
 }
 
@@ -122,7 +122,7 @@ function precompile(file: any) {
   const name = path.parse(file.path).name.replace('.template', '');
 
   try {
-    file.contents = new Buffer(hbs.precompile(file.contents.toString('utf8')));
+    file.contents = Buffer.from(hbs.precompile(file.contents.toString('utf8')));
     return file;
   } catch (e) {
     console.log(chalk.red(`Error precompiling template "${name}": `) + (e as Error).message);
@@ -139,7 +139,7 @@ function registerTemplate(file: any) {
   const name = path.parse(file.path).name.replace('.template', ''),
     contents = file.contents.toString('utf8');
 
-  file.contents = new Buffer(`window.kiln.componentTemplates['${name}']=${contents}\n`);
+  file.contents = Buffer.from(`window.kiln.componentTemplates['${name}']=${contents}\n`);
   return file;
 }
 
@@ -158,7 +158,7 @@ function minifyTemplate(file: any, shouldMinify: any) {
   try {
     const minified = uglify.minify(file.contents.toString('utf8'), { output: { inline_script: true } });
 
-    file.contents = new Buffer(minified.code);
+    file.contents = Buffer.from(minified.code);
     return file;
   } catch (e) {
     const name = path.parse(file.path).name.replace('.template', '');

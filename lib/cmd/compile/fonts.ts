@@ -123,7 +123,7 @@ function getFontCSS(file: any, styleguide: string, isInlined: boolean) {
       css += `src: url(${assetHost}${assetPath}/fonts/${styleguide}/${fileName}); }`;
     }
 
-    file.contents = new Buffer(css);
+    file.contents = Buffer.from(css);
     return file;
   }
 }
