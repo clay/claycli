@@ -16,7 +16,7 @@ oat_generated: false
 >
 > Conventions:
 > - `oat_current_task_id` always points at the **next plan task to do** (not the last completed task).
-> - When all plan tasks are complete, set `oat_current_task_id: p03-t01`.
+> - When all plan tasks are complete, set `oat_current_task_id: p02-t13`.
 > - Reviews are **not** plan tasks. Track review status in `plan.md` under `## Reviews` (e.g., `| final | code | passed | ... |`).
 > - Keep phase/task statuses consistent with the Progress Overview table so restarts resume correctly.
 > - Before running the `oat-project-pr-final` skill, ensure `## Final Summary (for PR/docs)` is filled with what was actually implemented.
@@ -27,11 +27,11 @@ oat_generated: false
 |-------|--------|-------|-----------|
 | Phase 0: Characterization Tests | completed | 3 | 3/3 |
 | Phase 1: Foundation | completed | 5 | 5/5 |
-| Phase 2: Bundling Pipeline | completed | 12 | 12/12 |
+| Phase 2: Bundling Pipeline | in_progress | 15 | 12/15 |
 | Phase 3: Dependency Cleanup | pending | 8 | 0/8 |
 | Phase 4: TypeScript Conversion | pending | 9 | 0/9 |
 
-**Total:** 20/37 tasks completed
+**Total:** 20/40 tasks completed
 
 **Integration Test Checkpoints (HiLL gates):**
 - Checkpoint 1 (p02-t07): after P0+P1+P2 — Browserify→Webpack migration
@@ -692,6 +692,52 @@ Removed — `clay pack` was an unreleased experiment. No characterization tests 
 - Asset error classification uses file extension regex heuristic (covers SVG, PNG, GIF, JPEG, WebP, ICO, fonts, video, audio)
 - Non-fatal asset errors (from broken media imports in consuming projects) still produce success entries alongside error reports
 - Shared commit with p02-t11 because `isAssetError` and `collectResults` serve both tasks
+
+---
+
+### Review Received: p02 (re-review v3 — cycle 3, user override for cycle 4)
+
+**Date:** 2026-02-26
+**Review artifact:** reviews/p02-review-2026-02-26.md
+
+**Findings:**
+- Critical: 0
+- Important: 3
+- Medium: 0
+- Minor: 0
+
+**Finding details:**
+- I1: Webpack emits nested assets with absolute-path entry names — `entry[file] = file` creates `public/js/Users/.../entry.js.js`
+- I2: Fatal JS compile errors still write partial bundle artifacts (`_prelude.js`, `_registry.json`, etc.) before returning errors
+- I3: `--minify` depends on undeclared transitive dependency (`terser`) not in `package.json`
+
+**New tasks added:** p02-t13, p02-t14, p02-t15
+
+**Status:** Review row updated to `fixes_added`. Review cycle limit reached (3 cycles); user authorized override to continue.
+
+**Deferred Findings:**
+- None
+
+---
+
+### Task p02-t13: (review) Use synthetic entry keys in createWebpackConfig
+
+**Status:** pending
+**Commit:** -
+
+---
+
+### Task p02-t14: (review) Skip file writes on fatal JS compile errors
+
+**Status:** pending
+**Commit:** -
+
+---
+
+### Task p02-t15: (review) Add terser as direct dependency
+
+**Status:** pending
+**Commit:** -
 
 ---
 

@@ -754,6 +754,101 @@ git commit -m "fix(p02-t12): fix buildScripts failure signaling on compile error
 
 ---
 
+### Task p02-t13: (review) Use synthetic entry keys in createWebpackConfig
+
+**Files:**
+- Modify: `lib/cmd/compile/scripts.js`
+- Modify: `lib/cmd/compile/scripts.test.js`
+
+**Step 1: Understand the issue**
+
+Review finding: `createWebpackConfig()` uses absolute file paths as entry names (`entry[file] = file`). Webpack interprets the entry name as a path for `output.filename = '[name].js'`, creating extra emitted bundles at `public/js/Users/.../entry.js.js` that leak build-machine paths into output.
+Location: `lib/cmd/compile/scripts.js:238`
+
+**Step 2: Implement fix**
+
+Change the entry key from the absolute path to a sanitized/synthetic key. The simplest approach: use the file's index or a hash as the entry key, since claycli doesn't use Webpack's emitted chunks (it reads `stats.modules` and writes its own global-pack files). Keep the absolute path as the entry value.
+
+**Step 3: Verify**
+
+Run: `npx jest lib/cmd/compile/scripts.test.js --no-coverage`
+Expected: Tests pass
+
+Run: `npm test`
+Expected: Lint + tests pass
+
+Add a contract test assertion that `public/js` contains no nested directories / no files with absolute-path-like names.
+
+**Step 4: Commit**
+
+```bash
+git add lib/cmd/compile/scripts.js lib/cmd/compile/scripts.test.js
+git commit -m "fix(p02-t13): use synthetic entry keys to prevent path leakage in output"
+```
+
+---
+
+### Task p02-t14: (review) Skip file writes on fatal JS compile errors
+
+**Files:**
+- Modify: `lib/cmd/compile/scripts.js`
+- Modify: `lib/cmd/compile/scripts.test.js`
+
+**Step 1: Understand the issue**
+
+Review finding: When fatal JS compile errors occur, `buildScripts()` suppresses success entries (p02-t12 fix) but still processes modules and writes `_prelude.js`, `_postlude.js`, `_registry.json`, `_ids.json`, and `client-env.json`, leaving `public/js` in an inconsistent state.
+Location: `lib/cmd/compile/scripts.js:591`
+
+**Step 2: Implement fix**
+
+After collecting errors and before any file writes, check if there are fatal (non-asset) errors. If so, skip module processing, file writing, and cache/metadata export. Return errors immediately.
+
+**Step 3: Verify**
+
+Run: `npx jest lib/cmd/compile/scripts.test.js --no-coverage`
+Expected: Tests pass
+
+Run: `npm test`
+Expected: Lint + tests pass
+
+Add a contract test assertion that verifies `public/js` does not exist (or is empty) after a fatal JS compile error.
+
+**Step 4: Commit**
+
+```bash
+git add lib/cmd/compile/scripts.js lib/cmd/compile/scripts.test.js
+git commit -m "fix(p02-t14): skip file writes on fatal JS compile errors"
+```
+
+---
+
+### Task p02-t15: (review) Add terser as direct dependency
+
+**Files:**
+- Modify: `package.json`
+
+**Step 1: Understand the issue**
+
+Review finding: `scripts.js` directly imports `terser`, but `package.json` does not declare it in dependencies. It works via hoisting from `terser-webpack-plugin`, but is not guaranteed.
+
+**Step 2: Implement fix**
+
+Add `terser` to `dependencies` in `package.json` with a version range compatible with the currently installed transitive version. Run `npm install` to update `package-lock.json`.
+
+**Step 3: Verify**
+
+Run: `npm test`
+Expected: Lint + tests pass
+
+**Step 4: Commit**
+
+```bash
+git add package.json package-lock.json
+git commit -m "fix(p02-t15): add terser as direct dependency"
+```
+
+---
+
 ## Phase 3: Dependency Cleanup & Stream Modernization
 
 ### Task p03-t01: Expand tests for Highland-based modules before replacement
@@ -1289,7 +1384,7 @@ Document pass/fail in implementation.md. All 3 checkpoints must pass before fina
 |-------|------|--------|------|----------|
 | p00 | code | pending | - | - |
 | p01 | code | pending | - | - |
-| p02 | code | received | 2026-02-26 | reviews/p02-review-2026-02-26.md |
+| p02 | code | fixes_added | 2026-02-26 | reviews/p02-review-2026-02-26.md |
 | p03 | code | pending | - | - |
 | p04 | code | pending | - | - |
 | final | code | pending | - | - |
@@ -1314,11 +1409,11 @@ When all tasks below are complete, this plan is ready for final code review and 
 **Scope:**
 - Phase 0: 3 tasks - Characterization tests (scripts, get-script-dependencies, styles)
 - Phase 1: 5 tasks - Foundation (Node 20+, Jest 29, ESLint 9, CI)
-- Phase 2: 12 tasks - Bundling pipeline (PostCSS 8, Browserify→Webpack, ecosystem deps, **integration test checkpoint 1**, review fixes: service rewrite, dep graph, contract tests, minify behavior, failure signaling)
+- Phase 2: 15 tasks - Bundling pipeline (PostCSS 8, Browserify→Webpack, ecosystem deps, **integration test checkpoint 1**, review fixes: service rewrite, dep graph, contract tests, minify behavior, failure signaling, entry keys, skip writes on error, terser dep)
 - Phase 3: 8 tasks - Dependency cleanup (test expansion, Highland→async/await, native fetch, modern deps, **integration test checkpoint 2**)
 - Phase 4: 9 tasks - TypeScript conversion (setup, leaf→utility→core→compile→CLI→publish, **integration test checkpoint 3**)
 
-**Total: 37 tasks**
+**Total: 40 tasks**
 
 ---
 
