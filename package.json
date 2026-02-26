@@ -2,17 +2,24 @@
   "name": "claycli",
   "version": "5.1.0-0",
   "description": "A command-line interface for Clay",
-  "main": "index.js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "preferGlobal": true,
   "bin": {
-    "clay": "cli/index.js"
+    "clay": "dist/cli/index.js"
   },
+  "files": [
+    "dist/"
+  ],
   "scripts": {
-    "lint": "eslint lib cli index.js",
+    "build": "tsc -p tsconfig.build.json",
+    "lint": "eslint lib cli index.ts",
     "test": "npm run lint && jest",
+    "type-check": "tsc --noEmit",
     "coveralls": "cat ./coverage/lcov.info | coveralls",
     "release": "./.circleci/scripts/release.sh",
-    "watch": "jest --watch"
+    "watch": "jest --watch",
+    "prepublishOnly": "npm run build"
   },
   "jest": {
     "automock": false,

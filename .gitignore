@@ -51,4 +51,7 @@ website/yarn.lock
 website/node_modules
 website/i18n/*
 
+# TypeScript build output
+dist/
+
 .oat/config.local.json

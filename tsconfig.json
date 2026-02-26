@@ -18,9 +18,8 @@
   "include": [
     "lib/**/*",
     "cli/**/*",
-    "index.js",
-    "setup-jest.js",
-    "cli/index.js"
+    "index.ts",
+    "setup-jest.js"
   ],
   "exclude": [
     "node_modules",

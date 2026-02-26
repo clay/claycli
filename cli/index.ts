@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-'use strict';
 
 // force colors.js to use colors when exporting
 // by passing a SECRET HIDDEN FLAG into claycli, which triggers
@@ -15,7 +14,7 @@ const yargs = require('yargs'),
   notifier = updateNotifier({
     pkg
   }),
-  commands = {
+  commands: Record<string, string> = {
     c: 'compile',
     cfg: 'config',
     e: 'export',
