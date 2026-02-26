@@ -1,9 +1,9 @@
 ---
-oat_status: complete
+oat_status: in_progress
 oat_ready_for: null
 oat_blockers: []
 oat_last_updated: 2026-02-26
-oat_current_task_id: null
+oat_current_task_id: p04-t18
 oat_generated: false
 ---
 
@@ -29,9 +29,9 @@ oat_generated: false
 | Phase 1: Foundation | completed | 5 | 5/5 |
 | Phase 2: Bundling Pipeline | completed | 15 | 15/15 |
 | Phase 3: Dependency Cleanup | completed | 11 | 11/11 |
-| Phase 4: TypeScript Conversion | completed | 17 | 17/17 |
+| Phase 4: TypeScript Conversion | in_progress | 18 | 17/18 |
 
-**Total:** 51/51 tasks completed
+**Total:** 51/52 tasks completed
 
 **Integration Test Checkpoints (HiLL gates):**
 - Checkpoint 1 (p02-t07): after P0+P1+P2 — Browserify→Webpack migration
@@ -1609,6 +1609,37 @@ Removed — `clay pack` was an unreleased experiment. No characterization tests 
 - package.json copied into dist/ at build time for cli/index.ts require resolution
 - Highland.js retained in compile orchestration (deferred to future project phase)
 - babel-plugin-lodash upstream warning not fixable on claycli side (deferred)
+
+---
+
+### Review Received: p04
+
+**Date:** 2026-02-26
+**Review artifact:** reviews/p04-review-2026-02-26.md
+
+**Findings:**
+- Critical: 0
+- Important: 1
+- Medium: 0
+- Minor: 0
+
+**New tasks added:** p04-t18
+
+**Finding disposition:**
+- I1 (WHATWG URL breaks schemeless inputs) → p04-t18: fix urlToUri/getExt to handle schemeless domain.com/... inputs
+
+**Next:** Execute fix task via the `oat-project-implement` skill.
+
+After the fix task is complete:
+- Update the review row status to `fixes_completed`
+- Re-run `oat-project-review-provide code p04` then `oat-project-review-receive` to reach `passed`
+
+---
+
+### Task p04-t18: (review) Fix WHATWG URL migration for schemeless CLI inputs
+
+**Status:** pending
+**Commit:** -
 
 ---
 

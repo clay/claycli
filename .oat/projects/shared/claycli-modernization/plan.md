@@ -1655,6 +1655,57 @@ git commit -m "chore(p04-t17): remove unused path-browserify dependency"
 
 ---
 
+### Task p04-t18: (review) Fix WHATWG URL migration for schemeless CLI inputs
+
+**Files:**
+- Modify: `lib/prefixes.ts`
+- Modify: `lib/prefixes.test.js`
+
+**Step 1: Understand the issue**
+
+Review finding: p04-t14 replaced `url.parse()` with `new URL()` in `urlToUri()` and `getExt()` without handling non-absolute inputs. `new URL('domain.com/_pages/foo.html')` throws `Invalid URL`, breaking documented CLI usage like `clay lint domain.com/_pages/foo`. The original `url.parse()` returned a usable pathname for schemeless inputs.
+
+Locations: `lib/prefixes.ts:80` (`urlToUri`), `lib/prefixes.ts:99` (`getExt`)
+
+**Step 2: Implement fix**
+
+Use a fallback base for schemeless URLs, e.g.:
+```typescript
+function safeParseUrl(url: string) {
+  try {
+    return new URL(url);
+  } catch (_e) {
+    return new URL(url, 'http://placeholder');
+  }
+}
+```
+
+Apply to both `urlToUri()` and `getExt()` where `new URL()` is called.
+
+**Step 3: Add regression tests**
+
+Add tests to `lib/prefixes.test.js` for schemeless inputs:
+- `urlToUri('domain.com/_components/foo/instances/bar')` → `/_components/foo/instances/bar`
+- `getExt('domain.com/_pages/foo.html')` → `.html`
+- `getExt('domain.com/_components/foo')` → `''` (no extension)
+
+**Step 4: Verify**
+
+Run: `npx jest lib/prefixes.test.js lib/cmd/lint.test.js --no-coverage`
+Expected: All tests pass
+
+Run: `npm test && npx tsc --noEmit`
+Expected: Full suite passes, types clean
+
+**Step 5: Commit**
+
+```bash
+git add lib/prefixes.ts lib/prefixes.test.js
+git commit -m "fix(p04-t18): handle schemeless URLs in prefixes urlToUri/getExt"
+```
+
+---
+
 ## Deferred Items (Future Improvements)
 
 Items deliberately deferred from this modernization with documented rationale.
@@ -1686,7 +1737,7 @@ Items deliberately deferred from this modernization with documented rationale.
 | p01 | code | pending | - | - |
 | p02 | code | fixes_completed | 2026-02-26 | reviews/p02-review-2026-02-26.md |
 | p03 | code | fixes_completed | 2026-02-26 | reviews/p03-review-2026-02-26.md |
-| p04 | code | received | 2026-02-26 | reviews/p04-review-2026-02-26.md |
+| p04 | code | fixes_added | 2026-02-26 | reviews/p04-review-2026-02-26.md |
 | final | code | passed | 2026-02-25 | reviews/final-rereview-2026-02-25.md |
 | spec | artifact | pending | - | - |
 | design | artifact | pending | - | - |
@@ -1711,9 +1762,9 @@ When all tasks below are complete, this plan is ready for final code review and 
 - Phase 1: 5 tasks - Foundation (Node 20+, Jest 29, ESLint 9, CI)
 - Phase 2: 15 tasks - Bundling pipeline (PostCSS 8, Browserify→Webpack, ecosystem deps, **integration test checkpoint 1**, review fixes: service rewrite, dep graph, contract tests, minify behavior, failure signaling, entry keys, skip writes on error, terser dep)
 - Phase 3: 11 tasks - Dependency cleanup (test expansion, Highland→async/await, native fetch, modern deps, **integration test checkpoint 2**, review fixes: bounded concurrency, import stream handling, gulp-newer ENOENT)
-- Phase 4: 17 tasks - TypeScript conversion (setup, leaf→utility→core→compile→CLI→publish, **integration test checkpoint 3**, review fixes: cli/compile TS conversion, Buffer.from, unused deps, getDependencies types, URL.parse, RequestInit type, tsconfig cleanup, path-browserify)
+- Phase 4: 18 tasks - TypeScript conversion (setup, leaf→utility→core→compile→CLI→publish, **integration test checkpoint 3**, review fixes: cli/compile TS conversion, Buffer.from, unused deps, getDependencies types, URL.parse, RequestInit type, tsconfig cleanup, path-browserify, schemeless URL fix)
 
-**Total: 51 tasks**
+**Total: 52 tasks**
 
 ---
 
