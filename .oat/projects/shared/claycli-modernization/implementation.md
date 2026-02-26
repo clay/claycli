@@ -3,7 +3,7 @@ oat_status: in_progress
 oat_ready_for: null
 oat_blockers: []
 oat_last_updated: 2026-02-25
-oat_current_task_id: p03-t01
+oat_current_task_id: p02-t08
 oat_generated: false
 ---
 
@@ -27,11 +27,11 @@ oat_generated: false
 |-------|--------|-------|-----------|
 | Phase 0: Characterization Tests | completed | 3 | 3/3 |
 | Phase 1: Foundation | completed | 5 | 5/5 |
-| Phase 2: Bundling Pipeline | completed | 7 | 7/7 |
+| Phase 2: Bundling Pipeline | in_progress | 10 | 7/10 |
 | Phase 3: Dependency Cleanup | pending | 8 | 0/8 |
 | Phase 4: TypeScript Conversion | pending | 9 | 0/9 |
 
-**Total:** 15/32 tasks completed
+**Total:** 15/35 tasks completed
 
 **Integration Test Checkpoints (HiLL gates):**
 - Checkpoint 1 (p02-t07): after P0+P1+P2 — Browserify→Webpack migration
@@ -506,6 +506,65 @@ Removed — `clay pack` was an unreleased experiment. No characterization tests 
 **Notable decisions/deviations:**
 - Build time slower than Browserify (44s vs 6s) — expected with webpack cold start; filesystem caching enabled for incremental builds
 - Non-fatal error handling added to match Browserify's behavior of not killing entire build on individual module failures
+
+---
+
+### Review Received: p02 (cumulative through p00, p01, p02)
+
+**Date:** 2026-02-25
+**Review artifact:** reviews/p02-review-2026-02-25.md
+
+**Findings:**
+- Critical: 2
+- Important: 1
+- Medium: 0
+- Minor: 0
+
+**Finding details:**
+- C1: Webpack rewrite drops dependency graph metadata — `processModule()` never populates `deps` from Webpack module relationships, producing empty `_registry.json` entries
+- C2: `services/server/<name>` imports never rewritten — path check uses `endsWith('services/server')` but real requests include filename
+- I1: Phase 2 tests don't exercise `buildScripts()` contract — allowed both critical regressions to pass CI
+
+**New tasks added:** p02-t08, p02-t09, p02-t10
+
+**Next:** Execute fix tasks via the `oat-project-implement` skill starting from p02-t08.
+
+After the fix tasks are complete:
+- Update the review row status to `fixes_completed`
+- Re-run `oat-project-review-provide code p02` then `oat-project-review-receive` to reach `passed`
+
+---
+
+### Task p02-t08: (review) Fix services/server rewrite path check
+
+**Status:** pending
+**Commit:** -
+
+**Notes:**
+- Fix C2: Change `endsWith('services/server')` to detect `services/server/` directory segment
+- Add positive rewrite test case
+
+---
+
+### Task p02-t09: (review) Populate dependency graph from Webpack module stats
+
+**Status:** pending
+**Commit:** -
+
+**Notes:**
+- Fix C1: Build dependency map from `mod.reasons` / Webpack stats module graph
+- Populate `deps` object and `subcache.registry[moduleId]` with actual dependency edges
+
+---
+
+### Task p02-t10: (review) Add buildScripts contract tests for output artifacts
+
+**Status:** pending
+**Commit:** -
+
+**Notes:**
+- Fix I1: Add integration-level tests that exercise `buildScripts()` with a fixture project
+- Assert non-empty registry deps, correct module format, service rewrite, env extraction
 
 ---
 

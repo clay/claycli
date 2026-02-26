@@ -552,6 +552,132 @@ Document pass/fail in implementation.md. This is the highest-risk checkpoint —
 
 ---
 
+### Task p02-t08: (review) Fix services/server rewrite path check
+
+**Files:**
+- Modify: `lib/cmd/compile/scripts.js`
+- Modify: `lib/cmd/compile/scripts.test.js`
+
+**Step 1: Understand the issue**
+
+Review finding: `rewriteServiceRequire()` resolves the full request path (including the service filename) and checks `endsWith('services/server')`. Real requests are typically `../../services/server/foo`, so `absoluteRequirePath` ends with `services/server/foo` and the condition never matches.
+Location: `lib/cmd/compile/scripts.js:88`
+
+**Step 2: Fix the path check**
+
+Change the condition from checking if the full resolved path ends with `services/server` to checking if the resolved path contains a `services/server/` directory segment (or the parent directory of the resolved file is `services/server`). The rewrite in `resource.request` should preserve the filename — only replace `services/server` with `services/client` in the path.
+
+Also update the `clientPath` computation to point at the correct client-side file for the existence check.
+
+**Step 3: Add positive rewrite test**
+
+Add a test case to `scripts.test.js` that verifies `rewriteServiceRequire` correctly rewrites `../../services/server/foo` to `../../services/client/foo`.
+
+**Step 4: Verify**
+
+Run: `npx jest lib/cmd/compile/scripts.test.js --no-coverage`
+Expected: All tests pass including the new positive rewrite test
+
+Run the inline verification from the review:
+```bash
+node -e "
+var path = require('path');
+var scripts = require('./lib/cmd/compile/scripts');
+var resource = { request: '../../services/server/foo', context: path.resolve(process.cwd(), 'components', 'article') };
+scripts.rewriteServiceRequire(resource);
+if (!resource.request.includes('services/client/')) throw new Error('rewrite failed: ' + resource.request);
+console.log('OK:', resource.request);
+"
+```
+
+**Step 5: Commit**
+
+```bash
+git add lib/cmd/compile/scripts.js lib/cmd/compile/scripts.test.js
+git commit -m "fix(p02-t08): fix services/server rewrite path check for Webpack"
+```
+
+---
+
+### Task p02-t09: (review) Populate dependency graph from Webpack module stats
+
+**Files:**
+- Modify: `lib/cmd/compile/scripts.js`
+
+**Step 1: Understand the issue**
+
+Review finding: `processModule()` initializes `deps = {}` and never populates it from Webpack module relationships. This produces `_registry.json` entries with no transitive dependencies and Browserify-compatible module wrappers with no require resolution map.
+Location: `lib/cmd/compile/scripts.js:389`
+
+The `deps` object in the global-pack format maps required module names to resolved module IDs: `{"./foo": "components/foo/model"}`. This is used at runtime by the `_prelude.js` require shim to resolve `require()` calls. The `registry` array stores the transitive dependency IDs for each module, used by `get-script-dependencies.js` to compute asset bundles.
+
+**Step 2: Build dependency map from Webpack stats**
+
+Webpack's `stats.toJson({ reasons: true })` includes `mod.reasons` — an array of objects describing why each module was included. Use this data (plus the `modules` array itself) to build the dependency graph:
+
+1. First pass: build a map of `filePath → moduleId` for all processed modules
+2. Second pass: for each module, examine its `reasons` to find which other modules depend on it, OR use `mod.modules` / `mod.dependencies` if available
+3. Alternatively, request `stats.toJson({ modules: true, reasons: true })` and for each module look at `mod.reasons[].moduleIdentifier` to find parent modules, then invert to get `parent → [child deps]`
+
+Populate `deps` with `{ requiredName: resolvedModuleId }` entries. Populate `ctx.subcache.registry[moduleId]` with the array of dependency module IDs.
+
+**Step 3: Verify locally**
+
+Run: `npx jest lib/cmd/compile/scripts.test.js --no-coverage`
+Expected: Existing tests still pass
+
+**Step 4: Commit**
+
+```bash
+git add lib/cmd/compile/scripts.js
+git commit -m "fix(p02-t09): populate dependency graph from Webpack module stats"
+```
+
+---
+
+### Task p02-t10: (review) Add buildScripts contract tests for output artifacts
+
+**Files:**
+- Modify: `lib/cmd/compile/scripts.test.js`
+
+**Step 1: Understand the issue**
+
+Review finding: `scripts.test.js` only tests helper functions. It does not cover `buildScripts()` output artifacts, which allowed both C1 (empty deps) and C2 (broken rewrite) to ship while unit tests passed.
+Location: `lib/cmd/compile/scripts.test.js`
+
+**Step 2: Create minimal fixture project**
+
+Create a temporary fixture directory structure in a `beforeAll` setup:
+- `components/foo/client.js` — requires `./model`
+- `components/foo/model.js` — simple module
+- `components/foo/kiln.js` — simple module
+- `services/server/bar.js` — a server-side service
+- `services/client/bar.js` — its client-side counterpart
+
+**Step 3: Add contract tests**
+
+Write tests that call `buildScripts()` with the fixture project and assert:
+1. **Registry structure:** `_registry.json` exists, has entries, and dependency arrays are non-empty for modules that have `require()` calls
+2. **IDs structure:** `_ids.json` exists with `filePath → moduleId` mapping
+3. **Bucket files:** at least one bucket file exists (e.g., `_models-*.js`)
+4. **Module format:** output files contain `window.modules["id"] = [function(...)` pattern
+5. **Service rewrite:** `services/server/bar` require is rewritten to `services/client/bar` in the output
+6. **Env vars:** if a fixture module references `process.env.FOO`, `client-env.json` includes `FOO`
+
+**Step 4: Verify**
+
+Run: `npx jest lib/cmd/compile/scripts.test.js --no-coverage`
+Expected: All tests pass, including contract tests that validate C1 and C2 fixes
+
+**Step 5: Commit**
+
+```bash
+git add lib/cmd/compile/scripts.test.js
+git commit -m "test(p02-t10): add buildScripts contract tests for output artifacts"
+```
+
+---
+
 ## Phase 3: Dependency Cleanup & Stream Modernization
 
 ### Task p03-t01: Expand tests for Highland-based modules before replacement
@@ -1087,7 +1213,7 @@ Document pass/fail in implementation.md. All 3 checkpoints must pass before fina
 |-------|------|--------|------|----------|
 | p00 | code | pending | - | - |
 | p01 | code | pending | - | - |
-| p02 | code | received | 2026-02-25 | reviews/p02-review-2026-02-25.md |
+| p02 | code | fixes_added | 2026-02-25 | reviews/p02-review-2026-02-25.md |
 | p03 | code | pending | - | - |
 | p04 | code | pending | - | - |
 | final | code | pending | - | - |
@@ -1112,11 +1238,11 @@ When all tasks below are complete, this plan is ready for final code review and 
 **Scope:**
 - Phase 0: 3 tasks - Characterization tests (scripts, get-script-dependencies, styles)
 - Phase 1: 5 tasks - Foundation (Node 20+, Jest 29, ESLint 9, CI)
-- Phase 2: 7 tasks - Bundling pipeline (PostCSS 8, Browserify→Webpack, ecosystem deps, **integration test checkpoint 1**)
+- Phase 2: 10 tasks - Bundling pipeline (PostCSS 8, Browserify→Webpack, ecosystem deps, **integration test checkpoint 1**, review fixes: service rewrite, dep graph, contract tests)
 - Phase 3: 8 tasks - Dependency cleanup (test expansion, Highland→async/await, native fetch, modern deps, **integration test checkpoint 2**)
 - Phase 4: 9 tasks - TypeScript conversion (setup, leaf→utility→core→compile→CLI→publish, **integration test checkpoint 3**)
 
-**Total: 32 tasks**
+**Total: 35 tasks**
 
 ---
 
