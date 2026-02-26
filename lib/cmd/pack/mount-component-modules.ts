@@ -1,21 +1,8 @@
-'use strict';
-
-/**
- * A callback to pass to Webpack to mount the initial Clay components.
- * @callback mountComponentModulesCallback
- * @param {string} componentName - The name of the component to import.
- * @returns {Promise} - A Promise that resolves when the component has been imported.
- */
-
 /**
  * Find all Clay components---DOM elements whose `data-uri` attribute
  * contains "_components/"---
- *
- * @param {mountComponentModulesCallback} callback
- * @returns {Promise} - A Promise that resolves when Webpack has finished
- *    initializing Clay components.
  */
-function mountComponentModules(callback) {
+function mountComponentModules(callback: (name: string) => Promise<unknown>): Promise<PromiseSettledResult<unknown>[]> {
   return Promise.resolve().then(() => {
     const componentSelector = '[data-uri*="_components/"]';
     const componentElements = Array.from(document.querySelectorAll(componentSelector));
@@ -23,24 +10,21 @@ function mountComponentModules(callback) {
     return componentElements;
   }).then(componentElements => {
     const componentPromises = componentElements.map(element => {
-      const componentURI = element.dataset.uri;
+      const componentURI = (element as HTMLElement).dataset.uri!;
       const [, name] = Array.from(/_components\/(.+?)(\/instances|$)/.exec(componentURI) || []);
 
       if (!name) {
-        const err = new Error(`No component script found for ${ element } (at ${ componentURI }).`, {
-          element,
-          componentURI
-        });
+        const err = new Error(`No component script found for ${ element } (at ${ componentURI }).`);
 
         console.error(err);
 
         return Promise.reject(err);
-      };
+      }
 
       return Promise.resolve().then(() => {
         return callback(name);
-      }).then(mod => mod && mod.default || mod)
-        .then(mod => {
+      }).then((mod: unknown) => (mod as Record<string, unknown>)?.default || mod)
+        .then((mod: unknown) => {
           if (typeof mod === 'function') {
             return mod(element);
           }
@@ -53,4 +37,4 @@ function mountComponentModules(callback) {
   });
 }
 
-module.exports = mountComponentModules;
+export = mountComponentModules;

@@ -1,5 +1,3 @@
-'use strict';
-
 // Mock VueLoaderPlugin — vue-template-compiler is a peer dep only available
 // in consuming projects (e.g., nymag/sites), not in claycli's own node_modules.
 // Contract tests run buildScripts() which needs the plugin to instantiate, but
@@ -464,7 +462,7 @@ describe('buildScripts contract', () => {
     cacheDir = path.resolve(process.cwd(), '.webpack-cache'),
     fixtureDir = path.resolve(process.cwd(), '_test-contract-fixture'),
     entryFile = path.join(fixtureDir, 'entry.js'),
-    result;
+    result: any;
 
   function createFixture() {
     var helperFile = path.join(fixtureDir, 'lib', 'helper.js'),
@@ -519,7 +517,7 @@ describe('buildScripts contract', () => {
   });
 
   it('returns success results', () => {
-    var successes = result.filter((r) => r.type === 'success');
+    var successes = result.filter((r: any) => r.type === 'success');
 
     expect(successes.length).toBeGreaterThan(0);
   });
@@ -541,7 +539,7 @@ describe('buildScripts contract', () => {
 
   it('writes output files in global-pack format', () => {
     var outFiles = glob.sync(path.join(destPath, '*.js')),
-      hasModuleFormat = outFiles.some((f) => {
+      hasModuleFormat = outFiles.some((f: any) => {
         var content = fs.readFileSync(f, 'utf8');
 
         return content.includes('window.modules["');
@@ -553,7 +551,7 @@ describe('buildScripts contract', () => {
 
   it('module wrappers contain populated dependency maps', () => {
     var outFiles = glob.sync(path.join(destPath, '*.js')),
-      allContent = outFiles.map((f) => fs.readFileSync(f, 'utf8')).join('\n'),
+      allContent = outFiles.map((f: any) => fs.readFileSync(f, 'utf8')).join('\n'),
       // Match: window.modules["id"] = [..., {non-empty deps}];
       modulePattern = /window\.modules\["[^"]+"\] = \[function[^]*?\},\s*(\{[^}]*\})\];/g,
       match, depsStr, hasNonEmptyDeps = false;
@@ -578,7 +576,7 @@ describe('buildScripts contract', () => {
 
   it('rewrites services/server requires to services/client in output', () => {
     var outFiles = glob.sync(path.join(destPath, '*.js')),
-      allContent = outFiles.map((f) => fs.readFileSync(f, 'utf8')).join('\n'),
+      allContent = outFiles.map((f: any) => fs.readFileSync(f, 'utf8')).join('\n'),
       ids = fs.readJsonSync(idsPath),
       clientSvcPath = path.join(fixtureDir, 'services', 'client', 'svc.js'),
       clientSvcId = ids[clientSvcPath];
@@ -593,14 +591,14 @@ describe('buildScripts contract', () => {
 
   it('does not emit nested directories or absolute-path files under destPath', () => {
     var nestedFiles = glob.sync(path.join(destPath, '**', '*.js'), { nodir: true })
-      .filter((f) => path.relative(destPath, f).includes(path.sep));
+      .filter((f: any) => path.relative(destPath, f).includes(path.sep));
 
     expect(nestedFiles).toEqual([]);
   });
 
   it('produces smaller output when minify is true', async () => {
     var normalFiles = glob.sync(path.join(destPath, '*.js')),
-      normalSize = normalFiles.reduce((sum, f) => sum + fs.readFileSync(f, 'utf8').length, 0),
+      normalSize = normalFiles.reduce((sum: any, f: any) => sum + fs.readFileSync(f, 'utf8').length, 0),
       minResult, minFiles, minSize;
 
     // Re-run with minify enabled
@@ -609,9 +607,9 @@ describe('buildScripts contract', () => {
     createFixture();
     minResult = await scripts.buildScripts([entryFile], { minify: true });
     minFiles = glob.sync(path.join(destPath, '*.js'));
-    minSize = minFiles.reduce((sum, f) => sum + fs.readFileSync(f, 'utf8').length, 0);
+    minSize = minFiles.reduce((sum: any, f: any) => sum + fs.readFileSync(f, 'utf8').length, 0);
 
-    expect(minResult.some((r) => r.type === 'success')).toBe(true);
+    expect(minResult.some((r: any) => r.type === 'success')).toBe(true);
     expect(minSize).toBeLessThan(normalSize);
 
     // Restore non-minified output for other tests
@@ -630,7 +628,7 @@ describe('buildScripts contract', () => {
     await scripts.buildScripts([entryFile], { minify: true });
 
     outFiles = glob.sync(path.join(destPath, '*.js'));
-    allContent = outFiles.map((f) => fs.readFileSync(f, 'utf8')).join('\n');
+    allContent = outFiles.map((f: any) => fs.readFileSync(f, 'utf8')).join('\n');
     // Terser may drop quotes for numeric IDs (window.modules["1"] → window.modules[1])
     // which is functionally equivalent; check for the wrapper pattern broadly
     hasModuleFormat = allContent.includes('window.modules[');
@@ -671,8 +669,8 @@ describe('buildScripts failure signaling', () => {
     );
 
     result = await scripts.buildScripts([entryFile], {});
-    errors = result.filter((r) => r.type === 'error');
-    successes = result.filter((r) => r.type === 'success');
+    errors = result.filter((r: any) => r.type === 'error');
+    successes = result.filter((r: any) => r.type === 'success');
 
     expect(errors.length).toBeGreaterThan(0);
     expect(successes.length).toBe(0);
@@ -697,3 +695,5 @@ describe('buildScripts failure signaling', () => {
     expect(fs.existsSync(clientEnvPath)).toBe(false);
   }, 30000);
 });
+
+export {};

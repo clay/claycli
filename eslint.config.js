@@ -118,7 +118,7 @@ module.exports = [
   },
   // Browser globals for client-side code
   {
-    files: ['lib/cmd/compile/_client-init.js', 'lib/cmd/pack/mount-component-modules.js'],
+    files: ['lib/cmd/compile/_client-init.js', 'lib/cmd/pack/mount-component-modules.ts'],
     languageOptions: {
       globals: {
         ...globals.browser

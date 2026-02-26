@@ -1,7 +1,7 @@
-'use strict';
-const _ = require('lodash'),
-  fs = require('fs-extra'),
-  path = require('path'),
+import _ from 'lodash';
+import path from 'path';
+
+const fs = require('fs-extra'),
   h = require('highland'),
   glob = require('glob'),
   chokidar = require('chokidar'),
@@ -61,7 +61,7 @@ function buildKiln() {
   return h(gulp.src(kilnGlob)
     .pipe(changed(destPath, { hasChanged: helpers.hasChanged }))
     .pipe(gulp.dest(destPath))
-    .pipe(es.mapSync((file) => ({ type: 'success', message: file.path }))));
+    .pipe(es.mapSync((file: any) => ({ type: 'success', message: file.path }))));
 }
 
 /**
@@ -74,7 +74,7 @@ function copyClientInit() {
     .pipe(babel(babelConfig))
     .pipe(replace('#NODE_ENV#', process.env.NODE_ENV || ''))
     .pipe(gulp.dest(destPath))
-    .pipe(es.mapSync((file) => ({ type: 'success', message: file.path }))));
+    .pipe(es.mapSync((file: any) => ({ type: 'success', message: file.path }))));
 }
 
 /**
@@ -82,7 +82,7 @@ function copyClientInit() {
  * Used as a Webpack NormalModuleReplacementPlugin callback.
  * @param {object} resource webpack resource object
  */
-function rewriteServiceRequire(resource) {
+function rewriteServiceRequire(resource: any) {
   var requestPath = resource.request,
     contextPath = resource.context || '',
     absoluteRequirePath = path.resolve(contextPath, requestPath),
@@ -109,7 +109,7 @@ function rewriteServiceRequire(resource) {
  * @param {array} legacyFiles
  * @return {string|undefined} module id
  */
-function getModuleId(file, legacyFiles) {
+function getModuleId(file: string, legacyFiles: string[]): string | undefined {
   const name = file.split('/').slice(-2)[0],
     isKilnPlugin = _.includes(file, path.join(process.cwd(), 'services', 'kiln')),
     isLegacyFile = _.includes(legacyFiles, file),
@@ -138,15 +138,15 @@ function getModuleId(file, legacyFiles) {
  * @param {array}  [opts.legacyFiles]
  * @return {function}
  */
-function idGenerator({ cachedIds, legacyFiles }) {
-  const generatedIds = _.assign({}, cachedIds);
+function idGenerator({ cachedIds, legacyFiles }: { cachedIds: Record<string, any>; legacyFiles: string[] }) {
+  const generatedIds: Record<string, any> = _.assign({}, cachedIds);
 
   let i = _.max(_.values(generatedIds).filter(_.isFinite)) + 1 || 1;
 
-  return (file) => {
+  return (file: string) => {
     let id = generatedIds[file] || (generatedIds[file] = getModuleId(file, legacyFiles) || i++);
 
-    temporaryIDs[id] = file;
+    (temporaryIDs as Record<string, any>)[id] = file;
     return id;
   };
 }
@@ -156,7 +156,7 @@ function idGenerator({ cachedIds, legacyFiles }) {
  * @param  {object} dep
  * @return {string[]|string}
  */
-function getOutfile(dep) {
+function getOutfile(dep: { id: any }) {
   const id = dep.id;
 
   if (_.includes(['prelude', 'postlude'], id)) {
@@ -179,7 +179,7 @@ function getOutfile(dep) {
       path.join(destPath, `_kiln-${helpers.bucket(id)}.js`)
     ];
   } else if (_.isFinite(parseInt(id))) {
-    const name = _.isString(temporaryIDs[id]) && path.parse(temporaryIDs[id]).name;
+    const name = _.isString((temporaryIDs as Record<string, any>)[id]) && path.parse((temporaryIDs as Record<string, any>)[id]).name;
 
     return [
       path.join(destPath, `${id}.js`),
@@ -220,7 +220,7 @@ function getPostlude() {
  * @param {object} deps mapping of require strings to resolved module IDs
  * @return {string}
  */
-function formatModule(id, source, deps) {
+function formatModule(id: any, source: string, deps: Record<string, any>) {
   return `window.modules["${id}"] = [function(require,module,exports){${source}}, ${JSON.stringify(deps)}];`;
 }
 
@@ -232,10 +232,10 @@ function formatModule(id, source, deps) {
  * @param {string[]} options.legacyFiles
  * @return {object} webpack config
  */
-function createWebpackConfig(entries, options) {
-  var entry = {};
+function createWebpackConfig(entries: string[], options: any) {
+  var entry: Record<string, any> = {};
 
-  entries.forEach((file, i) => {
+  entries.forEach((file: string, i: number) => {
     entry[i] = file;
   });
 
@@ -363,7 +363,7 @@ function createWebpackConfig(entries, options) {
  * @param {object} mod webpack stats module
  * @return {string|null}
  */
-function resolveModulePath(mod) {
+function resolveModulePath(mod: any): string | null {
   var filePath = mod.identifier;
 
   if (!filePath || filePath.startsWith('webpack/') || mod.moduleType === 'runtime') {
@@ -383,16 +383,16 @@ function resolveModulePath(mod) {
  * @param {function} getOrGenerateId ID generator function
  * @return {object} { depsMap: {moduleId: {req: depId}}, registryMap: {moduleId: [depIds]} }
  */
-function buildDependencyGraph(modules, getOrGenerateId) {
-  var identifierToPath = {},
-    pathToModuleId = {},
-    depsMap = {},
-    registryMap = {};
+function buildDependencyGraph(modules: any[], getOrGenerateId: (file: string) => any) {
+  var identifierToPath: Record<string, string> = {},
+    pathToModuleId: Record<string, any> = {},
+    depsMap: Record<string, Record<string, any>> = {},
+    registryMap: Record<string, any[]> = {};
 
   // Pass 1: assign IDs and build lookup maps
-  modules.forEach((mod) => {
+  modules.forEach((mod: any) => {
     var filePath = resolveModulePath(mod),
-      moduleId;
+      moduleId: any;
 
     if (filePath) {
       moduleId = getOrGenerateId(filePath);
@@ -404,9 +404,9 @@ function buildDependencyGraph(modules, getOrGenerateId) {
   });
 
   // Pass 2: build deps from reasons
-  modules.forEach((mod) => {
+  modules.forEach((mod: any) => {
     var filePath = resolveModulePath(mod),
-      moduleId;
+      moduleId: any;
 
     if (!filePath) {
       return;
@@ -415,8 +415,8 @@ function buildDependencyGraph(modules, getOrGenerateId) {
     if (!moduleId) {
       return;
     }
-    (mod.reasons || []).forEach((reason) => {
-      var parentPath, parentId;
+    (mod.reasons || []).forEach((reason: any) => {
+      var parentPath: string | undefined, parentId: any;
 
       if (!reason.moduleIdentifier || !reason.userRequest) {
         return;
@@ -445,12 +445,12 @@ function buildDependencyGraph(modules, getOrGenerateId) {
  * @param {Array} envVars accumulator for extracted variable names
  * @return {string} source with process.env replaced by window.process.env
  */
-function extractEnvVars(source, envVars) {
+function extractEnvVars(source: string, envVars: string[]) {
   var envMatches = source.match(/process\.env\.(\w+)/ig);
 
   if (envMatches) {
     source = source.replace(/process\.env/ig, 'window.process.env');
-    envMatches.forEach((match) => {
+    envMatches.forEach((match: string) => {
       var envVar = match.match(/process\.env\.(\w+)/i);
 
       if (envVar) {
@@ -467,9 +467,9 @@ function extractEnvVars(source, envVars) {
  * @param {function} getOrGenerateId ID generator function
  * @param {object} ctx context with subcache, fileContents, envVars, depsMap, registryMap
  */
-function processModule(mod, getOrGenerateId, ctx) {
+function processModule(mod: any, getOrGenerateId: (file: string) => any, ctx: any) {
   var filePath = resolveModulePath(mod),
-    source, moduleId, deps, content, outfiles;
+    source: string, moduleId: any, deps: any, content: string, outfiles: any;
 
   if (!filePath) {
     return;
@@ -492,7 +492,7 @@ function processModule(mod, getOrGenerateId, ctx) {
   if (!Array.isArray(outfiles)) {
     outfiles = [outfiles];
   }
-  outfiles.forEach((outfile) => {
+  outfiles.forEach((outfile: any) => {
     ctx.fileContents[outfile] = (ctx.fileContents[outfile] || '') + content + '\n';
   });
 }
@@ -502,7 +502,7 @@ function processModule(mod, getOrGenerateId, ctx) {
  * @param {object} error error result object with message
  * @return {boolean}
  */
-function isAssetError(error) {
+function isAssetError(error: { message?: string }) {
   var msg = error.message || '';
 
   return /\.(svg|png|gif|jpe?g|webp|ico|woff2?|ttf|eot|mp[34]|webm|ogg|wav)/i.test(msg);
@@ -513,7 +513,7 @@ function isAssetError(error) {
  * @param {Array} errors collected error results
  * @return {boolean}
  */
-function hasFatalErrors(errors) {
+function hasFatalErrors(errors: any[]) {
   return errors.length > 0 && !errors.every(isAssetError);
 }
 
@@ -524,7 +524,7 @@ function hasFatalErrors(errors) {
  * @param {string[]} entries original entry file paths
  * @return {Array} combined result array
  */
-function collectResults(errors, entries) {
+function collectResults(errors: any[], entries: string[]) {
   if (hasFatalErrors(errors)) {
     return errors;
   }
@@ -537,9 +537,9 @@ function collectResults(errors, entries) {
  * @param {object} fileContents mapping of output file paths to source strings
  * @return {Promise}
  */
-async function minifyFileContents(fileContents) {
+async function minifyFileContents(fileContents: Record<string, string>) {
   var paths = Object.keys(fileContents),
-    i, minified;
+    i: number, minified: any;
 
   for (i = 0; i < paths.length; i++) {
     minified = await terser.minify(fileContents[paths[i]], {
@@ -564,9 +564,9 @@ async function minifyFileContents(fileContents) {
  * @param {object} [options.cache]
  * @return {Promise}
  */
-function buildScripts(entries, options = {}) {
-  var getOrGenerateId, config,
-    subcache = {
+function buildScripts(entries: string[], options: any = {}) {
+  var getOrGenerateId: (file: string) => any, config: any,
+    subcache: any = {
       ids: {},
       env: [],
       registry: {},
@@ -585,8 +585,8 @@ function buildScripts(entries, options = {}) {
   config = createWebpackConfig(entries, options);
 
   return new Promise((resolve) => {
-    webpack(config, async (err, stats) => {
-      var info, ctx, graph, cssChunks, cssContent;
+    webpack(config, async (err: any, stats: any) => {
+      var info: any, ctx: any, graph: any, cssChunks: string[], cssContent: string;
 
       if (err) {
         return resolve([{ type: 'error', message: err.message }]);
@@ -597,7 +597,7 @@ function buildScripts(entries, options = {}) {
 
       // Collect errors; asset-only errors are non-fatal and allow continued processing
       if (info.errors && info.errors.length > 0) {
-        info.errors.forEach((e) => {
+        info.errors.forEach((e: any) => {
           ctx.errors.push({ type: 'error', message: e.message || e });
         });
       }
@@ -614,7 +614,7 @@ function buildScripts(entries, options = {}) {
         graph = buildDependencyGraph(info.modules, getOrGenerateId);
         ctx.depsMap = graph.depsMap;
         ctx.registryMap = graph.registryMap;
-        info.modules.forEach((mod) => {
+        info.modules.forEach((mod: any) => {
           processModule(mod, getOrGenerateId, ctx);
         });
       }
@@ -630,7 +630,7 @@ function buildScripts(entries, options = {}) {
 
       // Write all output files
       fs.ensureDirSync(destPath);
-      Object.keys(ctx.fileContents).forEach((outfile) => {
+      Object.keys(ctx.fileContents).forEach((outfile: string) => {
         fs.ensureDirSync(path.dirname(outfile));
         fs.writeFileSync(outfile, ctx.fileContents[outfile]);
       });
@@ -643,7 +643,7 @@ function buildScripts(entries, options = {}) {
 
         fs.ensureDirSync(path.dirname(kilnPluginCSSDestPath));
         fs.writeFileSync(kilnPluginCSSDestPath, cssContent);
-        cssChunks.forEach((f) => fs.removeSync(f));
+        cssChunks.forEach((f: string) => fs.removeSync(f));
       }
 
       // Merge subcache into main cache
@@ -670,12 +670,12 @@ function buildScripts(entries, options = {}) {
  * @param {array} [options.globs]
  * @return {Object} with build (Highland Stream) and watch (Chokidar instance)
  */
-function compile(options = {}) { // eslint-disable-line complexity
+function compile(options: any = {}) { // eslint-disable-line complexity
   const watch = options.watch || false,
     minify = options.minify || variables.minify || false,
     globs = options.globs || [],
     reporter = options.reporter || 'pretty',
-    globFiles = globs.length ? _.flatten(_.map(globs, (g) => glob.sync(path.join(process.cwd(), g)))) : [],
+    globFiles = globs.length ? _.flatten(_.map(globs, (g: string) => glob.sync(path.join(process.cwd(), g)))) : [],
     bundleEntries = glob.sync(componentClientsGlob).concat(
       glob.sync(componentModelsGlob),
       glob.sync(componentKilnGlob),
@@ -684,22 +684,22 @@ function compile(options = {}) { // eslint-disable-line complexity
       glob.sync(kilnPluginsGlob),
       globFiles
     ),
-    bundleOptions = { minify, legacyFiles: globFiles },
+    bundleOptions: any = { minify, legacyFiles: globFiles },
     watcher = watch && chokidar.watch(bundleEntries);
 
   fs.ensureDirSync(destPath);
 
   return {
-    build: h(buildScripts(bundleEntries, bundleOptions).then((res) => {
+    build: h(buildScripts(bundleEntries, bundleOptions).then((res: any) => {
       if (watcher) {
         watcher.add(bundleOptions.cache.files);
         watcher.add(kilnGlob);
-        watcher.on('change', (file) => {
-          if (_.includes(file, 'node_modules/clay-kiln')) {
+        watcher.on('change', (file: string) => {
+          if (_.includes(file as string, 'node_modules/clay-kiln')) {
             buildKiln();
           } else {
             buildScripts(bundleOptions.cache.files, bundleOptions)
-              .then(function (result) {
+              .then(function (result: any) {
                 _.map(result, reporters.logAction(reporter, 'compile'));
               });
             copyClientInit();
@@ -712,14 +712,14 @@ function compile(options = {}) { // eslint-disable-line complexity
   };
 }
 
-module.exports = compile;
-module.exports.getDependencies = require('./get-script-dependencies').getDependencies;
-
-// for testing
-module.exports.getModuleId = getModuleId;
-module.exports.idGenerator = idGenerator;
-module.exports.getOutfile = getOutfile;
-module.exports.rewriteServiceRequire = rewriteServiceRequire;
-module.exports.buildScripts = buildScripts;
-module.exports._temporaryIDs = temporaryIDs;
-module.exports._destPath = destPath;
+// Mixed default + named export pattern
+export = Object.assign(compile, {
+  getDependencies: require('./get-script-dependencies').getDependencies,
+  getModuleId,
+  idGenerator,
+  getOutfile,
+  rewriteServiceRequire,
+  buildScripts,
+  _temporaryIDs: temporaryIDs,
+  _destPath: destPath
+});

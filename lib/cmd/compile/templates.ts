@@ -1,10 +1,10 @@
-'use strict';
-const _ = require('lodash'),
-  h = require('highland'),
+import _ from 'lodash';
+import path from 'path';
+
+const h = require('highland'),
   // glob = require('glob'),
   fs = require('fs-extra'),
   afs = require('amphora-fs'),
-  path = require('path'),
   gulp = require('gulp'),
   rename = require('gulp-rename'),
   groupConcat = require('gulp-group-concat'),
@@ -78,7 +78,7 @@ function hasTemplateChanged(minify) {
  * @param  {string} filepath
  * @return {string}
  */
-function inlineRead(source, filepath) {
+function inlineRead(source: any, filepath: any) {
   const staticIncludes = source.match(/\{\{\{\s?read\s?'(.*?)'\s?\}\}\}/ig),
     name = _.last(path.dirname(filepath).split(path.sep));
 
@@ -92,7 +92,7 @@ function inlineRead(source, filepath) {
     try {
       fileContents = escape(fs.readFileSync(filepath, 'utf8')); // read file, then escape any single-quotes
     } catch (e) {
-      console.log(chalk.red(`Error replacing {{{ read \'${filepath}\' }}} in "${name}": `) + e.message);
+      console.log(chalk.red(`Error replacing {{{ read \'${filepath}\' }}} in "${name}": `) + (e as Error).message);
       process.exit(1);
     }
 
@@ -106,7 +106,7 @@ function inlineRead(source, filepath) {
  * @param  {Vinyl} file
  * @return {Vinyl}
  */
-function wrapTemplate(file) {
+function wrapTemplate(file: any) {
   let source = _.includes(file.path, 'clay-kiln') ? file.contents.toString('utf8') : inlineRead(file.contents.toString('utf8'), file.path);
 
   file.contents = new Buffer(clayHbs.wrapPartial(_.last(path.dirname(file.path).split(path.sep)), source));
@@ -118,14 +118,14 @@ function wrapTemplate(file) {
  * @param  {Vinyl} file
  * @return {Vinyl}
  */
-function precompile(file) {
+function precompile(file: any) {
   const name = path.parse(file.path).name.replace('.template', '');
 
   try {
     file.contents = new Buffer(hbs.precompile(file.contents.toString('utf8')));
     return file;
   } catch (e) {
-    console.log(chalk.red(`Error precompiling template "${name}": `) + e.message);
+    console.log(chalk.red(`Error precompiling template "${name}": `) + (e as Error).message);
     throw e;
   }
 }
@@ -135,7 +135,7 @@ function precompile(file) {
  * @param  {Vinyl} file
  * @return {Vinyl}
  */
-function registerTemplate(file) {
+function registerTemplate(file: any) {
   const name = path.parse(file.path).name.replace('.template', ''),
     contents = file.contents.toString('utf8');
 
@@ -149,7 +149,7 @@ function registerTemplate(file) {
  * @param  {boolean} shouldMinify
  * @return {Vinyl}
  */
-function minifyTemplate(file, shouldMinify) {
+function minifyTemplate(file: any, shouldMinify: any) {
   if (!shouldMinify) {
     // don't do anything, pass it through
     return file;
@@ -163,7 +163,7 @@ function minifyTemplate(file, shouldMinify) {
   } catch (e) {
     const name = path.parse(file.path).name.replace('.template', '');
 
-    console.log(chalk.red(`Error minifying template "${name}": `) + e.message);
+    console.log(chalk.red(`Error minifying template "${name}": `) + (e as Error).message);
     process.exit(1);
   }
 }
@@ -176,8 +176,8 @@ function minifyTemplate(file, shouldMinify) {
  * @param {boolean} [options.minify] minify resulting js
  * @return {Object} with build (Highland Stream) and watch (Chokidar instance)
  */
-function compile(options = {}) {
-  const componentPaths = afs.getComponents().map((name) => path.join(afs.getComponentPath(name), templateGlob)),
+function compile(options: any = {}) {
+  const componentPaths = afs.getComponents().map((name: any) => path.join(afs.getComponentPath(name), templateGlob)),
     sourcePaths = componentPaths.concat([path.join(process.cwd(), 'layouts', '**', templateGlob)]);
 
   let watch = options.watch || false,
@@ -185,12 +185,12 @@ function compile(options = {}) {
     reporter = options.reporter || 'pretty';
 
   function concatTemplates() {
-    return minify ? groupConcat(bundles) : es.mapSync((file) => file);
+    return minify ? groupConcat(bundles) : es.mapSync((file: any) => file);
   }
 
   function buildPipeline() {
     return gulp.src(sourcePaths, { base: process.cwd() })
-      .pipe(rename((filepath) => {
+      .pipe(rename((filepath: any) => {
         const name = _.last(filepath.dirname.split(path.sep));
 
         filepath.dirname = '';
@@ -218,25 +218,25 @@ function compile(options = {}) {
       */
       .pipe(es.mapSync(wrapTemplate))
       .pipe(es.mapSync(precompile))
-      .on('error', (err) => {
+      .on('error', (err: any) => {
         if (!watch) {
           throw err;
         }
       })
       .pipe(es.mapSync(registerTemplate))
-      .pipe(es.mapSync((file) => minifyTemplate(file, minify)))
+      .pipe(es.mapSync((file: any) => minifyTemplate(file, minify)))
       .pipe(concatTemplates()) // when minifying, concat to '_templates-<letter>-<letter>.js'
       .pipe(gulp.dest(destPath))
-      .pipe(es.mapSync((file) => ({ type: 'success', message: file.path })));
+      .pipe(es.mapSync((file: any) => ({ type: 'success', message: file.path })));
   }
 
   gulp.task('templates', () => {
     return h(buildPipeline());
   });
 
-  gulp.task('templates:watch', cb => {
+  gulp.task('templates:watch', (cb: any) => {
     return h(buildPipeline())
-      .each((item) => {
+      .each((item: any) => {
         _.map([item], reporters.logAction(reporter, 'compile'));
       })
       .done(cb);
@@ -255,4 +255,4 @@ function compile(options = {}) {
   }
 }
 
-module.exports = compile;
+export = compile;

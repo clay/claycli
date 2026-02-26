@@ -1,5 +1,3 @@
-'use strict';
-
 const path = require('path'),
   mockFs = require('mock-fs'),
   lib = require('./get-script-dependencies');
@@ -158,7 +156,7 @@ describe('get-script-dependencies', () => {
     const fn = lib.getAllDeps;
 
     it('returns bucket file names when minified', () => {
-      var fsConfig = {},
+      var fsConfig: Record<string, any> = {},
         result;
 
       fsConfig[path.join(destPath, '_deps-a-d.js')] = '';
@@ -173,7 +171,7 @@ describe('get-script-dependencies', () => {
     });
 
     it('returns numeric file names when not minified', () => {
-      var fsConfig = {},
+      var fsConfig: Record<string, any> = {},
         result;
 
       fsConfig[path.join(destPath, '1.js')] = '';
@@ -190,7 +188,7 @@ describe('get-script-dependencies', () => {
     });
 
     it('returns empty array when no deps exist', () => {
-      var fsConfig = {};
+      var fsConfig: Record<string, any> = {};
 
       fsConfig[destPath] = {};
       mockFs(fsConfig);
@@ -203,7 +201,7 @@ describe('get-script-dependencies', () => {
     const fn = lib.getAllModels;
 
     it('returns bucket file names when minified', () => {
-      var fsConfig = {},
+      var fsConfig: Record<string, any> = {},
         result;
 
       fsConfig[path.join(destPath, '_models-a-d.js')] = '';
@@ -216,7 +214,7 @@ describe('get-script-dependencies', () => {
     });
 
     it('returns individual model file names when not minified', () => {
-      var fsConfig = {},
+      var fsConfig: Record<string, any> = {},
         result;
 
       fsConfig[path.join(destPath, 'article.model.js')] = '';
@@ -235,7 +233,7 @@ describe('get-script-dependencies', () => {
     const fn = lib.getAllKilnjs;
 
     it('returns bucket file names when minified', () => {
-      var fsConfig = {},
+      var fsConfig: Record<string, any> = {},
         result;
 
       fsConfig[path.join(destPath, '_kiln-a-d.js')] = '';
@@ -248,7 +246,7 @@ describe('get-script-dependencies', () => {
     });
 
     it('returns individual kiln file names when not minified', () => {
-      var fsConfig = {},
+      var fsConfig: Record<string, any> = {},
         result;
 
       fsConfig[path.join(destPath, 'footer.kiln.js')] = '';
@@ -265,7 +263,7 @@ describe('get-script-dependencies', () => {
     const fn = lib.getAllTemplates;
 
     it('returns bucket file names when minified', () => {
-      var fsConfig = {},
+      var fsConfig: Record<string, any> = {},
         result;
 
       fsConfig[path.join(destPath, '_templates-a-d.js')] = '';
@@ -278,7 +276,7 @@ describe('get-script-dependencies', () => {
     });
 
     it('returns individual template file names when not minified', () => {
-      var fsConfig = {},
+      var fsConfig: Record<string, any> = {},
         result;
 
       fsConfig[path.join(destPath, 'article.template.js')] = '';
@@ -296,7 +294,7 @@ describe('get-script-dependencies', () => {
 
     describe('edit mode', () => {
       it('returns flattened array of all edit-mode scripts with asset path', () => {
-        var fsConfig = {},
+        var fsConfig: Record<string, any> = {},
           result;
 
         // Create deps, models, kiln, templates
@@ -316,7 +314,7 @@ describe('get-script-dependencies', () => {
       });
 
       it('includes deps, models, kiln, templates, and kiln-plugins in edit mode', () => {
-        var fsConfig = {},
+        var fsConfig: Record<string, any> = {},
           result;
 
         fsConfig[path.join(destPath, '_deps-a-d.js')] = '';
@@ -335,7 +333,7 @@ describe('get-script-dependencies', () => {
       });
 
       it('edit mode order: _prelude, deps, models, kilnjs, templates, _kiln-plugins, _postlude', () => {
-        var fsConfig = {},
+        var fsConfig: Record<string, any> = {},
           result, preludeIdx, depsIdx, modelsIdx, kilnIdx, templatesIdx, kilnPluginsIdx, postludeIdx;
 
         fsConfig[path.join(destPath, '1.js')] = '';
@@ -363,7 +361,7 @@ describe('get-script-dependencies', () => {
       });
 
       it('does not include _client-init in edit mode', () => {
-        var fsConfig = {},
+        var fsConfig: Record<string, any> = {},
           result;
 
         fsConfig[destPath] = {};
@@ -435,7 +433,7 @@ describe('get-script-dependencies', () => {
 
     describe('asset path handling', () => {
       it('prepends asset path to all generated URLs', () => {
-        var fsConfig = {},
+        var fsConfig: Record<string, any> = {},
           result;
 
         fsConfig[destPath] = {};
@@ -444,13 +442,13 @@ describe('get-script-dependencies', () => {
         result = fn([], '/my-site/assets', { edit: true });
 
         // eslint-disable-next-line max-nested-callbacks
-        result.forEach((url) => {
+        result.forEach((url: any) => {
           expect(url).toMatch(/^\/my-site\/assets\/js\//);
         });
       });
 
       it('works with empty asset path', () => {
-        var fsConfig = {},
+        var fsConfig: Record<string, any> = {},
           result;
 
         fsConfig[destPath] = {};
@@ -459,10 +457,12 @@ describe('get-script-dependencies', () => {
         result = fn([], '', { edit: true });
 
         // eslint-disable-next-line max-nested-callbacks
-        result.forEach((url) => {
+        result.forEach((url: any) => {
           expect(url).toMatch(/^\/js\//);
         });
       });
     });
   });
 });
+
+export {};

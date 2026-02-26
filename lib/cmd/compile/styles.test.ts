@@ -1,5 +1,3 @@
-'use strict';
-
 const path = require('path'),
   fs = require('fs-extra'),
   styles = require('./styles');
@@ -95,7 +93,7 @@ describe('compile/styles', () => {
   describe('hasChanged', () => {
     const fn = styles.hasChanged;
 
-    var tmpDir, targetDir;
+    var tmpDir: any, targetDir: any;
 
     beforeEach(() => {
       tmpDir = path.join(cwd, 'styleguides');
@@ -198,3 +196,5 @@ describe('compile/styles', () => {
     });
   });
 });
+
+export {};

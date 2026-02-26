@@ -1,4 +1,5 @@
-'use strict';
+import _ from 'lodash';
+import path from 'path';
 
 const {
   EvalSourceMapDevToolPlugin,
@@ -6,7 +7,6 @@ const {
   NormalModuleReplacementPlugin,
   ProgressPlugin
 } = require('webpack');
-const _ = require('lodash');
 const AssetManifestPlugin = require('webpack-assets-manifest');
 const CaseSensitivePathsPlugin = require('case-sensitive-paths-webpack-plugin');
 const Config = require('webpack-chain');
@@ -16,7 +16,6 @@ const { getConfigValue } = require('../../config-file-helpers');
 const mixins = require('postcss-mixins');
 const MomentLocalesPlugin = require('moment-locales-webpack-plugin');
 const nested = require('postcss-nested');
-const path = require('path');
 const simpleVars  = require('postcss-simple-vars');
 const { VueLoaderPlugin } = require('vue-loader');
 const helpers = require('../../compilation-helpers');
@@ -61,7 +60,7 @@ function createClientConfig() {
     .plugin('replace-server-services')
       .use(NormalModuleReplacementPlugin, [
         /server/,
-        resource => {
+        (resource: any) => {
           if (!resource.context.includes('services')) return;
 
           resource.request = resource.request.replace(/server/ig, 'client');
@@ -184,7 +183,7 @@ function createClientConfig() {
  * @returns {Config} - The modified configuration object.
  * @throws {Error} - If the customizer returns an invalid config object.
  */
-function buildCustomConfig(config) {
+function buildCustomConfig(config: any) {
   const customizer = getConfigValue('packConfig');
 
   if (!customizer) {
@@ -215,7 +214,7 @@ function buildCustomConfig(config) {
  * @param {Config} config - The webpack-chain configuration object.
  * @returns {Config} - The modified configuration object.
  */
-function buildDevelopmentConfig(config) {
+function buildDevelopmentConfig(config: any) {
   /* eslint-disable indent --- It's easier to read config chains with extra indentation. */
 
   config
@@ -251,7 +250,7 @@ function buildDevelopmentConfig(config) {
  * @param {Config} config - The webpack-chain configuration object.
  * @returns {Config} - The modified configuration object.
  */
-function buildProductionConfig(config) {
+function buildProductionConfig(config: any) {
 
 
   config
@@ -292,4 +291,4 @@ function getWebpackConfig() {
   return client;
 }
 
-module.exports = getWebpackConfig;
+export = getWebpackConfig;

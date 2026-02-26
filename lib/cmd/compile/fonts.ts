@@ -1,8 +1,8 @@
-'use strict';
-const _ = require('lodash'),
-  h = require('highland'),
+import _ from 'lodash';
+import path from 'path';
+
+const h = require('highland'),
   afs = require('amphora-fs'),
-  path = require('path'),
   es = require('event-stream'),
   gulp = require('gulp'),
   newer = require('../../gulp-plugins/gulp-newer'),
@@ -44,7 +44,7 @@ const _ = require('lodash'),
  * @param  {boolean} inlined
  * @return {boolean}
  */
-function getLinkedSetting(linked, inlined) {
+function getLinkedSetting(linked: any, inlined: any) {
   // default linked to true UNLESS inlined is set (and linked isn't)
   if (typeof linked === 'undefined' && inlined) {
     // inlined is set, so don't link fonts
@@ -62,7 +62,7 @@ function getLinkedSetting(linked, inlined) {
  * @param  {array} fontArray e.g. ['georgiapro', 'bold', 'italic']
  * @return {object} w/ { name, style, weight } css declarations
  */
-function getFontAttributes(fontArray) {
+function getFontAttributes(fontArray: string[]) {
   let name = fontArray[0], // e.g. georgiapro, note: font families are case insensitive in css
     weight, style;
 
@@ -94,7 +94,7 @@ function getFontAttributes(fontArray) {
  * @param  {boolean} isInlined
  * @return {string} @font-face declaration
  */
-function getFontCSS(file, styleguide, isInlined) {
+function getFontCSS(file: any, styleguide: string, isInlined: boolean) {
   const ext = path.extname(file.path), // e.g. '.woff'
     fileName = path.basename(file.path), // e.g. 'GeorgiaProBold.woff'
     fontAttrs = getFontAttributes(
@@ -140,7 +140,7 @@ function getFontCSS(file, styleguide, isInlined) {
  * @param {boolean} [options.linked] compile linked font css (defaults to true, unless inlined is set)
  * @return {Object} with build (Highland Stream) and watch (Chokidar instance)
  */
-function compile(options = {}) {
+function compile(options: any = {}) {
   let styleguides = afs.getFolders(sourcePath),
     // check env variables
     minify = options.minify || variables.minify || false,
@@ -160,12 +160,12 @@ function compile(options = {}) {
         inlinedFontsTask = gulp.src(fontsSrc)
           // if a font in the styleguide is changed, recompile the result file
           .pipe(newer({ dest: path.join(destPath, 'css', `_inlined-fonts.${styleguide}.css`), ctime: true }))
-          .pipe(es.mapSync((file) => getFontCSS(file, styleguide, true)))
+          .pipe(es.mapSync((file: any) => getFontCSS(file, styleguide, true)))
           .pipe(concat(`_inlined-fonts.${styleguide}.css`))
           .pipe(gulpIf(Boolean(minify), cssmin()))
           .pipe(gulp.dest(path.join(destPath, 'css')))
-          .pipe(es.mapSync((file) => ({ type: 'success', message: file.path })));
-        streams.push(inlinedFontsTask);
+          .pipe(es.mapSync((file: any) => ({ type: 'success', message: file.path })));
+        (streams as any[]).push(inlinedFontsTask);
       }
 
       if (linked) {
@@ -176,12 +176,12 @@ function compile(options = {}) {
           // copy font file itself (to public/fonts/<styleguide>/)
           .pipe(rename({ dirname: styleguide }))
           .pipe(gulp.dest(path.join(destPath, 'fonts')))
-          .pipe(es.mapSync((file) => getFontCSS(file, styleguide, false)))
+          .pipe(es.mapSync((file: any) => getFontCSS(file, styleguide, false)))
           .pipe(concat(`_linked-fonts.${styleguide}.css`))
           .pipe(gulpIf(Boolean(minify), cssmin()))
           .pipe(gulp.dest(path.join(destPath, 'css')))
-          .pipe(es.mapSync((file) => ({ type: 'success', message: file.path })));
-        streams.push(linkedFontsTask);
+          .pipe(es.mapSync((file: any) => ({ type: 'success', message: file.path })));
+        (streams as any[]).push(linkedFontsTask);
       }
 
       return streams;
@@ -194,9 +194,9 @@ function compile(options = {}) {
     return h(buildPipeline());
   });
 
-  gulp.task('fonts:watch', cb => {
+  gulp.task('fonts:watch', (cb: any) => {
     return h(buildPipeline())
-      .each((item) => {
+      .each((item: any) => {
         _.map([item], reporters.logAction(reporter, 'compile'));
       })
       .done(cb);
@@ -220,4 +220,4 @@ function compile(options = {}) {
 
 /* eslint-enable complexity */
 
-module.exports = compile;
+export = compile;

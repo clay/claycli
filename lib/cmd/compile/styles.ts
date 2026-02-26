@@ -1,8 +1,8 @@
-'use strict';
-const _ = require('lodash'),
-  fs = require('fs-extra'),
+import _ from 'lodash';
+import path from 'path';
+
+const fs = require('fs-extra'),
   h = require('highland'),
-  path = require('path'),
   es = require('event-stream'),
   gulp = require('gulp'),
   rename = require('gulp-rename'),
@@ -35,7 +35,7 @@ const _ = require('lodash'),
  * @param  {string} filepath
  * @return {string}
  */
-function transformPath(filepath) {
+function transformPath(filepath: any) {
   const component = path.basename(filepath, '.css'), // component name, plus variation if applicable
     pathArray = path.dirname(filepath).split(path.sep),
     styleguide = pathArray[pathArray.length - 2]; // parses 'styleguides/<styleguide>/components' for the name of the styleguide
@@ -53,18 +53,18 @@ function transformPath(filepath) {
  * @param  {string}  targetPath
  * @return {Promise}
  */
-function hasChanged(stream, sourceFile, targetPath) {
+function hasChanged(stream: any, sourceFile: any, targetPath: any) {
   let deps;
 
   try {
     deps = detective(sourceFile.contents.toString());
-  } catch (_e) { // eslint-disable-line no-unused-vars
+  } catch (_e) {
     // detective handles most postcss syntax, but doesn't know about plugins
     // if it hits something that confuses it, fail gracefully (disregard any potential dependencies)
     deps = [];
   }
 
-  return fs.stat(targetPath).then((targetStat) => {
+  return fs.stat(targetPath).then((targetStat: any) => {
     const hasUpdatedDeps = _.some(deps, (dep) => {
       const depStat = fs.statSync(path.join(process.cwd(), 'styleguides', dep));
 
@@ -86,7 +86,7 @@ function hasChanged(stream, sourceFile, targetPath) {
  * becomes public/css/<component>.<styleguide>.css
  * @param  {object} filepath
  */
-function renameFile(filepath) {
+function renameFile(filepath: any) {
   const component = filepath.basename,
     styleguide = filepath.dirname.split('/')[0];
 
@@ -102,7 +102,7 @@ function renameFile(filepath) {
  * @param {array} [options.plugins] postcss plugin functions
  * @return {Object} with build (Highland Stream) and watch (Chokidar instance)
  */
-function compile(options = {}) {
+function compile(options: any = {}) {
   let minify = options.minify || variables.minify || false,
     watch = options.watch || false,
     plugins = options.plugins || [],
@@ -128,16 +128,16 @@ function compile(options = {}) {
       ].concat(plugins)))
       .pipe(gulpIf(Boolean(minify), cssmin()))
       .pipe(gulp.dest(destPath))
-      .pipe(es.mapSync((file) => ({ type: 'success', message: path.basename(file.path) })));
+      .pipe(es.mapSync((file: any) => ({ type: 'success', message: path.basename(file.path) })));
   }
 
   gulp.task('styles', () => {
     return h(buildPipeline());
   });
 
-  gulp.task('styles:watch', (cb) => {
+  gulp.task('styles:watch', (cb: any) => {
     return h(buildPipeline())
-      .each((item) => {
+      .each((item: any) => {
         _.map([item], reporters.logAction(reporter, 'compile'));
       })
       .done(cb);
@@ -159,11 +159,11 @@ function compile(options = {}) {
   }
 }
 
-module.exports = compile;
-
-// for testing
-module.exports.transformPath = transformPath;
-module.exports.hasChanged = hasChanged;
-module.exports.renameFile = renameFile;
-module.exports._destPath = destPath;
-module.exports._variables = variables;
+// Mixed default + named export pattern
+export = Object.assign(compile, {
+  transformPath,
+  hasChanged,
+  renameFile,
+  _destPath: destPath,
+  _variables: variables
+});
