@@ -3,7 +3,7 @@ oat_status: in_progress
 oat_ready_for: null
 oat_blockers: []
 oat_last_updated: 2026-02-25
-oat_current_task_id: p04-t08
+oat_current_task_id: p04-t09
 oat_generated: false
 ---
 
@@ -29,9 +29,9 @@ oat_generated: false
 | Phase 1: Foundation | completed | 5 | 5/5 |
 | Phase 2: Bundling Pipeline | completed | 15 | 15/15 |
 | Phase 3: Dependency Cleanup | completed | 8 | 8/8 |
-| Phase 4: TypeScript Conversion | in_progress | 9 | 7/9 |
+| Phase 4: TypeScript Conversion | in_progress | 9 | 8/9 |
 
-**Total:** 38/40 tasks completed
+**Total:** 39/40 tasks completed
 
 **Integration Test Checkpoints (HiLL gates):**
 - Checkpoint 1 (p02-t07): after P0+P1+P2 — Browserify→Webpack migration
@@ -1253,8 +1253,24 @@ Removed — `clay pack` was an unreleased experiment. No characterization tests 
 
 ### Task p04-t08: Update AGENTS.md for Phase 4
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** 6efc323
+
+**Outcome (required):**
+- Updated Non-Negotiables: replaced 'use strict' + CJS-only rules with TypeScript + CJS-at-runtime convention
+- Added TypeScript Conventions section covering export =, const require, tsconfig split, any usage policy
+- Updated tech stack with TypeScript 5, ts-jest, typescript-eslint
+- Updated file extensions (.ts), commands (build, type-check), and definition of done
+
+**Files changed:**
+- `AGENTS.md` — comprehensive update for TypeScript codebase conventions
+
+**Verification:**
+- Run: `npm run lint`
+- Result: lint clean
+
+**Notes / Decisions:**
+- Kept AGENTS.md concise and focused on what developers need to know for day-to-day work
 
 ---
 
