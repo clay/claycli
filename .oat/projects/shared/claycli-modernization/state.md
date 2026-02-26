@@ -1,6 +1,6 @@
 ---
-oat_current_task: p04-t06
-oat_last_commit: 12a6d40
+oat_current_task: p04-t07
+oat_last_commit: 43d5f2a
 oat_blockers: []
 oat_hill_checkpoints: ["discovery", "spec", "design"]
 oat_hill_completed: []
@@ -21,7 +21,7 @@ oat_generated: false
 
 ## Current Phase
 
-Implementation — Phase 4 in progress (5/9 tasks).
+Implementation — Phase 4 in progress (6/9 tasks).
 
 ## Artifacts
 

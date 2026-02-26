@@ -3,7 +3,7 @@ oat_status: in_progress
 oat_ready_for: null
 oat_blockers: []
 oat_last_updated: 2026-02-25
-oat_current_task_id: p04-t06
+oat_current_task_id: p04-t07
 oat_generated: false
 ---
 
@@ -29,9 +29,9 @@ oat_generated: false
 | Phase 1: Foundation | completed | 5 | 5/5 |
 | Phase 2: Bundling Pipeline | completed | 15 | 15/15 |
 | Phase 3: Dependency Cleanup | completed | 8 | 8/8 |
-| Phase 4: TypeScript Conversion | in_progress | 9 | 5/9 |
+| Phase 4: TypeScript Conversion | in_progress | 9 | 6/9 |
 
-**Total:** 36/40 tasks completed
+**Total:** 37/40 tasks completed
 
 **Integration Test Checkpoints (HiLL gates):**
 - Checkpoint 1 (p02-t07): after P0+P1+P2 — Browserify→Webpack migration
@@ -1191,8 +1191,32 @@ Removed — `clay pack` was an unreleased experiment. No characterization tests 
 
 ### Task p04-t06: Convert CLI entry points to TypeScript
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** 43d5f2a
+
+**Outcome (required):**
+- Renamed 7 CLI files from .js to .ts (cli-options, config, export, import, lint, log, pack)
+- Kept cli/index.js and index.js as .js (bin entry point and package main — need build step)
+- Added type annotations to all function params and callbacks
+- Converted module.exports to export = pattern
+
+**Files changed:**
+- `cli/cli-options.ts` — converted to `export = options`
+- `cli/config.ts` — typed builder/set/get/handler, converted to `export =`
+- `cli/export.ts` — typed handler callbacks and error handling
+- `cli/import.ts` — typed handler callbacks and result processing
+- `cli/lint.ts` — typed handler callbacks and reporter summaries
+- `cli/log.ts` — typed init/setup/setLogger, `export = Object.assign(init, {...})`
+- `cli/pack.ts` — typed webpack callbacks, converted exports to `export =`
+- `tsconfig.json` — added cli/index.js to include list
+
+**Verification:**
+- Run: `npm test && npx tsc --noEmit`
+- Result: 372 passed, lint clean, types clean
+
+**Notes / Decisions:**
+- cli/index.js kept as .js: it's the `bin` entry point with `#!/usr/bin/env node` shebang; Node can't auto-resolve .ts without explicit extensions; build step (p04-t07) will handle this
+- index.js kept as .js: it's the package `main` entry; same rationale
 
 ---
 
