@@ -3,7 +3,7 @@ oat_status: in_progress
 oat_ready_for: null
 oat_blockers: []
 oat_last_updated: 2026-02-26
-oat_current_task_id: p03-t01
+oat_current_task_id: p03-t03
 oat_generated: false
 ---
 
@@ -28,10 +28,10 @@ oat_generated: false
 | Phase 0: Characterization Tests | completed | 3 | 3/3 |
 | Phase 1: Foundation | completed | 5 | 5/5 |
 | Phase 2: Bundling Pipeline | completed | 15 | 15/15 |
-| Phase 3: Dependency Cleanup | pending | 8 | 0/8 |
+| Phase 3: Dependency Cleanup | in_progress | 8 | 2/8 |
 | Phase 4: TypeScript Conversion | pending | 9 | 0/9 |
 
-**Total:** 23/40 tasks completed
+**Total:** 25/40 tasks completed
 
 **Integration Test Checkpoints (HiLL gates):**
 - Checkpoint 1 (p02-t07): after P0+P1+P2 — Browserify→Webpack migration
@@ -807,25 +807,55 @@ Removed — `clay pack` was an unreleased experiment. No characterization tests 
 
 ## Phase 3: Dependency Cleanup & Stream Modernization
 
-**Status:** pending
-**Started:** -
+**Status:** in_progress
+**Started:** 2026-02-25
 
 ### Task p03-t01: Expand tests for Highland-based modules before replacement
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** 670cdf6
 
-**Notes:**
-- Expand rest.test.js (29 tests → add SSL, recursive URI, elastic edge cases)
-- Expand import.test.js (26 tests → add YAML splitting, @published edge cases)
-- Expand lint.test.js (28 tests → add deep recursion, error propagation)
+**Outcome (required):**
+- Added 19 new tests across 3 Highland-based modules (374 total, up from 355)
+- rest.test.js: +8 tests — recursive URI 3-hop resolution, base64 encoding verification, query pluralization, _source/_id merging, network rejection for query/put/isElasticPrefix, non-SSL agent null check
+- import.test.js: +4 tests — mixed root types bootstrap, empty YAML/JSON input, deeply invalid JSON error
+- lint.test.js: +7 tests — 3-level component nesting, mixed property+list references, unreachable public URL, multiple schema errors, cross-group non-existent fields, description-only schema
+
+**Files changed:**
+- `lib/rest.test.js` - 8 new tests for edge cases
+- `lib/cmd/import.test.js` - 4 new tests for edge cases
+- `lib/cmd/lint.test.js` - 7 new tests for edge cases
+
+**Verification:**
+- Run: `npm test`
+- Result: 374 passed, lint clean
 
 ---
 
 ### Task p03-t02: Replace Highland.js with async/await in rest.js
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** 3a1d3cb
+
+**Outcome (required):**
+- Rewrote rest.js core functions as Promise-based: `getAsync`, `putAsync`, `queryAsync`, `findURIAsync`, `isElasticPrefixAsync`
+- Highland-wrapped exports preserved via `toStream()` adapter for backward compat with lint.js, export.js, import.js
+- Extracted `formatPutBody()` and `processQueryResponse()` helpers to stay within ESLint complexity limit
+- Kept `putAsync`/`queryAsync` as regular functions (not async) to preserve synchronous throw for API key validation
+- Rewrote all tests to exercise async exports directly; added Highland adapter smoke tests
+- Fixed previously vacuous `.catch()` error tests that never ran assertions
+
+**Files changed:**
+- `lib/rest.js` - rewrote from Highland-only to dual-export (Promise + Highland wrapper)
+- `lib/rest.test.js` - rewrote tests for async API, added Highland adapter tests
+
+**Verification:**
+- Run: `npm test`
+- Result: 376 passed, lint clean, 100% coverage on rest.js
+
+**Notes / Decisions:**
+- Dual-export pattern chosen to avoid modifying consumers yet (deferred to p03-t03)
+- `putAsync`/`queryAsync` must NOT be async functions — async converts `throw` to rejected promise, breaking synchronous validation expected by export.js consumers
 
 ---
 
