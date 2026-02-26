@@ -3,7 +3,7 @@ oat_status: in_progress
 oat_ready_for: null
 oat_blockers: []
 oat_last_updated: 2026-02-26
-oat_current_task_id: p02-t11
+oat_current_task_id: p03-t01
 oat_generated: false
 ---
 
@@ -16,7 +16,7 @@ oat_generated: false
 >
 > Conventions:
 > - `oat_current_task_id` always points at the **next plan task to do** (not the last completed task).
-> - When all plan tasks are complete, set `oat_current_task_id: p02-t13`.
+> - When all plan tasks are complete, set `oat_current_task_id: null`.
 > - Reviews are **not** plan tasks. Track review status in `plan.md` under `## Reviews` (e.g., `| final | code | passed | ... |`).
 > - Keep phase/task statuses consistent with the Progress Overview table so restarts resume correctly.
 > - Before running the `oat-project-pr-final` skill, ensure `## Final Summary (for PR/docs)` is filled with what was actually implemented.
@@ -27,11 +27,11 @@ oat_generated: false
 |-------|--------|-------|-----------|
 | Phase 0: Characterization Tests | completed | 3 | 3/3 |
 | Phase 1: Foundation | completed | 5 | 5/5 |
-| Phase 2: Bundling Pipeline | in_progress | 15 | 12/15 |
+| Phase 2: Bundling Pipeline | completed | 15 | 15/15 |
 | Phase 3: Dependency Cleanup | pending | 8 | 0/8 |
 | Phase 4: TypeScript Conversion | pending | 9 | 0/9 |
 
-**Total:** 20/40 tasks completed
+**Total:** 23/40 tasks completed
 
 **Integration Test Checkpoints (HiLL gates):**
 - Checkpoint 1 (p02-t07): after P0+P1+P2 — Browserify→Webpack migration
@@ -323,8 +323,38 @@ Removed — `clay pack` was an unreleased experiment. No characterization tests 
 
 ## Phase 2: Bundling Pipeline Modernization
 
-**Status:** in_progress
+**Status:** completed
 **Started:** 2026-02-25
+
+### Phase Summary
+
+**Outcome (what changed):**
+- Replaced Browserify bundler with Webpack 5 for script compilation (`buildScripts()`)
+- Rewrote `scripts.js` from Highland/Browserify streaming to async/Promise Webpack pipeline
+- PostCSS 7→8 upgrade with all 7 plugins updated (backward compatible)
+- Preserved global-pack output format (`window.modules["id"] = [fn, deps]`) for nymag/sites compatibility
+- Dependency graph extraction now uses Webpack `stats.toJson()` module reasons instead of custom Browserify transform
+- Restored `--minify` behavior via terser post-processing (compress, no mangle)
+- Fixed failure signaling: fatal JS compile errors skip all file writes and produce errors-only results
+- Fixed entry key path leakage: numeric indices prevent nested chunk directories
+- Added terser as direct dependency (was transitive-only)
+- 62 contract and unit tests covering build output, dependency graph, minification, error handling
+
+**Key files touched:**
+- `lib/cmd/compile/scripts.js` - full rewrite (Browserify→Webpack)
+- `lib/cmd/compile/scripts.test.js` - expanded from 48 to 62 tests
+- `lib/cmd/compile/get-script-dependencies.js` - preserved API, updated internals
+- `lib/cmd/compile/get-webpack-config.js` - new Webpack config builder
+- `package.json` - PostCSS 8 plugins, terser, webpack deps
+
+**Verification:**
+- Run: `npm test`
+- Result: 355 passed, lint clean
+
+**Notable decisions/deviations:**
+- 3 review cycles (v1: 2C+1I, v2: 1C+1I, v3: 0C+3I) — 8 fix tasks total across all cycles
+- Terser drops quotes on numeric keys (`window.modules["1"]` → `window.modules[1]`) — functionally equivalent
+- Review cycle limit (3) overridden by user; proceeding without additional re-review
 
 ### Task p02-t01: Upgrade PostCSS 7 to 8
 
@@ -632,14 +662,10 @@ Removed — `clay pack` was an unreleased experiment. No characterization tests 
 
 **New tasks added:** p02-t11, p02-t12
 
-**Status:** All fix tasks completed (p02-t11, p02-t12). Review row updated to `fixes_completed`.
-
-**Next:** Request re-review via `oat-project-review-provide code p02` then `oat-project-review-receive` to reach `passed`.
+**Status:** All fix tasks completed (p02-t11, p02-t12). Re-review v3 triggered and processed; see v3 section below.
 
 **Deferred Findings:**
 - None
-
-**Next:** Execute fix tasks via `oat-project-implement` starting at `p02-t11`. After both tasks are complete, mark the review row `fixes_completed` and request another `code p02` re-review.
 
 ---
 
@@ -713,7 +739,7 @@ Removed — `clay pack` was an unreleased experiment. No characterization tests 
 
 **New tasks added:** p02-t13, p02-t14, p02-t15
 
-**Status:** Review row updated to `fixes_added`. Review cycle limit reached (3 cycles); user authorized override to continue.
+**Status:** All 3 fix tasks completed (p02-t13, p02-t14, p02-t15). Review row updated to `fixes_completed`. Review cycle limit overridden by user — proceeding to Phase 3 without additional p02 re-review.
 
 **Deferred Findings:**
 - None
@@ -722,22 +748,60 @@ Removed — `clay pack` was an unreleased experiment. No characterization tests 
 
 ### Task p02-t13: (review) Use synthetic entry keys in createWebpackConfig
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** 9c9f7f5
+
+**Outcome (required):**
+- Changed entry keys from absolute file paths to numeric indices (`entry[i] = file`)
+- Prevents webpack from emitting nested chunks at `public/js/Users/.../entry.js.js`
+- Added contract test asserting no nested directories under destPath
+
+**Files changed:**
+- `lib/cmd/compile/scripts.js` - one-line fix in `createWebpackConfig()`
+- `lib/cmd/compile/scripts.test.js` - added nested directory assertion
+
+**Verification:**
+- Run: `npm test`
+- Result: 355 passed, lint clean
 
 ---
 
 ### Task p02-t14: (review) Skip file writes on fatal JS compile errors
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** 273095a
+
+**Outcome (required):**
+- Added early return after error collection: fatal (non-asset) errors skip all module processing, file writes, and cache/metadata export
+- Extracted `hasFatalErrors()` helper (also used by `collectResults()`) to keep complexity under limit
+- Added contract test verifying `_registry.json`, `_ids.json`, and `client-env.json` do not exist after fatal error
+
+**Files changed:**
+- `lib/cmd/compile/scripts.js` - early return guard, `hasFatalErrors()` helper
+- `lib/cmd/compile/scripts.test.js` - added artifact-absence assertion for fatal errors
+
+**Verification:**
+- Run: `npm test`
+- Result: 355 passed, lint clean
 
 ---
 
 ### Task p02-t15: (review) Add terser as direct dependency
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** e906f3b
+
+**Outcome (required):**
+- Added `terser@^5.46.0` to `dependencies` in `package.json`
+- Previously relied on transitive dep via `terser-webpack-plugin`; now explicitly declared
+
+**Files changed:**
+- `package.json` - added terser to dependencies
+- `package-lock.json` - regenerated
+
+**Verification:**
+- Run: `npm test`
+- Result: 355 passed, lint clean
 
 ---
 
