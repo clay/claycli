@@ -6,7 +6,7 @@ oat_hill_checkpoints: ["discovery", "spec", "design"]
 oat_hill_completed: []
 oat_parallel_execution: false
 oat_phase: implement
-oat_phase_status: in_progress
+oat_phase_status: complete
 oat_execution_mode: single-thread
 oat_workflow_mode: import
 oat_workflow_origin: imported
@@ -15,13 +15,13 @@ oat_generated: false
 
 # Project State: claycli-modernization
 
-**Status:** Implementation — Tasks complete; awaiting final re-review
+**Status:** Implementation Complete — Final review passed
 **Started:** 2026-02-25
 **Last Updated:** 2026-02-26
 
 ## Current Phase
 
-Implementation — All 48 tasks complete; awaiting final re-review.
+Implementation Complete — All 48 tasks done, final review passed. Ready for PR.
 
 ## Artifacts
 
@@ -39,7 +39,7 @@ Implementation — All 48 tasks complete; awaiting final re-review.
 - ✓ Phase 2: Bundling Pipeline (15/15 tasks)
 - ✓ Phase 3: Dependency Cleanup (8/8 tasks)
 - ✓ Phase 4: TypeScript Conversion (17/17 tasks)
-- ⧗ Awaiting final re-review
+- ✓ Final review passed
 
 ## Blockers
 
@@ -47,4 +47,4 @@ None
 
 ## Next Milestone
 
-Run final re-review (`oat-project-review-provide code final` → `oat-project-review-receive`) to reach `passed`, then create PR.
+Create PR via `oat-project-pr-final` or manually.

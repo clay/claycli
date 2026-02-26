@@ -1644,7 +1644,7 @@ Items deliberately deferred from this modernization with documented rationale.
 | p02 | code | fixes_completed | 2026-02-26 | reviews/p02-review-2026-02-26.md |
 | p03 | code | pending | - | - |
 | p04 | code | pending | - | - |
-| final | code | fixes_completed | 2026-02-25 | reviews/final-review-2026-02-26.md |
+| final | code | passed | 2026-02-25 | reviews/final-rereview-2026-02-25.md |
 | spec | artifact | pending | - | - |
 | design | artifact | pending | - | - |
 | plan | artifact | fixes_completed | 2026-02-25 | reviews/artifact-plan-review-2026-02-25.md |

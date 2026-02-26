@@ -1,5 +1,5 @@
 ---
-oat_status: in_progress
+oat_status: complete
 oat_ready_for: null
 oat_blockers: []
 oat_last_updated: 2026-02-26
@@ -1490,17 +1490,21 @@ Removed — `clay pack` was an unreleased experiment. No characterization tests 
 
 ### Phase 4 Summary
 
-**Outcome:** Converted entire codebase from JavaScript to TypeScript. All source files are now .ts (except setup-jest.js and eslint.config.js). TypeScript compiles to CommonJS JS via tsc, with declarations and source maps. Published package ships compiled JS from dist/.
+**Outcome:** Converted entire codebase from JavaScript to TypeScript. All source files are now .ts (except setup-jest.js and eslint.config.js). TypeScript compiles to CommonJS JS via tsc, with declarations and source maps. Published package ships compiled JS from dist/. Review fixes addressed deprecated APIs (Buffer, URL), unused deps, type safety, and build config cleanup.
 
 **Key files touched:**
 - All `lib/**/*.js` → `.ts` (40+ files: utilities, commands, compile pipeline, pack)
 - All `cli/*.js` → `.ts` (8 files: cli-options, config, export, import, lint, log, pack, index)
+- All `cli/compile/*.js` → `.ts` (7 files: custom-tasks, fonts, index, media, scripts, styles, templates)
 - `index.js` → `index.ts` (programmatic API entry point)
 - `tsconfig.json` (type-checking config, strict mode)
-- `tsconfig.build.json` (new: compilation config with declarations/source maps)
-- `package.json` (entry points → dist/, build/type-check scripts, files field)
+- `tsconfig.build.json` (compilation config with declarations/source maps, cleaned up)
+- `package.json` (entry points → dist/, build/type-check scripts, files field, removed 4 unused deps)
 - `.gitignore` (added dist/)
 - `AGENTS.md` (TypeScript conventions documentation)
+- `lib/rest.ts` (FetchOptions type, new URL() API)
+- `lib/prefixes.ts` (new URL() API)
+- `lib/cmd/compile/get-script-dependencies.ts` (typed API contract)
 
 **Verification:** npm test (372 passed, lint clean, types clean), npm run build (191 files), integration checkpoint 3 (625 files compiled, 4571 JS outputs, 4046 registry entries)
 
@@ -1510,6 +1514,8 @@ Removed — `clay pack` was an unreleased experiment. No characterization tests 
 - Test files use `export {};` to avoid TS2451 global scope conflicts
 - resolveLoader needs dual depth paths (3-level for source, 4-level for dist/)
 - package.json copied into dist/ at build time for cli/index.ts require resolution
+- Highland.js retained in compile orchestration (deferred to future project phase)
+- babel-plugin-lodash upstream warning not fixable on claycli side (deferred)
 
 ---
 
@@ -1626,6 +1632,19 @@ Track test execution during implementation.
 - Types clean (tsc --noEmit, strict mode)
 - Build succeeds (tsc -p tsconfig.build.json, 191 files)
 - 3 integration checkpoints with nymag/sites: 625 files compiled, 4571 JS outputs, 4046 registry entries
+
+**Review fixes applied:**
+- Converted cli/compile/*.js to TypeScript (7 files)
+- Replaced deprecated `new Buffer()` with `Buffer.from()` (5 instances)
+- Removed 4 unused production dependencies (dependency-tree, exports-loader, imports-loader, path-browserify)
+- Added proper types to getDependencies() API contract
+- Replaced deprecated `nodeUrl.parse()` with `new URL()` (4 instances)
+- Added `FetchOptions` interface to eliminate `as RequestInit` assertions
+- Cleaned up tsconfig.build.json include/exclude contradiction
+
+**Deferred items (documented in plan.md):**
+- Highland.js retention in compile orchestration modules (requires own project phase)
+- babel-plugin-lodash upstream warning (no fix available on claycli side)
 
 **Design deltas (if any):**
 - No design.md exists (plan was imported). Implementation follows the imported plan faithfully.
