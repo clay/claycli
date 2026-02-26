@@ -3,7 +3,7 @@ oat_status: in_progress
 oat_ready_for: null
 oat_blockers: []
 oat_last_updated: 2026-02-25
-oat_current_task_id: p02-t08
+oat_current_task_id: null
 oat_generated: false
 ---
 
@@ -27,11 +27,11 @@ oat_generated: false
 |-------|--------|-------|-----------|
 | Phase 0: Characterization Tests | completed | 3 | 3/3 |
 | Phase 1: Foundation | completed | 5 | 5/5 |
-| Phase 2: Bundling Pipeline | in_progress | 10 | 7/10 |
+| Phase 2: Bundling Pipeline | completed | 10 | 10/10 |
 | Phase 3: Dependency Cleanup | pending | 8 | 0/8 |
 | Phase 4: TypeScript Conversion | pending | 9 | 0/9 |
 
-**Total:** 15/35 tasks completed
+**Total:** 18/35 tasks completed
 
 **Integration Test Checkpoints (HiLL gates):**
 - Checkpoint 1 (p02-t07): after P0+P1+P2 — Browserify→Webpack migration
@@ -491,21 +491,22 @@ Removed — `clay pack` was an unreleased experiment. No characterization tests 
 
 ### Phase 2 Summary
 
-**Outcome:** Migrated script compilation from Browserify to Webpack 5, updated PostCSS from v7 to v8, updated browserslist, verified gulp retention for non-script tasks, and passed integration checkpoint with nymag/sites.
+**Outcome:** Migrated script compilation from Browserify to Webpack 5, updated PostCSS from v7 to v8, updated browserslist, verified gulp retention for non-script tasks, and passed integration checkpoint with nymag/sites. Review fixes: fixed services/server rewrite path check, populated dependency graph from Webpack module stats, added 7 buildScripts contract tests.
 
 **Key files touched:**
-- `lib/cmd/compile/scripts.js` (major rewrite: Browserify → Webpack)
-- `lib/cmd/compile/scripts.test.js` (48 characterization tests)
+- `lib/cmd/compile/scripts.js` (major rewrite: Browserify → Webpack, service rewrite fix, dep graph population)
+- `lib/cmd/compile/scripts.test.js` (48 characterization + 2 rewrite + 7 contract = 57 tests)
 - `lib/cmd/compile/styles.js` (PostCSS 7 → 8)
 - `package.json` / `package-lock.json` (dependency updates)
 - `AGENTS.md` (updated technology stack documentation)
-- `.browserslistrc` (new, replaces inline config)
 
-**Verification:** npm test (341 passed), nymag/sites integration (1189 files compiled)
+**Verification:** npm test (350 passed, lint clean), nymag/sites integration (1189 files compiled)
 
 **Notable decisions/deviations:**
 - Build time slower than Browserify (44s vs 6s) — expected with webpack cold start; filesystem caching enabled for incremental builds
 - Non-fatal error handling added to match Browserify's behavior of not killing entire build on individual module failures
+- Two-pass dependency graph building uses `mod.reasons[]` from Webpack stats to reconstruct parent→child edges
+- Contract tests mock `vue-loader` and inject `babelTargets` to run webpack in test environment
 
 ---
 
@@ -527,44 +528,89 @@ Removed — `clay pack` was an unreleased experiment. No characterization tests 
 
 **New tasks added:** p02-t08, p02-t09, p02-t10
 
-**Next:** Execute fix tasks via the `oat-project-implement` skill starting from p02-t08.
+**Status:** All 3 fix tasks completed (p02-t08, p02-t09, p02-t10). Review row updated to `fixes_completed`.
 
-After the fix tasks are complete:
-- Update the review row status to `fixes_completed`
-- Re-run `oat-project-review-provide code p02` then `oat-project-review-receive` to reach `passed`
+**Next:** Request re-review via `oat-project-review-provide code p02` then `oat-project-review-receive` to reach `passed`.
 
 ---
 
 ### Task p02-t08: (review) Fix services/server rewrite path check
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** ebd2d61
 
-**Notes:**
-- Fix C2: Change `endsWith('services/server')` to detect `services/server/` directory segment
-- Add positive rewrite test case
+**Outcome (required):**
+- Fixed path check from `endsWith('services/server')` to `includes('services/server' + sep)` — now matches file imports like `../../services/server/foo`
+- Fixed client path computation to resolve client counterpart correctly when filename is present
+- Added 2 positive rewrite test cases (file import + directory import)
+
+**Files changed:**
+- `lib/cmd/compile/scripts.js` - fixed `rewriteServiceRequire` path detection and client path resolution
+- `lib/cmd/compile/scripts.test.js` - added positive rewrite tests with real filesystem fixtures
+
+**Verification:**
+- Run: `npx jest lib/cmd/compile/scripts.test.js --no-coverage`
+- Result: 50 passed (48 existing + 2 new)
+- Run: `npm test`
+- Result: 343 passed, lint clean
+
+**Notes / Decisions:**
+- Used `includes(segment + path.sep)` OR `endsWith(segment)` to handle both `services/server/foo` and `services/server` (directory) imports
+- Used `_.escapeRegExp` for the replacement to handle platform-specific path separators
 
 ---
 
 ### Task p02-t09: (review) Populate dependency graph from Webpack module stats
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** bfaabaf
 
-**Notes:**
-- Fix C1: Build dependency map from `mod.reasons` / Webpack stats module graph
-- Populate `deps` object and `subcache.registry[moduleId]` with actual dependency edges
+**Outcome (required):**
+- Added `buildDependencyGraph()` function that does two-pass analysis of Webpack stats modules
+- Pass 1 builds `identifier → filePath → moduleId` lookup maps
+- Pass 2 uses `mod.reasons` to build parent→child dependency edges: `depsMap[parentId][userRequest] = childId`
+- `deps` object now populated in global-pack module wrapper for runtime require resolution
+- `registryMap[moduleId]` now populated for `_registry.json` (used by `getDependencies()`)
+- Extracted `extractEnvVars()` helper to reduce `processModule` complexity below lint threshold
+
+**Files changed:**
+- `lib/cmd/compile/scripts.js` - added `buildDependencyGraph()`, `extractEnvVars()`; refactored `processModule` to 3 params, reads deps from `ctx`
+
+**Verification:**
+- Run: `npx eslint lib/cmd/compile/scripts.js` — clean (0 errors)
+- Run: `npm test` — 343 passed, lint clean
+
+**Notes / Decisions:**
+- Used IIFE-free structure: `buildDependencyGraph` returns `{ depsMap, registryMap }` which is attached to `ctx` before calling `processModule`
+- `mod.reasons[].moduleIdentifier` identifies the parent; `mod.reasons[].userRequest` is the require string
+- Dependency edges are only tracked between modules that have resolvable file paths (webpack internals/runtime modules excluded)
 
 ---
 
 ### Task p02-t10: (review) Add buildScripts contract tests for output artifacts
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** e702b85
 
-**Notes:**
-- Fix I1: Add integration-level tests that exercise `buildScripts()` with a fixture project
-- Assert non-empty registry deps, correct module format, service rewrite, env extraction
+**Outcome (required):**
+- Added 7 contract tests exercising the full `buildScripts()` pipeline end-to-end
+- Tests cover: success results, `_registry.json` non-empty dependency edges, `_ids.json` mapping, global-pack output format, populated deps in module wrappers, `process.env` extraction to `client-env.json`, and `services/server→client` rewrite in output
+- Mocked `vue-loader` (peer dep only available in consuming projects) and injected valid `babelTargets` via `configFileHelpers.setConfigFile`
+- Uses real filesystem fixture (entry.js, helper.js, server/client service pair) with 30s timeout for webpack compilation
+
+**Files changed:**
+- `lib/cmd/compile/scripts.test.js` - added `buildScripts contract` describe block with 7 test cases + vue-loader mock
+
+**Verification:**
+- Run: `npx jest lib/cmd/compile/scripts.test.js --no-coverage`
+- Result: 57 passed (50 existing + 7 new contract tests)
+- Run: `npm test`
+- Result: 350 passed, lint clean
+
+**Notes / Decisions:**
+- `vue-loader` mock uses jest.mock hoisting to intercept before `scripts.js` loads the module
+- `babelTargets` injected via `configFileHelpers.setConfigFile()` — in production, consuming projects provide this via `claycli.config.js`
+- Fixture uses real webpack compilation (not mocked) to validate the full pipeline
 
 ---
 
