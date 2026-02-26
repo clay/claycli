@@ -3,7 +3,7 @@ oat_status: in_progress
 oat_ready_for: null
 oat_blockers: []
 oat_last_updated: 2026-02-26
-oat_current_task_id: p03-t08
+oat_current_task_id: p04-t01
 oat_generated: false
 ---
 
@@ -28,10 +28,10 @@ oat_generated: false
 | Phase 0: Characterization Tests | completed | 3 | 3/3 |
 | Phase 1: Foundation | completed | 5 | 5/5 |
 | Phase 2: Bundling Pipeline | completed | 15 | 15/15 |
-| Phase 3: Dependency Cleanup | in_progress | 8 | 7/8 |
+| Phase 3: Dependency Cleanup | completed | 8 | 8/8 |
 | Phase 4: TypeScript Conversion | pending | 9 | 0/9 |
 
-**Total:** 30/40 tasks completed
+**Total:** 31/40 tasks completed
 
 **Integration Test Checkpoints (HiLL gates):**
 - Checkpoint 1 (p02-t07): after P0+P1+P2 — Browserify→Webpack migration
@@ -992,12 +992,48 @@ Removed — `clay pack` was an unreleased experiment. No characterization tests 
 
 ### Task p03-t08: Integration test checkpoint 2 — nymag/sites
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** 47b57c1
 
-**Notes:**
-- HiLL gate — verify Highland→async/await didn't break compile
-- Must pass before proceeding to Phase 4
+**Outcome (required):**
+- Linked claycli into nymag/sites and ran `clay compile --globs 'global/js/**/!(*.test).js'`
+- Compiled 625 files in 32.94s (warm webpack cache from checkpoint 1)
+- 4577 JS output files, 4046 registry entries (matches checkpoint 1)
+- Output format correct: `window.modules=[]` prelude, global-pack module wrappers
+- Fixed kew→Promise migration bug in gulp-newer: native Promises require catch before microtask boundary unlike kew
+
+**Files changed:**
+- `lib/gulp-plugins/gulp-newer/index.js` - fix unhandled rejection in constructor (catch ENOENT), suppress extraStats rejection, use resolved values in _transform
+
+**Verification:**
+- Run: `npm test`
+- Result: 372 passed, lint clean
+- Integration: nymag/sites compiled successfully
+
+**Notes / Decisions:**
+- Non-fatal errors (8 unique asset parse failures) are identical to checkpoint 1 — project-level issues in nymag/sites dependencies, not claycli bugs
+- File count lower (625 vs 1189) due to webpack filesystem cache; registry entries (4046) match exactly
+
+### Phase 3 Summary
+
+**Outcome:** Replaced Highland.js streams with async/await in lint, export, import commands and their supporting modules (rest.js, prefixes.js, formatting.js). Removed isomorphic-fetch (native fetch), kew (native Promises), base-64 (native Buffer), resolve (unused). Bumped fs-extra 9→11, yargs 16→17. Highland retained only in compile pipeline (lib/cmd/compile/).
+
+**Key files touched:**
+- `lib/rest.js`, `lib/prefixes.js`, `lib/formatting.js` (async/await, native APIs)
+- `lib/cmd/lint.js`, `lib/cmd/export.js`, `lib/cmd/import.js` (Highland→async/await)
+- `cli/lint.js`, `cli/export.js`, `cli/import.js` (Promise consumption)
+- `lib/gulp-plugins/gulp-newer/index.js` (kew→native Promises)
+- All corresponding test files updated
+- `AGENTS.md` (documentation)
+
+**Verification:** npm test (372 passed, lint clean), nymag/sites integration (625 files compiled, 4046 registry entries)
+
+**Notable decisions/deviations:**
+- Skipped ESM-only upgrades: chalk v5, update-notifier v6, get-stdin v9, glob v10
+- Retained uglify-js (used in sync Gulp template pipeline; terser is async-only)
+- Retained moment (peer dep of moment-locales-webpack-plugin)
+- Fixed mock ordering in export tests (sequential for-loops vs Highland parallel execution)
+- Fixed unhandled Promise rejection in gulp-newer (kew vs native Promise semantics)
 
 ---
 
