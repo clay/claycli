@@ -1,15 +1,28 @@
-'use strict';
+import _ from 'lodash';
 
-const _ = require('lodash'),
-  utils = require('clayutils'),
-  refProp = '_ref';
+const utils = require('clayutils');
+
+const refProp = '_ref';
+
+interface ComponentRef {
+  [refProp]: string;
+  [key: string]: unknown;
+}
+
+interface Bootstrap {
+  _components: Record<string, Record<string, unknown>>;
+  [key: string]: unknown;
+}
+
+interface AddedTracker {
+  asChild?: Record<string, boolean>;
+  [key: string]: unknown;
+}
 
 /**
  * normalize a potential component list
- * @param  {array} arr which may be component list or just data
- * @return {array}
  */
-function normalizeComponentList(arr) {
+function normalizeComponentList(arr: unknown[]): unknown[] {
   if (_.has(_.head(arr), refProp)) {
     // it's a component list! only return the references
     return _.map(arr, (item) => _.pick(item, refProp));
@@ -21,10 +34,8 @@ function normalizeComponentList(arr) {
 
 /**
  * normalize a potential component property
- * @param  {object} obj which may be a component prop or just data
- * @return {object}
  */
-function normalizeComponentProp(obj) {
+function normalizeComponentProp(obj: Record<string, unknown>): Record<string, unknown> {
   if (_.has(obj, refProp)) {
     // it's a component prop! only return the reference
     return { [refProp]: obj[refProp] };
@@ -37,11 +48,9 @@ function normalizeComponentProp(obj) {
 /**
  * remove child component data, leaving only their references
  * note: this removes _ref from the root of component data
- * @param  {object} data for a component
- * @return {object}
  */
-function normalize(data) {
-  let cleanData = {};
+function normalize(data: Record<string, unknown>): Record<string, unknown> {
+  const cleanData: Record<string, unknown> = {};
 
   _.forOwn(data, (val, key) => {
     if (_.isArray(val)) {
@@ -49,7 +58,7 @@ function normalize(data) {
       cleanData[key] = normalizeComponentList(val);
     } else if (_.isObject(val)) {
       // possibly a component prop
-      cleanData[key] = normalizeComponentProp(val);
+      cleanData[key] = normalizeComponentProp(val as Record<string, unknown>);
     } else if (key !== refProp) {
       // add any other bits of component data
       cleanData[key] = val;
@@ -59,11 +68,17 @@ function normalize(data) {
   return cleanData;
 }
 
-function addComponent(item, bootstrap, added) {
+function addComponent(
+  item: ComponentRef,
+  bootstrap: Bootstrap,
+  added: AddedTracker
+): ComponentRef {
   const uri = item[refProp],
     name = utils.getComponentName(uri),
     instance = utils.getComponentInstance(uri),
-    data = instance ? _.get(bootstrap, `_components.${name}.instances.${instance}`) : _.omit(_.get(bootstrap, `_components.${name}`), 'instances');
+    data: Record<string, unknown> | undefined = instance
+      ? _.get(bootstrap, `_components.${name}.instances.${instance}`) as Record<string, unknown> | undefined
+      : _.omit(_.get(bootstrap, `_components.${name}`) as Record<string, unknown>, 'instances') as Record<string, unknown>;
 
   if (!data || !_.size(data)) {
     return item; // just return the _ref, since it doesn't point to any data we currently have
@@ -71,22 +86,22 @@ function addComponent(item, bootstrap, added) {
   } else {
     // if we've found the component, add its data and mark it as added
     _.set(added, `asChild['${uri}']`, true);
-    added[uri] = true;
+    (added as Record<string, unknown>)[uri] = true;
     return _.assign(item, denormalize(data, bootstrap, added)); // recursion excursion!
   }
 }
 
 /**
  * denormalize a potential component list
- * @param  {array} arr which may be component list or just data
- * @param {object} bootstrap containing all components
- * @param {object} added
- * @return {array}
  */
-function denormalizeComponentList(arr, bootstrap, added) {
+function denormalizeComponentList(
+  arr: unknown[],
+  bootstrap: Bootstrap,
+  added: AddedTracker
+): unknown[] {
   if (_.has(_.head(arr), refProp)) {
     // it's a component list! grab the data from the bootstrap
-    return _.map(arr, (item) => addComponent(item, bootstrap, added));
+    return _.map(arr, (item) => addComponent(item as ComponentRef, bootstrap, added));
   } else {
     // just component data, move along
     return arr;
@@ -95,15 +110,15 @@ function denormalizeComponentList(arr, bootstrap, added) {
 
 /**
  * denormalize a potential component prop
- * @param  {object} obj which may be component prop or just data
- * @param {object} bootstrap containing all components
- * @param {object} added
- * @return {array}
  */
-function denormalizeComponentProp(obj, bootstrap, added) {
+function denormalizeComponentProp(
+  obj: Record<string, unknown>,
+  bootstrap: Bootstrap,
+  added: AddedTracker
+): Record<string, unknown> {
   if (_.has(obj, refProp)) {
     // it's a component prop! grab the data from the bootstrap
-    return addComponent(obj, bootstrap, added);
+    return addComponent(obj as ComponentRef, bootstrap, added);
   } else {
     // just component data, move along
     return obj;
@@ -114,19 +129,19 @@ function denormalizeComponentProp(obj, bootstrap, added) {
  * add child component data to their references,
  * and update a list of added components
  * note: this is similar to how amphora composes json
- * @param  {object} data for a component
- * @param {object} bootstrap containing all components
- * @param {object} added
- * @return {object}
  */
-function denormalize(data, bootstrap, added) {
+function denormalize(
+  data: Record<string, unknown>,
+  bootstrap: Bootstrap,
+  added: AddedTracker
+): Record<string, unknown> {
   _.forOwn(data, (val, key) => {
     if (_.isArray(val)) {
       // possibly a component list
       data[key] = denormalizeComponentList(val, bootstrap, added);
     } else if (_.isObject(val)) {
       // possibly a component prop
-      data[key] = denormalizeComponentProp(val, bootstrap, added);
+      data[key] = denormalizeComponentProp(val as Record<string, unknown>, bootstrap, added);
     } else {
       // add any other bits of component data
       data[key] = val;
@@ -136,5 +151,4 @@ function denormalize(data, bootstrap, added) {
   return data;
 }
 
-module.exports.normalize = normalize;
-module.exports.denormalize = denormalize;
+export { normalize, denormalize };

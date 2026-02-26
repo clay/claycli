@@ -1,7 +1,4 @@
-'use strict';
-
-// all types of data
-module.exports = [
+const types: readonly string[] = [
   '/_layouts',
   '/_components',
   '/_pages',
@@ -9,3 +6,5 @@ module.exports = [
   '/_uris',
   '/_lists'
 ];
+
+export = types;

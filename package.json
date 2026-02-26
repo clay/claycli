@@ -23,7 +23,11 @@
     "transform": {
       "^.+\\.ts$": "ts-jest"
     },
-    "moduleFileExtensions": ["ts", "js", "json"],
+    "moduleFileExtensions": [
+      "ts",
+      "js",
+      "json"
+    ],
     "collectCoverage": true,
     "collectCoverageFrom": [
       "**/*.{js,ts}",
@@ -66,6 +70,7 @@
   "homepage": "https://github.com/nymag/clay-cli#readme",
   "devDependencies": {
     "@eslint/js": "^9.39.3",
+    "@types/lodash": "^4.17.24",
     "@types/node": "^25.3.1",
     "coveralls": "^3.0.0",
     "eslint": "^9.39.3",
