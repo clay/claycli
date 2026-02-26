@@ -2,8 +2,8 @@
 oat_status: in_progress
 oat_ready_for: null
 oat_blockers: []
-oat_last_updated: 2026-02-25
-oat_current_task_id: null
+oat_last_updated: 2026-02-26
+oat_current_task_id: p04-t10
 oat_generated: false
 ---
 
@@ -29,9 +29,9 @@ oat_generated: false
 | Phase 1: Foundation | completed | 5 | 5/5 |
 | Phase 2: Bundling Pipeline | completed | 15 | 15/15 |
 | Phase 3: Dependency Cleanup | completed | 8 | 8/8 |
-| Phase 4: TypeScript Conversion | completed | 9 | 9/9 |
+| Phase 4: TypeScript Conversion | in_progress | 17 | 9/17 |
 
-**Total:** 40/40 tasks completed
+**Total:** 40/48 tasks completed
 
 **Integration Test Checkpoints (HiLL gates):**
 - Checkpoint 1 (p02-t07): after P0+P1+P2 — Browserify→Webpack migration
@@ -1298,6 +1298,91 @@ Removed — `clay pack` was an unreleased experiment. No characterization tests 
 - resolveLoader needs both 3-level (source) and 4-level (dist) __dirname paths; non-existent path silently skipped
 - package.json copied to dist/ at build time so require('../package.json') resolves from dist/cli/
 - All 3 integration checkpoints pass — TypeScript conversion is complete
+
+---
+
+### Review Received: final
+
+**Date:** 2026-02-26
+**Review artifact:** reviews/final-review-2026-02-26.md
+
+**Findings:**
+- Critical: 0
+- Important: 3
+- Medium: 5
+- Minor: 6
+
+**New tasks added:** p04-t10, p04-t11, p04-t12, p04-t13, p04-t14, p04-t15, p04-t16, p04-t17
+
+**Deferred findings (with rationale):**
+- M1 (Highland retention): Removing Highland from compile modules requires rewriting Gulp stream orchestration — a separate project phase. Documented in AGENTS.md and plan.md Deferred Items.
+- m4 (babel-plugin-lodash warning): Upstream issue in babel-plugin-lodash package, no fix available on claycli side. Documented in plan.md Deferred Items.
+
+**Non-issues (no action):** m1 (dist/ gitignored), m2 (prerelease version correct), m3 (event-stream pin intentional), m5 (coverage exclusions valid)
+
+**Next:** Execute fix tasks via the `oat-project-implement` skill.
+
+After the fix tasks are complete:
+- Update the review row status to `fixes_completed`
+- Re-run `oat-project-review-provide code final` then `oat-project-review-receive` to reach `passed`
+
+---
+
+### Task p04-t10: (review) Convert cli/compile/*.js to TypeScript
+
+**Status:** pending
+**Commit:** -
+
+---
+
+### Task p04-t11: (review) Replace deprecated new Buffer() with Buffer.from()
+
+**Status:** pending
+**Commit:** -
+
+---
+
+### Task p04-t12: (review) Remove unused production dependencies
+
+**Status:** pending
+**Commit:** -
+
+---
+
+### Task p04-t13: (review) Add proper types to getDependencies() API contract
+
+**Status:** pending
+**Commit:** -
+
+---
+
+### Task p04-t14: (review) Replace deprecated nodeUrl.parse() with new URL()
+
+**Status:** pending
+**Commit:** -
+
+---
+
+### Task p04-t15: (review) Fix RequestInit type assertion in rest.ts
+
+**Status:** pending
+**Commit:** -
+
+---
+
+### Task p04-t16: (review) Clean up tsconfig.build.json include/exclude
+
+**Status:** pending
+**Commit:** -
+
+---
+
+### Task p04-t17: (review) Verify and remove path-browserify if unused
+
+**Status:** pending
+**Commit:** -
+
+---
 
 ### Phase 4 Summary
 
