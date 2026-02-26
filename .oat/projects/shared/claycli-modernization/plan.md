@@ -1129,6 +1129,49 @@ Document pass/fail in implementation.md. Do not proceed to Phase 4 without user 
 
 ---
 
+### Task p03-t09: (review) Restore bounded concurrency in export/import/lint
+
+**Files:**
+- Modify: `lib/cmd/export.js`
+- Modify: `lib/cmd/import.js`
+- Modify: `lib/cmd/lint.js`
+- Modify: `lib/cmd/export.test.js`
+- Modify: `lib/cmd/import.test.js`
+- Modify: `lib/cmd/lint.test.js`
+- Create: `lib/concurrency.js`
+- Create: `lib/concurrency.test.js`
+
+**Step 1:** Implement inline CJS-compatible pLimit/mapConcurrent (p-limit v5+ is ESM-only)
+**Step 2:** Thread concurrency through export/import/lint functions using mapConcurrent
+**Step 3:** Change test concurrency from 1000→1 (mock-order-dependent tests)
+**Step 4:** Verify and commit
+
+---
+
+### Task p03-t10: (review) Fix import stream/stdin handling regression
+
+**Files:**
+- Modify: `lib/cmd/import.js`
+- Modify: `lib/cmd/import.test.js`
+- Modify: `cli/import.js`
+
+**Step 1:** Add stream detection in parseDispatchSource before object fallback
+**Step 2:** Fix CLI stdin fallback to error when get-stdin returns empty
+**Step 3:** Add regression tests (stream rejection, Buffer input, empty string)
+**Step 4:** Verify and commit
+
+---
+
+### Task p03-t11: (review) Fix gulp-newer to only suppress ENOENT stat errors
+
+**Files:**
+- Modify: `lib/gulp-plugins/gulp-newer/index.js`
+
+**Step 1:** Change `.catch(() => null)` to only suppress ENOENT, re-throw others
+**Step 2:** Verify and commit
+
+---
+
 ## Phase 4: TypeScript Conversion
 
 ### Task p04-t01: Set up TypeScript infrastructure
@@ -1642,7 +1685,7 @@ Items deliberately deferred from this modernization with documented rationale.
 | p00 | code | pending | - | - |
 | p01 | code | pending | - | - |
 | p02 | code | fixes_completed | 2026-02-26 | reviews/p02-review-2026-02-26.md |
-| p03 | code | pending | - | - |
+| p03 | code | fixes_completed | 2026-02-26 | reviews/p03-review-2026-02-26.md |
 | p04 | code | received | 2026-02-26 | reviews/p04-review-2026-02-26.md |
 | final | code | passed | 2026-02-25 | reviews/final-rereview-2026-02-25.md |
 | spec | artifact | pending | - | - |
@@ -1667,10 +1710,10 @@ When all tasks below are complete, this plan is ready for final code review and 
 - Phase 0: 3 tasks - Characterization tests (scripts, get-script-dependencies, styles)
 - Phase 1: 5 tasks - Foundation (Node 20+, Jest 29, ESLint 9, CI)
 - Phase 2: 15 tasks - Bundling pipeline (PostCSS 8, Browserify→Webpack, ecosystem deps, **integration test checkpoint 1**, review fixes: service rewrite, dep graph, contract tests, minify behavior, failure signaling, entry keys, skip writes on error, terser dep)
-- Phase 3: 8 tasks - Dependency cleanup (test expansion, Highland→async/await, native fetch, modern deps, **integration test checkpoint 2**)
+- Phase 3: 11 tasks - Dependency cleanup (test expansion, Highland→async/await, native fetch, modern deps, **integration test checkpoint 2**, review fixes: bounded concurrency, import stream handling, gulp-newer ENOENT)
 - Phase 4: 17 tasks - TypeScript conversion (setup, leaf→utility→core→compile→CLI→publish, **integration test checkpoint 3**, review fixes: cli/compile TS conversion, Buffer.from, unused deps, getDependencies types, URL.parse, RequestInit type, tsconfig cleanup, path-browserify)
 
-**Total: 48 tasks**
+**Total: 51 tasks**
 
 ---
 
