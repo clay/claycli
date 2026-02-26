@@ -6,15 +6,20 @@ const glob = require('glob'),
   destPath = path.resolve(process.cwd(), 'public', 'js'),
   registryPath = path.resolve(destPath, '_registry.json');
 
+interface GetDependenciesOptions {
+  edit?: boolean;
+  minify?: boolean;
+}
+
 /**
  * get all dependencies (for edit mode)
  * @param  {boolean} minify
  * @return {array}
  */
-function getAllDeps(minify: any) {
+function getAllDeps(minify: boolean): string[] {
   const fileName = minify ? '_deps-?-?.js' : '+([0-9]).js';
 
-  return glob.sync(path.join(destPath, fileName)).map((filepath: any) => path.parse(filepath).name);
+  return glob.sync(path.join(destPath, fileName)).map((filepath: string) => path.parse(filepath).name);
 }
 
 
@@ -24,10 +29,10 @@ function getAllDeps(minify: any) {
  * @param  {boolean} minify
  * @return {array}
  */
-function getAllModels(minify: any) {
+function getAllModels(minify: boolean): string[] {
   const fileName = minify ? '_models-?-?.js' : '*.model.js';
 
-  return glob.sync(path.join(destPath, fileName)).map((filepath: any) => path.parse(filepath).name);
+  return glob.sync(path.join(destPath, fileName)).map((filepath: string) => path.parse(filepath).name);
 }
 
 /**
@@ -35,10 +40,10 @@ function getAllModels(minify: any) {
  * @param  {boolean} minify
  * @return {array}
  */
-function getAllKilnjs(minify: any) {
+function getAllKilnjs(minify: boolean): string[] {
   const fileName = minify ? '_kiln-?-?.js' : '*.kiln.js';
 
-  return glob.sync(path.join(destPath, fileName)).map((filepath: any) => path.parse(filepath).name);
+  return glob.sync(path.join(destPath, fileName)).map((filepath: string) => path.parse(filepath).name);
 }
 
 /**
@@ -46,10 +51,10 @@ function getAllKilnjs(minify: any) {
  * @param  {boolean} minify
  * @return {array}
  */
-function getAllTemplates(minify: any) {
+function getAllTemplates(minify: boolean): string[] {
   const fileName = minify ? '_templates-?-?.js' : '*.template.js';
 
-  return glob.sync(path.join(destPath, fileName)).map((filepath: any) => path.parse(filepath).name);
+  return glob.sync(path.join(destPath, fileName)).map((filepath: string) => path.parse(filepath).name);
 }
 
 /**
@@ -58,7 +63,7 @@ function getAllTemplates(minify: any) {
  * @param  {string} assetPath e.g. '/site-path/'
  * @return {string} e.g. '/site-path/js/foo.js'
  */
-function idToPublicPath(moduleId: any, assetPath = '') {
+function idToPublicPath(moduleId: string, assetPath = ''): string {
   return `${assetPath}/js/${moduleId}.js`;
 }
 
@@ -67,8 +72,8 @@ function idToPublicPath(moduleId: any, assetPath = '') {
  * @param {string} publicPath e.g. https://localhost.cache.com/media/js/tags.client.js
  * @return {string} e.g. tags.client
  */
-function publicPathToID(publicPath: any) {
-  return publicPath.split('/').pop().replace('.js', '');
+function publicPathToID(publicPath: string): string {
+  return publicPath.split('/').pop()!.replace('.js', '');
 }
 
 /**
@@ -78,11 +83,11 @@ function publicPathToID(publicPath: any) {
  * @param  {object} registry
  * @return {undefined}
  */
-function computeDep(dep: any, out: any, registry: any) {
+function computeDep(dep: string, out: Record<string, boolean>, registry: Record<string, string[]>): void {
   if (!out[dep]) {
     out[dep] = true;
     if (registry && registry[dep]) {
-      registry[dep].forEach((regDep: any) => computeDep(regDep, out, registry));
+      registry[dep].forEach((regDep: string) => computeDep(regDep, out, registry));
     } else {
       throw new Error(`Dependency Error: "${dep}" not found in registry. Please clear your public/js directory and recompile scripts`);
     }
@@ -94,13 +99,13 @@ function computeDep(dep: any, out: any, registry: any) {
  * @param  {array} entryIDs
  * @return {array}
  */
-function getComputedDeps(entryIDs: any) {
-  const registry = require(registryPath) || {},
+function getComputedDeps(entryIDs: string[]): string[] {
+  const registry: Record<string, string[]> = require(registryPath) || {},
     legacyIDs = Object.keys(registry).filter((key) => _.endsWith(key, '.legacy')),
-    out = {};
+    out: Record<string, boolean> = {};
 
   // compute deps for client.js files
-  entryIDs.forEach((entry: any) => computeDep(entry, out, registry));
+  entryIDs.forEach((entry: string) => computeDep(entry, out, registry));
   // compute deps for legacy _global.js if they exist
   legacyIDs.forEach((id) => computeDep(id, out, registry));
   return Object.keys(out);
@@ -116,17 +121,17 @@ function getComputedDeps(entryIDs: any) {
  * @param  {boolean} [options.minify] if we should send bundles or individual files
  * @return {array}
  */
-function getDependencies(scripts: any, assetPath: any, options: any = {}) {
+function getDependencies(scripts: string[], assetPath: string, options: GetDependenciesOptions = {}): string[] {
   const edit = options.edit,
     minify = options.minify;
 
   if (edit) {
     return _.flatten([
       '_prelude',
-      getAllDeps(minify), // dependencies for model.js and kiln plugins
-      getAllModels(minify), // model.js files
-      getAllKilnjs(minify), // kiln.js files
-      getAllTemplates(minify),
+      getAllDeps(!!minify), // dependencies for model.js and kiln plugins
+      getAllModels(!!minify), // model.js files
+      getAllKilnjs(!!minify), // kiln.js files
+      getAllTemplates(!!minify),
       '_kiln-plugins', // kiln plugins
       '_postlude'
     ]).map((id) => idToPublicPath(id, assetPath));
