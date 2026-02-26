@@ -3,7 +3,7 @@ oat_status: in_progress
 oat_ready_for: null
 oat_blockers: []
 oat_last_updated: 2026-02-26
-oat_current_task_id: p03-t04
+oat_current_task_id: p03-t08
 oat_generated: false
 ---
 
@@ -28,10 +28,10 @@ oat_generated: false
 | Phase 0: Characterization Tests | completed | 3 | 3/3 |
 | Phase 1: Foundation | completed | 5 | 5/5 |
 | Phase 2: Bundling Pipeline | completed | 15 | 15/15 |
-| Phase 3: Dependency Cleanup | in_progress | 8 | 3/8 |
+| Phase 3: Dependency Cleanup | in_progress | 8 | 7/8 |
 | Phase 4: TypeScript Conversion | pending | 9 | 0/9 |
 
-**Total:** 26/40 tasks completed
+**Total:** 30/40 tasks completed
 
 **Integration Test Checkpoints (HiLL gates):**
 - Checkpoint 1 (p02-t07): after P0+P1+P2 — Browserify→Webpack migration
@@ -902,29 +902,91 @@ Removed — `clay pack` was an unreleased experiment. No characterization tests 
 
 ### Task p03-t04: Replace isomorphic-fetch with native fetch
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** 03617a6
+
+**Outcome (required):**
+- Removed `require('isomorphic-fetch')` from rest.js (Node 20+ has native fetch)
+- Removed `jest.setMock('isomorphic-fetch', fetch)` from setup-jest.js
+- Removed isomorphic-fetch from package.json dependencies
+
+**Files changed:**
+- `lib/rest.js` - removed isomorphic-fetch require and `/* global fetch */` comment
+- `setup-jest.js` - removed jest.setMock for isomorphic-fetch
+- `package.json` - removed isomorphic-fetch dependency
+
+**Verification:**
+- Run: `npm test`
+- Result: 372 passed, lint clean
 
 ---
 
 ### Task p03-t05: Replace kew with native Promises
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** bc10aac
+
+**Outcome (required):**
+- Replaced kew promise library in vendored gulp-newer plugin with native Promise API
+- `Q.nfcall(fn, args)` → `util.promisify(fn)(args)`
+- `Q.resolve/reject/all` → `Promise.resolve/reject/all`
+- `.spread(fn)` → `.then(([a, b]) => fn(a, b))`
+- `.fail(fn)` → `.catch(fn)`
+- Removed `.end()` calls (native Promises don't need termination)
+- Removed kew from package.json
+
+**Files changed:**
+- `lib/gulp-plugins/gulp-newer/index.js` - replaced kew with native Promises
+- `package.json` - removed kew dependency
+
+**Verification:**
+- Run: `npm test`
+- Result: 372 passed, lint clean
 
 ---
 
 ### Task p03-t06: Modernize remaining dependencies
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** f930a2e
+
+**Outcome (required):**
+- Replaced `base-64` with native `Buffer.from().toString('base64')` in rest.js, prefixes.js, formatting.js
+- Removed unused `resolve` dependency (no imports found in codebase)
+- Bumped fs-extra ^9.1.0 → ^11.3.0
+- Bumped yargs ^16.2.0 → ^17.7.0
+
+**Files changed:**
+- `lib/rest.js` - removed base-64 require, use Buffer.from
+- `lib/prefixes.js` - removed base-64 require, use Buffer.from/toString
+- `lib/formatting.js` - removed base-64 require, use Buffer.from
+- `package.json` - removed base-64, resolve; bumped fs-extra, yargs
+
+**Verification:**
+- Run: `npm test`
+- Result: 372 passed, lint clean
+
+**Notes / Decisions:**
+- Skipped ESM-only upgrades: chalk v5, update-notifier v6, get-stdin v9, glob v10 (incompatible with CommonJS)
+- Retained uglify-js (used in sync Gulp template pipeline; terser is async-only)
+- Retained moment (peer dep of moment-locales-webpack-plugin used by pack command)
 
 ---
 
 ### Task p03-t07: Update AGENTS.md for Phase 3
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** 98cfc52
+
+**Outcome (required):**
+- Updated Patterns section: native fetch, async/await, Highland retained only in compile pipeline, native Buffer for base64
+
+**Files changed:**
+- `AGENTS.md` - updated patterns section
+
+**Verification:**
+- Run: `npm run lint`
+- Result: clean
 
 ---
 
