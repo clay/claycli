@@ -1,6 +1,6 @@
 ---
-oat_current_task: p03-t03
-oat_last_commit: 3a1d3cb
+oat_current_task: p03-t04
+oat_last_commit: f77eea7
 oat_blockers: []
 oat_hill_checkpoints: ["discovery", "spec", "design"]
 oat_hill_completed: []
@@ -29,7 +29,7 @@ Implementation — Phase 2 complete (15/15 tasks). Proceeding to Phase 3.
 - **Spec:** Not applicable (imported plan)
 - **Design:** Not applicable (imported plan)
 - **Plan:** `plan.md` (complete — imported from Claude plan)
-- **Implementation:** `implementation.md` (in progress — 24/40 tasks)
+- **Implementation:** `implementation.md` (in progress — 26/40 tasks)
 - **Imported Source:** `references/imported-plan.md`
 
 ## Progress
@@ -37,7 +37,7 @@ Implementation — Phase 2 complete (15/15 tasks). Proceeding to Phase 3.
 - ✓ Phase 0: Characterization Tests (3/3 tasks)
 - ✓ Phase 1: Foundation (5/5 tasks)
 - ✓ Phase 2: Bundling Pipeline (15/15 tasks)
-- ◐ Phase 3: Dependency Cleanup (2/8 tasks)
+- ◐ Phase 3: Dependency Cleanup (3/8 tasks)
 - ○ Phase 4: TypeScript Conversion (0/9 tasks)
 
 ## Blockers

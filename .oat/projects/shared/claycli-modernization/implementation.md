@@ -3,7 +3,7 @@ oat_status: in_progress
 oat_ready_for: null
 oat_blockers: []
 oat_last_updated: 2026-02-26
-oat_current_task_id: p03-t03
+oat_current_task_id: p03-t04
 oat_generated: false
 ---
 
@@ -28,10 +28,10 @@ oat_generated: false
 | Phase 0: Characterization Tests | completed | 3 | 3/3 |
 | Phase 1: Foundation | completed | 5 | 5/5 |
 | Phase 2: Bundling Pipeline | completed | 15 | 15/15 |
-| Phase 3: Dependency Cleanup | in_progress | 8 | 2/8 |
+| Phase 3: Dependency Cleanup | in_progress | 8 | 3/8 |
 | Phase 4: TypeScript Conversion | pending | 9 | 0/9 |
 
-**Total:** 25/40 tasks completed
+**Total:** 26/40 tasks completed
 
 **Integration Test Checkpoints (HiLL gates):**
 - Checkpoint 1 (p02-t07): after P0+P1+P2 — Browserify→Webpack migration
@@ -861,8 +861,42 @@ Removed — `clay pack` was an unreleased experiment. No characterization tests 
 
 ### Task p03-t03: Replace Highland.js in lint, export, import commands
 
-**Status:** pending
-**Commit:** -
+**Status:** completed
+**Commit:** f77eea7
+
+**Outcome (required):**
+- Converted all command-layer functions from Highland streams to async/await returning Promise<Array>
+- Removed Highland stream adapters from rest.js (get/put/query/findURI/isElasticPrefix now export only async versions)
+- Converted prefixes.add/remove from Highland streams to async functions
+- Converted formatting.toDispatch/toBootstrap from stream transforms to synchronous functions
+- Updated all 3 CLI consumers (cli/lint.js, cli/export.js, cli/import.js) to consume Promise-based APIs
+- Updated 6 test files to match new APIs; fixed mock ordering in export tests
+
+**Files changed:**
+- `lib/rest.js` - removed Highland adapters, exported async functions directly
+- `lib/rest.test.js` - renamed test methods, removed Highland adapter tests
+- `lib/prefixes.js` - rewrote add/remove as async functions
+- `lib/prefixes.test.js` - removed .toPromise(Promise) chains
+- `lib/formatting.js` - rewrote toDispatch/toBootstrap as synchronous functions
+- `lib/formatting.test.js` - rewrote all tests for synchronous API
+- `lib/cmd/lint.js` - extracted normalizeComponentUrl helper, async/await throughout
+- `lib/cmd/lint.test.js` - removed Highland stream consumption patterns
+- `lib/cmd/export.js` - async/await throughout
+- `lib/cmd/export.test.js` - reordered mocks for sequential execution order
+- `lib/cmd/import.js` - async/await throughout
+- `lib/cmd/import.test.js` - plain strings instead of Highland streams
+- `cli/lint.js` - Promise .then() instead of Highland .toArray()
+- `cli/export.js` - Promise .then() instead of Highland stream chain
+- `cli/import.js` - Promise .then() instead of Highland .map()/.toArray()
+
+**Verification:**
+- Run: `npm test`
+- Result: 372 passed, lint clean
+
+**Notes / Decisions:**
+- Mock ordering in export tests changed: Highland allowed parallel/different-order fetches, sequential for-loops process items completely before moving to next
+- Extracted `normalizeComponentUrl()` helper in lint.js to reduce `checkComponent` complexity from 10 to under 8
+- `continue` statements in import.js loops retained (no `no-continue` ESLint rule active)
 
 ---
 
