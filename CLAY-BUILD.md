@@ -31,7 +31,7 @@ The legacy `clay compile` pipeline was built on **Browserify + Gulp**, tools des
 | Browserify megabundle (all components in one file) | Any change = full rebuild, slow watch mode |
 | Gulp orchestration with 20+ plugins | Complex dependency chain, hard to debug |
 | Sequential compilation steps | CSS, JS, templates all ran in series |
-| No native code-splitting | Every page loaded every component's JS |
+| No shared chunk extraction | If two components shared a dependency, each dragged it in separately via the Browserify registry |
 | Babelify transpilation overhead | Slow even on small changes |
 | `_registry.json` + `_ids.json` numeric module graph | Opaque, hard to inspect or extend |
 
@@ -109,7 +109,7 @@ clay compile
     └── components/**/media/* → public/media/
 ```
 
-**Key runtime behaviour:** `_client-init.js` calls `window.require('article.client')` for **every** component at page-load, regardless of whether the component is on the page. Component modules execute their top-level code (e.g. `new Vue(...)`) at that point.
+**Key runtime behaviour:** `getDependencies()` in view mode walks `_registry.json` for only the components amphora placed on the page — it is page-specific. `_client-init.js` then calls `window.require(key)` for every `.client` key in `window.modules`, which is populated only by the scripts that were served. The subtle issue is that it mounts every loaded `.client` module regardless of whether that component's DOM element is actually present on the page.
 
 ---
 
@@ -196,8 +196,8 @@ flowchart LR
 | **JS tool** | Browserify + Babel (megabundles) | esbuild (code-split per component) | 🔄 Replaced; esbuild is ~10–20× faster than Browserify |
 | **CSS tool** | Gulp + PostCSS 7 | PostCSS 8 programmatic API | 🔄 Replaced; same PostCSS plugin ecosystem, newer API |
 | **Module graph** | `_registry.json` + `_ids.json` | `_manifest.json` (human-readable) | ⚠️ Different format; same purpose (maps components → files) |
-| **Component loader** | `_client-init.js` — mounts all components on load | `.clay/_view-init.js` — mounts only components in DOM | ✅ Better; avoids executing code for components not on the page |
-| **JS output** | `_modules-a-d.js` megabundles | Per-component files + `chunks/` (shared code split) | ✅ Better; browsers only download the scripts a given page needs |
+| **Component loader** | `_client-init.js` — mounts every loaded `.client` module, even if its DOM element is absent | `.clay/_view-init.js` — mounts only components whose DOM element is present | ✅ Better; avoids executing component code when the component isn't on the page |
+| **JS output** | Per-component files + individual dep files, page-scoped via registry walk | Per-component files + `chunks/` (shared deps extracted once) | ✅ Better; shared deps are downloaded once even when multiple components use them |
 ---
 
 ## 5. Feature-by-Feature Comparison
@@ -212,7 +212,7 @@ flowchart LR
 | **Bundle strategy** | Megabundle (all components in one file per alpha-bucket) | Code-split (shared chunks extracted automatically) |
 | **Output** | `_modules-a-d.js` … `_modules-u-z.js` | `components/article/client-[hash].js` + shared `chunks/` |
 | **Module graph** | `_registry.json` (numeric IDs) + `_ids.json` | `_manifest.json` (human-readable keys) |
-| **Component loader** | `_client-init.js` loads ALL components at startup | `_view-init.js` loads component ONLY when its element is in DOM |
+| **Component loader** | `_client-init.js` mounts every `.client` module in `window.modules` (page-scoped, but not DOM-presence-checked) | `_view-init.js` mounts a component only when its DOM element exists |
 | **Full rebuild time** | ~30–60s | ~3–4s |
 | **Watch rebuild** | Full rebuild on any change | Incremental: only changed module + its dependents |
 
@@ -276,7 +276,7 @@ flowchart LR
 
 > **Same result:** Both pipelines return a list of `<script>` src paths that amphora-html injects into the page.
 
-> **Key difference:** `clay build` only injects scripts for components actually on the page. `clay compile` injects the full megabundle (all components) regardless.
+> **Key difference:** Both pipelines are page-scoped — only scripts for components on the page are served. The difference is granularity: `clay compile` serves individual dep files per the registry walk (with no deduplication across components); `clay build` extracts shared dependencies into chunks so a shared module is downloaded exactly once even when multiple page components use it.
 
 ---
 
@@ -539,7 +539,7 @@ The way the codebase is compiled into browser-ready files was modernised. The un
 
 ### What improved for the engineering team?
 
-1. **Developer velocity:** A developer changing one CSS file in watch mode now sees their change reflected in ~1–3s instead of ~15–30s. JS changes are even faster: ~0.3–1s instead of ~30–60s.
+1. **Developer velocity:** A developer changing one CSS file in watch mode now sees their change reflected in ~0.5–3s instead of ~30–90s. JS changes are even faster: ~0.3–1s instead of ~30–60s.
 2. **Build reliability:** The new pipeline has no stateful cache files that can become stale. Every build produces the same output regardless of history.
 3. **Faster CI:** Full builds take ~33s instead of ~90s, reducing the feedback loop on every pull request and deployment.
 4. **Easier debugging:** Build errors now show the exact file, line, and column. Previously errors were buried in Gulp stream traces with no location context.
@@ -548,9 +548,9 @@ The way the codebase is compiled into browser-ready files was modernised. The un
 
 #### Smaller JavaScript payloads (code splitting)
 
-The old pipeline bundled all component JavaScript into megabundles (`_modules-a-d.js`, `_modules-e-h.js`, etc.). Every page loaded all of these files regardless of which components were actually on the page.
+Both pipelines are page-scoped — only scripts for the components on the page are served. The old pipeline walked `_registry.json` per component and served individual dep files; if two components on the same page both imported lodash, both entries listed lodash's dep file in the registry walk result, leading to redundant network requests (though the browser cached it after the first).
 
-The new pipeline uses **code splitting**: each component gets its own file, and shared dependencies are extracted into shared chunks. A page only loads the scripts for components it actually renders.
+The new pipeline uses **code splitting**: shared dependencies are extracted into a single chunk file. Two components that both import lodash will reference the same `chunks/lodash-[hash].js` — downloaded once, used by both. A page only loads the scripts for components it actually renders, with zero redundant dep files.
 
 **Why this matters:**
 - Less JavaScript downloaded on every page load
