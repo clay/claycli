@@ -74,11 +74,12 @@ async function handler(argv) {
         process.exit(1);
       }
 
+      // esbuild warnings are pre-existing code issues (duplicate object keys,
+      // typeof-null, etc.) that are not actionable build failures. Log a count
+      // so they are visible without flooding the terminal with full locations.
       if (result.warnings.length > 0) {
-        result.warnings.forEach(w => log('warn', w.text, { location: w.location }));
+        log('warn', `${result.warnings.length} esbuild warning(s) — run with --log-level=verbose to see details`);
       }
-
-      log('info', 'Build complete');
     } catch (error) {
       log('error', 'Build failed', { error: error.message });
       process.exit(1);
