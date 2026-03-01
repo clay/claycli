@@ -271,7 +271,6 @@ flowchart LR
 | Aspect | `clay compile` | `clay build` |
 |---|---|---|
 | **How scripts are resolved** | `getDependencies(scripts, assetPath)` reads `_registry.json`, walks numeric dep graph | `getDependenciesNextForComponents(names, assetPath, globalKeys)` reads `_manifest.json`, walks `imports` array |
-| **API called from** | `resolveMedia.js` in your Clay instance | `resolveMedia.js` in your Clay instance |
 | **Edit mode scripts** | All `_deps-*.js` + `_models-*.js` + `_kiln-*.js` + templates | `getEditScripts()` returns equivalent set from manifest |
 | **View mode scripts** | Numeric IDs resolved to file paths | Human-readable component keys resolved to hashed file paths |
 
