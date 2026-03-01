@@ -150,70 +150,41 @@ Both pipelines share the same source files and produce the same `public/` output
 
 ```mermaid
 flowchart LR
-    SRC(["`📁 **Source Files**
-    components/\*/\*.js
-    styleguides/\*/\*.css
-    components/\*/template.hbs`"]):::src
+    SRC(["📁 Source Files"]):::src
 
-    subgraph LEGACY["  🕐  clay compile  ·  Browserify + Gulp  ·  ~90s  "]
+    subgraph LEGACY[ ]
         direction TB
-        L1["📦 JS Bundle
-        Browserify + Babel
-        ━━━━━━━━━━━━
-        30–60 s"]:::slow
-        L2["🎨 CSS
-        Gulp + PostCSS 7
-        ━━━━━━━━━━━━
-        15–30 s"]:::slow
-        L3["📄 Templates
-        Gulp + Handlebars
-        ━━━━━━━━━━━━
-        10–20 s"]:::med
-        L4["🔤 Fonts + 🖼 Media
-        Gulp copy
-        ━━━━━━━━━━━━
-        2–5 s each"]:::fast
-        L1 -->|"⬇ waits"| L2 -->|"⬇ waits"| L3 -->|"⬇ waits"| L4
+        LH["🕐 clay compile · Browserify + Gulp · ~90s"]:::hdr
+        L1["📦 JS Bundle\nBrowserify + Babel\n30–60 s"]:::slow
+        L2["🎨 CSS\nGulp + PostCSS 7\n15–30 s"]:::slow
+        L3["📄 Templates\nGulp + Handlebars\n10–20 s"]:::med
+        L4["🔤 Fonts + 🖼 Media\nGulp copy · 2–5 s"]:::fast
+        LH ~~~ L1 -->|"waits"| L2 -->|"waits"| L3 -->|"waits"| L4
     end
 
-    subgraph MODERN["  ⚡  clay build  ·  esbuild + PostCSS 8  ·  ~33s  "]
+    subgraph MODERN[ ]
         direction TB
-        N0["🖼 Media
-        fs-extra copy
-        ━━━━━━━━━━━━
-        ~0.7 s"]:::fast
-        N1["📦 JS + Vue
-        esbuild
-        ━━━━━━━━━━
-        ~3 s"]:::vfast
-        N2["🎨 CSS
-        PostCSS 8
-        ━━━━━━━━━━
-        ~32 s"]:::slow
-        N3["📄 Templates
-        Handlebars
-        ━━━━━━━━━━
-        ~16 s"]:::med
-        N4["🔤 Fonts +
-        📚 Vendor
-        ━━━━━━━━━━
-        ~1 s each"]:::fast
-        N0 -->|"⬇ then all at once"| N1 & N2 & N3 & N4
+        NH["⚡ clay build · esbuild + PostCSS 8 · ~33s"]:::hdr
+        N0["🖼 Media\nfs-extra · ~0.7 s"]:::fast
+        N1["📦 JS + Vue\nesbuild · ~3 s"]:::vfast
+        N2["🎨 CSS\nPostCSS 8 · ~32 s"]:::slow
+        N3["📄 Templates\nHandlebars · ~16 s"]:::med
+        N4["🔤 Fonts + 📚 Vendor\nfs-extra · ~1 s"]:::fast
+        NH ~~~ N0 -->|"all at once"| N1 & N2 & N3 & N4
     end
 
-    OUT(["`📂 **public/**
-    js/ · css/
-    fonts/ · media/`"]):::out
+    OUT(["📂 public/"]):::out
 
     SRC --> LEGACY --> OUT
     SRC --> MODERN --> OUT
 
-    classDef src   fill:#1e293b,color:#94a3b8,stroke:#334155,stroke-width:1px
-    classDef out   fill:#1e293b,color:#94a3b8,stroke:#334155,stroke-width:1px
-    classDef slow  fill:#7f1d1d,color:#fca5a5,stroke:#991b1b,stroke-width:1px
-    classDef med   fill:#78350f,color:#fcd34d,stroke:#92400e,stroke-width:1px
-    classDef fast  fill:#14532d,color:#86efac,stroke:#166534,stroke-width:1px
-    classDef vfast fill:#052e16,color:#4ade80,stroke:#166534,stroke-width:1px
+    classDef src   fill:#1e293b,color:#94a3b8,stroke:#334155
+    classDef out   fill:#1e293b,color:#94a3b8,stroke:#334155
+    classDef hdr   fill:#1e3a5f,color:#93c5fd,stroke:#1d4ed8,font-weight:bold
+    classDef slow  fill:#7f1d1d,color:#fca5a5,stroke:#991b1b
+    classDef med   fill:#78350f,color:#fcd34d,stroke:#92400e
+    classDef fast  fill:#14532d,color:#86efac,stroke:#166534
+    classDef vfast fill:#052e16,color:#4ade80,stroke:#166534
 ```
 
 **Color guide:** 🔴 slow (&gt;15s) · 🟡 medium (10–20s) · 🟢 fast (&lt;5s) · 🌿 very fast (&lt;3s)
