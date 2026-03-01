@@ -146,82 +146,87 @@ clay build
 
 ## 4. Pipeline Comparison Diagram
 
-### Legacy — `clay compile` (steps run one after another)
+Both pipelines share the same source files and produce the same `public/` output. The difference is in *how* the steps are wired together.
 
 ```mermaid
-flowchart TD
-    SRC([📁 Source Files]):::src --> COMPILE[clay compile]:::cmd
+flowchart LR
+    SRC(["`📁 **Source Files**
+    components/\*/\*.js
+    styleguides/\*/\*.css
+    components/\*/template.hbs`"]):::src
 
-    COMPILE --> JS["📦 JS Bundle\nBrowserify + Babel\n~30–60s"]:::slow
-    JS --> CSS["🎨 CSS\nGulp + PostCSS 7\n~15–30s"]:::slow
-    CSS --> TPL["📄 Templates\nGulp + Handlebars\n~10–20s"]:::slow
-    TPL --> FONTS["🔤 Fonts\nGulp copy\n~2–5s"]:::fast
-    FONTS --> MEDIA["🖼 Media\nGulp copy\n~2–5s"]:::fast
-    MEDIA --> OUT([📂 public/]):::out
+    subgraph LEGACY["  🕐  clay compile  ·  Browserify + Gulp  ·  ~90s  "]
+        direction TB
+        L1["📦 JS Bundle
+        Browserify + Babel
+        ━━━━━━━━━━━━
+        30–60 s"]:::slow
+        L2["🎨 CSS
+        Gulp + PostCSS 7
+        ━━━━━━━━━━━━
+        15–30 s"]:::slow
+        L3["📄 Templates
+        Gulp + Handlebars
+        ━━━━━━━━━━━━
+        10–20 s"]:::med
+        L4["🔤 Fonts + 🖼 Media
+        Gulp copy
+        ━━━━━━━━━━━━
+        2–5 s each"]:::fast
+        L1 -->|"⬇ waits"| L2 -->|"⬇ waits"| L3 -->|"⬇ waits"| L4
+    end
 
-    classDef src  fill:#4a4a4a,color:#fff,stroke:none
-    classDef cmd  fill:#2563eb,color:#fff,stroke:none
-    classDef slow fill:#dc2626,color:#fff,stroke:none
-    classDef fast fill:#16a34a,color:#fff,stroke:none
-    classDef out  fill:#4a4a4a,color:#fff,stroke:none
+    subgraph MODERN["  ⚡  clay build  ·  esbuild + PostCSS 8  ·  ~33s  "]
+        direction TB
+        N0["🖼 Media
+        fs-extra copy
+        ━━━━━━━━━━━━
+        ~0.7 s"]:::fast
+        N1["📦 JS + Vue
+        esbuild
+        ━━━━━━━━━━
+        ~3 s"]:::vfast
+        N2["🎨 CSS
+        PostCSS 8
+        ━━━━━━━━━━
+        ~32 s"]:::slow
+        N3["📄 Templates
+        Handlebars
+        ━━━━━━━━━━
+        ~16 s"]:::med
+        N4["🔤 Fonts +
+        📚 Vendor
+        ━━━━━━━━━━
+        ~1 s each"]:::fast
+        N0 -->|"⬇ then all at once"| N1 & N2 & N3 & N4
+    end
+
+    OUT(["`📂 **public/**
+    js/ · css/
+    fonts/ · media/`"]):::out
+
+    SRC --> LEGACY --> OUT
+    SRC --> MODERN --> OUT
+
+    classDef src   fill:#1e293b,color:#94a3b8,stroke:#334155,stroke-width:1px
+    classDef out   fill:#1e293b,color:#94a3b8,stroke:#334155,stroke-width:1px
+    classDef slow  fill:#7f1d1d,color:#fca5a5,stroke:#991b1b,stroke-width:1px
+    classDef med   fill:#78350f,color:#fcd34d,stroke:#92400e,stroke-width:1px
+    classDef fast  fill:#14532d,color:#86efac,stroke:#166534,stroke-width:1px
+    classDef vfast fill:#052e16,color:#4ade80,stroke:#166534,stroke-width:1px
 ```
 
-> **Total: ~60–120s.** Each step must finish before the next one starts.
+**Color guide:** 🔴 slow (&gt;15s) · 🟡 medium (10–20s) · 🟢 fast (&lt;5s) · 🌿 very fast (&lt;3s)
 
----
-
-### New — `clay build` (steps run in parallel after media)
-
-```mermaid
-flowchart TD
-    SRC([📁 Source Files]):::src --> BUILD[clay build]:::cmd
-
-    BUILD --> MEDIA["🖼 Media\nfs-extra copy\n~0.7s"]:::fast
-
-    MEDIA --> JS["⚡ JS + Vue\nesbuild\n~3s"]:::vfast
-    MEDIA --> CSS["🎨 CSS\nPostCSS 8\n~32s"]:::slow
-    MEDIA --> FONTS["🔤 Fonts\nfs-extra\n~0.8s"]:::fast
-    MEDIA --> TPL["📄 Templates\nHandlebars\n~16s"]:::med
-    MEDIA --> VENDOR["📚 Vendor\nfs-extra\n~1s"]:::fast
-
-    JS --> OUT([📂 public/]):::out
-    CSS --> OUT
-    FONTS --> OUT
-    TPL --> OUT
-    VENDOR --> OUT
-
-    classDef src   fill:#4a4a4a,color:#fff,stroke:none
-    classDef cmd   fill:#7c3aed,color:#fff,stroke:none
-    classDef vfast fill:#15803d,color:#fff,stroke:none
-    classDef fast  fill:#16a34a,color:#fff,stroke:none
-    classDef med   fill:#d97706,color:#fff,stroke:none
-    classDef slow  fill:#dc2626,color:#fff,stroke:none
-    classDef out   fill:#4a4a4a,color:#fff,stroke:none
-```
-
-> **Total: ~33s** (limited only by the slowest step — CSS at ~32s). All five steps run at the same time.
-
----
-
-### What both pipelines produce (identical outputs)
-
-| Output | Path |
-|---|---|
-| Compiled CSS | `public/css/{component}.{styleguide}.css` |
-| Compiled templates | `public/js/{component}.template.js` |
-| Kiln scripts | `public/js/clay-kiln-{edit,view}.js` |
-| Font CSS | `public/css/_linked-fonts.{styleguide}.css` |
-| Binary fonts | `public/fonts/{styleguide}/` |
-| Media assets | `public/media/` |
-
-### What's different
-
-| | `clay compile` | `clay build` |
-|---|---|---|
-| Module graph | `_registry.json` + `_ids.json` (numeric IDs) | `_manifest.json` (human-readable keys) |
-| JS output | `_modules-a-d.js` … megabundles | Per-component files + shared `chunks/` |
-| Component loader | `_client-init.js` (loads all components at startup) | `.clay/_view-init.js` (loads only components on the page) |
-
+| | `clay compile` | `clay build` | Δ |
+|---|---|---|---|
+| **Total time** | ~60–120s | ~33s | **~2–3× faster** |
+| **Execution** | Sequential — each step waits for the one before it | Parallel — all steps run simultaneously after media | — |
+| **JS tool** | Browserify + Babel (megabundles) | esbuild (code-split per component) | — |
+| **CSS tool** | Gulp + PostCSS 7 | PostCSS 8 programmatic API | — |
+| **Module graph** | `_registry.json` + `_ids.json` | `_manifest.json` (human-readable) | — |
+| **Component loader** | `_client-init.js` — mounts all components on load | `.clay/_view-init.js` — mounts only components in DOM | — |
+| **JS output** | `_modules-a-d.js` megabundles | Per-component files + `chunks/` (shared code split) | — |
 ---
 
 ## 5. Feature-by-Feature Comparison
