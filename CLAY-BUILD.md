@@ -28,20 +28,31 @@ The legacy `clay compile` pipeline was built on **Browserify + Gulp**, tools des
 
 | Problem | Impact |
 |---|---|
-| Browserify megabundle (all components in one file) | Any change = full rebuild, slow watch mode |
-| Gulp orchestration with 20+ plugins | Complex dependency chain, hard to debug |
-| Sequential compilation steps | CSS, JS, templates all ran in series |
+| Browserify megabundle (all components in one file per alpha-bucket) | Any change = full rebuild of all component JS, slow watch mode |
+| Gulp orchestration with 20+ plugins | Complex dependency chain, hard to debug, slow npm install |
+| Sequential compilation steps | CSS, JS, templates all ran in series — total time = sum of all steps |
 | No shared chunk extraction | If two components shared a dependency, each dragged it in separately via the Browserify registry |
+| No tree shaking | Browserify bundled entire modules even if only one export was used |
+| No source maps | Build errors in production pointed to minified line numbers, not source |
+| No content-hashed filenames | Static filenames (`article.client.js`) forced full cache invalidation on every deploy |
 | Babelify transpilation overhead | Slow even on small changes |
 | `_registry.json` + `_ids.json` numeric module graph | Opaque, hard to inspect or extend |
+| `_prelude.js` / `_postlude.js` custom runtime | Browserify's own module system loaded on every page, adding baseline overhead |
+| `browserify-cache.json` stale cache risk | Corrupted/out-of-sync cache produced builds where old module code was silently served |
+| 20+ npm dependencies just for bundling | Large attack surface, slow installs, difficult version management |
 
 The new `clay build` pipeline replaces Browserify/Gulp with **esbuild + PostCSS 8**:
 
-- esbuild bundles JS/Vue in **milliseconds** (not seconds) with native code-splitting
+- esbuild bundles JS/Vue in **milliseconds** (not seconds) with native code-splitting and tree shaking
 - PostCSS 8's programmatic API replaces Gulp's stream-based CSS pipeline
 - All build steps (JS, CSS, fonts, templates, vendor, media) run **in parallel**
 - A human-readable `_manifest.json` replaces the numeric `_registry.json`/`_ids.json` pair
 - Watch mode starts instantly — no initial build, only rebuilds what changed
+- **Source maps** generated automatically — errors point to exact source file, line, and column
+- **Content-hashed filenames** (`article/client-A1B2C3.js`) — browsers and CDNs cache files forever; only changed files get new URLs on deploy
+- **Native ESM** output — no custom `window.require()` runtime, browsers handle imports natively
+- **Build-time `process.env.NODE_ENV`** — dead branches like `if (process.env.NODE_ENV !== 'production')` are eliminated at compile time, not runtime
+- Dependency footprint reduced from 20+ bundler packages to a handful
 
 ---
 
@@ -89,11 +100,13 @@ Both commands read **`claycli.config.js`** in the root of your Clay instance, bu
 clay compile
 │
 ├── scripts.js  ← Browserify megabundler
-│   ├── All component client.js files bundled into _modules-a-d.js … _modules-u-z.js
-│   ├── All model.js + kiln.js files bundled into _models-*.js, _kiln-*.js
+│   ├── Each component client.js → {name}.client.js  (individual file)
+│   ├── Each component model.js  → {name}.model.js + _models-{a-d}.js (bucket in minified mode)
+│   ├── Each component kiln.js   → {name}.kiln.js   + _kiln-{a-d}.js  (bucket in minified mode)
+│   ├── Shared deps              → {number}.js       + _deps-{a-d}.js  (bucket in minified mode)
+│   ├── _prelude.js / _postlude.js ← Browserify custom module runtime (window.require, window.modules)
 │   ├── _registry.json  ← numeric module ID graph (e.g. { "12": ["4","7"] })
 │   ├── _ids.json       ← module ID to filename map
-│   ├── _deps-*.js      ← shared dependency bundles
 │   └── _client-init.js ← runtime that calls window.require() on each .client module
 │
 ├── styles.js   ← Gulp + PostCSS 7
@@ -208,17 +221,21 @@ flowchart LR
 |---|---|---|
 | **Bundler** | Browserify 17 + babelify | esbuild |
 | **Transpilation** | Babel (preset-env) | esbuild native (ES2017 target) |
-| **Vue SFCs** | `@nymag/vueify` Browserify transform | `@nymag/vueify` esbuild plugin |
-| **Bundle strategy** | Megabundle (all components in one file per alpha-bucket) | Code-split (shared chunks extracted automatically) |
-| **Output** | `_modules-a-d.js` … `_modules-u-z.js` | `components/article/client-[hash].js` + shared `chunks/` |
+| **Vue SFCs** | `@nymag/vueify` Browserify transform | Custom esbuild plugin (`plugins/vue2.js`) using same underlying `vue-template-compiler` |
+| **Bundle strategy** | Per-component files + alpha-bucket dep bundles (`_deps-a-d.js`) | Per-component files + auto-extracted shared `chunks/` |
+| **Output filenames** | Static: `article.client.js` | Content-hashed: `components/article/client-A1B2C3.js` |
+| **Module runtime** | `_prelude.js` + `_postlude.js` (custom `window.require`) | Native ESM — no runtime overhead |
 | **Module graph** | `_registry.json` (numeric IDs) + `_ids.json` | `_manifest.json` (human-readable keys) |
 | **Component loader** | `_client-init.js` mounts every `.client` module in `window.modules` (page-scoped, but not DOM-presence-checked) | `_view-init.js` mounts a component only when its DOM element exists |
+| **Tree shaking** | None — entire imported modules are bundled | Yes — unused exports eliminated at build time |
+| **Source maps** | Not generated | Yes — `*.js.map` alongside every output file |
+| **Dead code elimination** | `process.env.NODE_ENV` set at runtime; dead branches survive minification | Set at build time via `define` — `if (dev) { ... }` blocks removed in production builds |
 | **Full rebuild time** | ~30–60s | ~3–4s |
 | **Watch rebuild** | Full rebuild on any change | Incremental: only changed module + its dependents |
 
 > **Same result:** In both cases, the browser receives compiled, browser-compatible JavaScript. Component `client.js` logic runs when the component is on the page.
 
-> **Key difference:** With Browserify, `new Vue(...)` at the top of a `client.js` runs at bundle-load time for EVERY component (even those not on the page). With esbuild + `_view-init.js`, it only runs when the component is present in the DOM.
+> **Key difference:** With Browserify, top-level side-effects in a `client.js` (e.g. `new Vue(...)`) run at page load for every component whose scripts were served, regardless of whether that component's DOM element is present. With esbuild + `_view-init.js`, component code runs only when the element is found in the DOM.
 
 ---
 
@@ -230,7 +247,7 @@ flowchart LR
 | **Concurrency** | Sequential per-file | Parallel with `p-limit(20)` |
 | **PostCSS plugins** | autoprefixer, postcss-import, postcss-mixins, postcss-simple-vars, postcss-nested | Same plugins |
 | **Minification** | cssnano (when `CLAYCLI_COMPILE_MINIFIED` set) | cssnano (same flag) |
-| **Error handling** | Stream error, halts pipeline | Per-file error logged, other files continue |
+| **Error handling** | Stream error halts the entire pipeline | Per-file error logged; remaining files continue compiling |
 | **Output format** | `public/css/{component}.{styleguide}.css` | **Identical** |
 | **Watch: CSS variation rebuild** | Recompiles changed file only | Recompiles all variations of the same component name (e.g. `article.css` change rebuilds `article_amp.css` too) |
 
@@ -247,7 +264,8 @@ flowchart LR
 | **API** | Gulp stream | Direct `fs.readFile` / `hbs.precompile` |
 | **Output** | `public/js/{name}.template.js` | **Identical** |
 | **Minified output** | `_templates-{a-d}.js` (bucketed) | **Identical** |
-| **Error handling** | Stream error | Per-template error logged, compilation continues |
+| **Error handling** | Stream error calls `process.exit(1)` — crashes the entire build on a single bad template | Per-template error logged; remaining templates continue compiling |
+| **Missing `{{{ read }}}` file** | `process.exit(1)` — build crashes immediately | Error logged; template compiles with token unreplaced so the missing asset is visible in browser |
 | **Progress tracking** | None | `onProgress(done, total)` callback → live % display |
 
 > **Same result:** The `window.kiln.componentTemplates['name'] = ...` assignment format is identical.
@@ -484,8 +502,26 @@ const chokidarOpts = {
 
 ### Disk output
 
-- `clay compile`: ~1 large bundle per alpha-bucket (hundreds of KB each)
-- `clay build`: many small per-component files + shared chunks. HTTP/2 multiplexing makes this efficient in production; individual files are easier to cache-bust.
+- `clay compile`: flat `public/js/` with static filenames. Deploying any JS change requires invalidating the entire CDN cache for all JS files, since filenames never change.
+- `clay build`: structured `public/js/components/…` + `public/js/chunks/` with **content-hashed filenames**. Only files that actually changed get new hashes on deploy — unchanged files (shared chunks, unmodified components) keep their old URLs and remain cached on CDN and in browsers indefinitely. This is the gold standard for long-lived caching.
+
+### npm dependency footprint
+
+The move from Browserify/Gulp to esbuild removes a significant number of packages:
+
+| Removed (clay compile) | Added (clay build) |
+|---|---|
+| `browserify`, `babelify`, `@babel/preset-env` | `esbuild` |
+| `gulp`, `highland`, `through2` | `postcss` (programmatic) |
+| `browserify-cache-api` | `p-limit` |
+| `browserify-extract-registry`, `browserify-extract-ids` | `cssnano` |
+| `browserify-global-pack`, `bundle-collapser` | `@vue/component-compiler-utils` |
+| `browserify-transform-tools`, `unreachable-branch-transform` | |
+| `uglifyify`, `gulp-changed`, `gulp-replace`, `gulp-babel` | |
+| `gulp-group-concat`, `gulp-cssmin`, `gulp-if`, `gulp-rename` | |
+| `detective-postcss` | |
+
+**Net result:** ~20 packages removed, ~5 added. Fewer packages means faster `npm install`, smaller `node_modules`, reduced supply-chain attack surface, and fewer version-conflict headaches.
 
 ---
 
@@ -495,13 +531,16 @@ const chokidarOpts = {
 
 | Topic | `clay compile` | `clay build` |
 |---|---|---|
-| **Debugging a build error** | Gulp stack trace through 5+ plugins, hard to attribute | Direct esbuild error: file, line, column |
-| **Understanding the output** | `_registry.json` with numeric IDs, requires `_ids.json` to decode | `_manifest.json` is human-readable JSON |
-| **Adding a new package** | May require a Browserify transform or browser-field shim | Add to `esbuildConfig.alias` or `browser-compat.js` |
-| **Vue SFCs** | `@nymag/vueify` Browserify transform | `@nymag/vueify` esbuild plugin (same library, different adapter) |
-| **Global variables (DS, Eventify)** | Implicit — available because Browserify didn't use strict module scope | Explicit — defined via `esbuild define` (`DS: 'window.DS'`) |
-| **Server-only imports in universal code** | `rewriteServiceRequire` Browserify transform | `service-rewrite.js` esbuild plugin (same concept) |
-| **`process.env.NODE_ENV`** | Set in `_client-init.js` at runtime | Set via `esbuild define` at build time |
+| **Debugging a build error** | Gulp stack trace through 5+ plugins, hard to attribute to a source file | Direct esbuild error: exact file, line, column |
+| **Debugging a runtime error** | Minified stack trace points to bundle line, not source | Source maps (`*.js.map`) generated automatically — browser DevTools show original source |
+| **Understanding the output** | `_registry.json` with numeric IDs, requires `_ids.json` to decode | `_manifest.json` is human-readable JSON — open it and immediately understand which files are loaded for which component |
+| **Adding a new package** | May require a Browserify transform or browser-field shim in the consuming repo | Add to `esbuildConfig.alias` in `claycli.config.js`, or it is automatically stubbed by `browser-compat.js` |
+| **Vue SFCs** | `@nymag/vueify` Browserify transform | Custom esbuild plugin using same `vue-template-compiler` — identical output |
+| **Global variables (DS, Eventify)** | Implicit — leaked into scope via Browserify's global module scope | Already defined in claycli's default config via `esbuild define`; no action needed unless adding new globals |
+| **Server-only imports in universal code** | `rewriteServiceRequire` Browserify transform | `service-rewrite.js` esbuild plugin (same concept, same enforcement) |
+| **`process.env.NODE_ENV`** | Set in `_client-init.js` at runtime — dead branches survive into the bundle | Set via `esbuild define` at build time — `if (process.env.NODE_ENV !== 'production') {}` blocks are eliminated in minified output |
+| **Tree shaking** | None — `require('lodash')` pulled in the whole library | Automatic — only the imported exports of a module are included |
+| **Modern JS syntax** | Babel target must be configured separately | Controlled by `target` in `esbuildConfig` (default: Chrome 80+, Firefox 78+, Safari 14+) — `??`, `?.`, class fields all work out of the box |
 
 **What's the same:**
 - `claycli.config.js` is the single configuration entry point
@@ -510,9 +549,9 @@ const chokidarOpts = {
 - `resolveMedia.js` integration is the same pattern (call a function, get script paths)
 
 **What's different:**
-- Module loading is lazy (per-component) instead of eager (all-at-once)
-- JS entry points are explicit file paths, not a single megabundle
-- Globals must be explicitly declared rather than relying on Browserify's scope merging
+- Component code runs lazily (only when the component's DOM element is present) instead of at page load
+- JS entry points are explicit per-component files, not a single megabundle shared across all components
+- Standard Clay globals (`DS`, `Eventify`, `Fingerprint2`) are already handled in claycli's defaults; only site-specific globals need configuring
 
 ---
 
@@ -520,14 +559,17 @@ const chokidarOpts = {
 
 | Concern | `clay compile` | `clay build` |
 |---|---|---|
-| **Build reproducibility** | Browserify cache (`browserify-cache.json`) can cause stale builds | esbuild rebuilds from scratch; no cache files |
-| **Docker volume mounts** | `chokidar` inotify events unreliable | `usePolling: true` explicitly configured |
-| **CI build time** | 60–120s per build | ~33s per build (2–4× improvement) |
+| **Build reproducibility** | `browserify-cache.json` can go stale, silently serving old module code | esbuild rebuilds from scratch every time; no cache file to corrupt |
+| **Docker volume mounts** | `chokidar` inotify events unreliable on macOS volume mounts | `usePolling: true` explicitly configured |
+| **CI build time** | 60–120s per build | ~33s per build (~63% reduction in CI compute minutes) |
 | **Health check** | No built-in indicator | `hasManifest()` returns `true` once a build has completed |
 | **Partial builds** | Not supported — full rebuild only | Watch mode rebuilds only changed assets |
-| **Output inspection** | `_registry.json` (opaque numeric IDs) | `_manifest.json` (human-readable, diffable) |
+| **Output inspection** | `_registry.json` (opaque numeric IDs, requires `_ids.json` to decode) | `_manifest.json` (human-readable JSON, easily `diff`-ed between deploys) |
+| **CDN cache management** | Static filenames → must invalidate entire CDN cache on every JS deploy | Content-hashed filenames → only changed files get new URLs; unchanged files stay cached |
+| **Rollback safety** | If build fails, `browserify-cache.json` may be left in a partial state | If build fails, the previous `_manifest.json` is untouched; `hasManifest()` continues to serve the last good build |
+| **Source maps in production** | Not generated | `*.js.map` files allow production error stacks to point to source lines |
 | **Node.js requirement** | Node ≥ 14 | Node ≥ 20 (esbuild requirement) |
-| **Error surface** | Errors can silently swallow via Gulp stream | Errors are explicit — build exits non-zero |
+| **Error surface** | Errors can be silently swallowed by Gulp stream error handlers | Errors are explicit — build exits non-zero, CI fails fast |
 
 ---
 
@@ -539,10 +581,12 @@ The way the codebase is compiled into browser-ready files was modernised. The un
 
 ### What improved for the engineering team?
 
-1. **Developer velocity:** A developer changing one CSS file in watch mode now sees their change reflected in ~0.5–3s instead of ~30–90s. JS changes are even faster: ~0.3–1s instead of ~30–60s.
-2. **Build reliability:** The new pipeline has no stateful cache files that can become stale. Every build produces the same output regardless of history.
-3. **Faster CI:** Full builds take ~33s instead of ~90s, reducing the feedback loop on every pull request and deployment.
-4. **Easier debugging:** Build errors now show the exact file, line, and column. Previously errors were buried in Gulp stream traces with no location context.
+1. **Developer velocity:** A developer changing a JS file in watch mode sees their change in ~0.3–1s instead of ~30–60s. CSS changes: ~1–3s instead of ~15–30s. This compounds across every developer, every day.
+2. **Build reliability:** No `browserify-cache.json` that can silently serve stale module code after a bad build. Every build is deterministic and reproducible.
+3. **Faster CI:** Full builds take ~33s instead of ~90s — roughly a 63% reduction. For teams paying per CI minute (GitHub Actions, CircleCI), this directly reduces infrastructure cost on every pull request and deployment.
+4. **Easier debugging:** Build errors show the exact file, line, and column. Source maps are generated automatically, so production error stack traces point to original source lines — not minified bundle line numbers.
+5. **Better error resilience:** A single bad template or CSS file no longer crashes the entire build. Errors are logged and the rest of the build continues.
+6. **Simpler dependency tree:** ~20 npm packages removed. Faster `npm install`, less supply-chain risk, fewer peer-dependency conflicts.
 
 ### What improved for the product — and why it matters to users?
 
@@ -555,6 +599,7 @@ The new pipeline uses **code splitting**: shared dependencies are extracted into
 **Why this matters:**
 - Less JavaScript downloaded on every page load
 - Less JavaScript parsed and executed by the browser before the page becomes interactive
+- Dead code (dev-only branches, unused library exports via tree shaking) is eliminated at build time — not shipped to users at all
 - This directly improves **Time to Interactive (TTI)** and **Interaction to Next Paint (INP)** — two metrics Google measures
 
 #### Core Web Vitals and SEO
@@ -577,7 +622,24 @@ Page performance is directly correlated with user engagement metrics tracked in 
 - **Session depth / pages per session:** Faster pages encourage users to navigate further.
 - **Conversion rate:** For pages with CTAs (newsletter sign-ups, subscription prompts), faster time-to-interactive means the CTA becomes clickable sooner.
 
-These are not theoretical benefits — they follow from delivering less JavaScript to the browser per page view, which is what code splitting directly achieves.
+These are not theoretical benefits — they follow from delivering less JavaScript to the browser per page view, which is what code splitting and tree shaking directly achieve.
+
+#### CDN cache efficiency (infrastructure cost)
+
+The old pipeline used static filenames (`article.client.js`). Every time any JavaScript changed, the entire cache had to be invalidated — browsers and CDNs re-downloaded every JS file, even those that hadn't changed.
+
+The new pipeline uses **content-hashed filenames** (`components/article/client-A1B2C3.js`). Only files that actually changed get a new URL. Unchanged shared chunks, unmodified components, and vendor scripts keep their old URLs and stay cached for months on CDN and in browsers.
+
+**Why this matters:**
+- Lower CDN bandwidth cost — most files are cache hits after the first load
+- Faster repeat page loads for returning users — cached files are reused across deploys
+- On a high-traffic site, this can meaningfully reduce monthly CDN egress costs
+
+#### Operational confidence
+
+- The build either fully succeeds and writes a new `_manifest.json`, or it fails and leaves the previous manifest untouched. There is no partial-success state.
+- `hasManifest()` is a single boolean health check: if it returns `true`, a complete build exists and the site can serve scripts.
+- Errors exit the build process with a non-zero code, so CI fails loudly instead of silently deploying a broken build.
 
 ### What's the risk?
 
