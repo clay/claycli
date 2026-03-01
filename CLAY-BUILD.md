@@ -146,50 +146,81 @@ clay build
 
 ## 4. Pipeline Comparison Diagram
 
+### Legacy — `clay compile` (steps run one after another)
+
+```mermaid
+flowchart TD
+    SRC([📁 Source Files]):::src --> COMPILE[clay compile]:::cmd
+
+    COMPILE --> JS["📦 JS Bundle\nBrowserify + Babel\n~30–60s"]:::slow
+    JS --> CSS["🎨 CSS\nGulp + PostCSS 7\n~15–30s"]:::slow
+    CSS --> TPL["📄 Templates\nGulp + Handlebars\n~10–20s"]:::slow
+    TPL --> FONTS["🔤 Fonts\nGulp copy\n~2–5s"]:::fast
+    FONTS --> MEDIA["🖼 Media\nGulp copy\n~2–5s"]:::fast
+    MEDIA --> OUT([📂 public/]):::out
+
+    classDef src  fill:#4a4a4a,color:#fff,stroke:none
+    classDef cmd  fill:#2563eb,color:#fff,stroke:none
+    classDef slow fill:#dc2626,color:#fff,stroke:none
+    classDef fast fill:#16a34a,color:#fff,stroke:none
+    classDef out  fill:#4a4a4a,color:#fff,stroke:none
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                        ASSET BUILD PIPELINES                                │
-├──────────────────────────────┬──────────────────────────────────────────────┤
-│  clay compile  (legacy)      │  clay build  (new)                           │
-│  Browserify + Gulp           │  esbuild + PostCSS 8                         │
-├──────────────────────────────┼──────────────────────────────────────────────┤
-│                              │                                              │
-│  Source files                │  Source files                                │
-│  │                           │  │                                           │
-│  ▼  [sequential]             │  ├──────────────────────┐ [parallel]         │
-│  ┌──────────┐                │  ▼                      ▼                    │
-│  │ scripts  │ Browserify     │  ┌──────────┐  ┌──────────────┐             │
-│  │ (JS+Vue) │ megabundle     │  │  esbuild │  │  PostCSS 8   │             │
-│  │ ~30-60s  │                │  │   (JS)   │  │    (CSS)     │             │
-│  └────┬─────┘                │  │   ~3s    │  │    ~32s      │             │
-│       │ [sequential]         │  └─────┬────┘  └──────┬───────┘             │
-│  ┌────▼─────┐                │        │              │                      │
-│  │  styles  │ Gulp+PostCSS7  │  ┌─────▼────┐  ┌─────▼────┐  ┌──────────┐  │
-│  │  (CSS)   │ ~20-40s        │  │_manifest │  │public/css│  │  fonts   │  │
-│  └────┬─────┘                │  └──────────┘  └──────────┘  │  vendor  │  │
-│       │ [sequential]         │                               │  media   │  │
-│  ┌────▼─────┐                │                               │templates │  │
-│  │templates │ Gulp+HBS       │                               └──────────┘  │
-│  │          │ ~10-20s        │                                              │
-│  └────┬─────┘                │  ● All steps run in parallel                │
-│       │ [sequential]         │  ● Total ≈ max(slowest step) ≈ 33s          │
-│  ┌────▼─────┐                │                                              │
-│  │  fonts   │ Gulp copy      ├──────────────────────────────────────────────┤
-│  │  media   │                │  SAME OUTPUTS (both pipelines produce):      │
-│  │  vendor  │                │  ✓ public/css/{component}.{styleguide}.css   │
-│  └──────────┘                │  ✓ public/js/{component}.template.js        │
-│                              │  ✓ public/js/clay-kiln-{edit,view}.js       │
-│  ● Steps run in series       │  ✓ public/css/_linked-fonts.{sg}.css        │
-│  ● Total ≈ sum of all steps  │  ✓ public/fonts/{styleguide}/               │
-│    ≈ 60-120s                 │  ✓ public/media/                             │
-│                              │                                              │
-│  UNIQUE TO OLD:              │  UNIQUE TO NEW:                              │
-│  _registry.json              │  _manifest.json (human-readable)             │
-│  _ids.json                   │  .clay/_view-init.js (generated bootstrap)   │
-│  _modules-*.js bundles       │  Code-split chunks (shared deps)             │
-│  _client-init.js             │  Per-step progress display with %            │
-└──────────────────────────────┴──────────────────────────────────────────────┘
+
+> **Total: ~60–120s.** Each step must finish before the next one starts.
+
+---
+
+### New — `clay build` (steps run in parallel after media)
+
+```mermaid
+flowchart TD
+    SRC([📁 Source Files]):::src --> BUILD[clay build]:::cmd
+
+    BUILD --> MEDIA["🖼 Media\nfs-extra copy\n~0.7s"]:::fast
+
+    MEDIA --> JS["⚡ JS + Vue\nesbuild\n~3s"]:::vfast
+    MEDIA --> CSS["🎨 CSS\nPostCSS 8\n~32s"]:::slow
+    MEDIA --> FONTS["🔤 Fonts\nfs-extra\n~0.8s"]:::fast
+    MEDIA --> TPL["📄 Templates\nHandlebars\n~16s"]:::med
+    MEDIA --> VENDOR["📚 Vendor\nfs-extra\n~1s"]:::fast
+
+    JS --> OUT([📂 public/]):::out
+    CSS --> OUT
+    FONTS --> OUT
+    TPL --> OUT
+    VENDOR --> OUT
+
+    classDef src   fill:#4a4a4a,color:#fff,stroke:none
+    classDef cmd   fill:#7c3aed,color:#fff,stroke:none
+    classDef vfast fill:#15803d,color:#fff,stroke:none
+    classDef fast  fill:#16a34a,color:#fff,stroke:none
+    classDef med   fill:#d97706,color:#fff,stroke:none
+    classDef slow  fill:#dc2626,color:#fff,stroke:none
+    classDef out   fill:#4a4a4a,color:#fff,stroke:none
 ```
+
+> **Total: ~33s** (limited only by the slowest step — CSS at ~32s). All five steps run at the same time.
+
+---
+
+### What both pipelines produce (identical outputs)
+
+| Output | Path |
+|---|---|
+| Compiled CSS | `public/css/{component}.{styleguide}.css` |
+| Compiled templates | `public/js/{component}.template.js` |
+| Kiln scripts | `public/js/clay-kiln-{edit,view}.js` |
+| Font CSS | `public/css/_linked-fonts.{styleguide}.css` |
+| Binary fonts | `public/fonts/{styleguide}/` |
+| Media assets | `public/media/` |
+
+### What's different
+
+| | `clay compile` | `clay build` |
+|---|---|---|
+| Module graph | `_registry.json` + `_ids.json` (numeric IDs) | `_manifest.json` (human-readable keys) |
+| JS output | `_modules-a-d.js` … megabundles | Per-component files + shared `chunks/` |
+| Component loader | `_client-init.js` (loads all components at startup) | `.clay/_view-init.js` (loads only components on the page) |
 
 ---
 
