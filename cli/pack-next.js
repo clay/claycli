@@ -39,14 +39,15 @@ async function handler(argv) {
     try {
       const ctx = await watch({
         ...options,
-        onRebuild(errors, warnings) {
+        onRebuild(errors) {
+          // In watch mode only surface errors — esbuild reports warnings for
+          // every file it touches on each incremental rebuild, not just the
+          // changed file, which floods the terminal with irrelevant noise.
+          // Warnings are still visible in full during `make compile`.
           if (errors.length > 0) {
             errors.forEach(e => log('error', e.text, { location: e.location }));
           } else {
-            if (warnings.length > 0) {
-              warnings.forEach(w => log('warn', w.text, { location: w.location }));
-            }
-            log('info', 'Rebuilt successfully');
+            log('info', '[js] Rebuilt successfully');
           }
         },
       });
