@@ -149,7 +149,7 @@
     "yargs": "^16.2.0"
   },
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=20.0.0"
   },
   "peerDependencies": {
     "clayhandlebars": "5"
