@@ -236,7 +236,7 @@ flowchart LR
 
 > **Same result:** Output CSS files are byte-for-byte identical between pipelines (same PostCSS plugins, same naming convention).
 
-> **Key difference:** In watch mode, `clay build` rebuilds all styleguide variants of a changed component. `clay compile` only rebuilt the exact file that changed, potentially leaving variation files stale.
+> **Key difference:** In watch mode, `clay compile` ran the full CSS glob on every change and used `gulp-changed` (ctime comparison) to skip files whose output was already up-to-date — it had no awareness of component variants. `clay build` explicitly derives the component prefix from the changed filename (e.g. `text-list_amp.css` → prefix `text-list`) and rebuilds every matching variant (`text-list.css`, `text-list_amp.css`, etc.) across all styleguides in one pass.
 
 ---
 
