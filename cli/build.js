@@ -1,6 +1,6 @@
 'use strict';
 
-const { build, watch } = require('../lib/cmd/pack-next');
+const { build, watch } = require('../lib/cmd/build');
 const log = require('./log').setup({ file: __filename });
 
 function builder(yargs) {
@@ -86,8 +86,8 @@ async function handler(argv) {
   }
 }
 
-exports.aliases = ['pn'];
+exports.aliases = ['pack-next', 'pn']; // pack-next kept for backward compat with existing Makefiles
 exports.builder = builder;
-exports.command = 'pack-next';
-exports.describe = 'Compile component scripts with esbuild (ESM output — Path B modernization)';
+exports.command = 'build';
+exports.describe = 'Compile component scripts and assets with esbuild';
 exports.handler = handler;

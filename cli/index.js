@@ -21,8 +21,10 @@ const yargs = require('yargs'),
     e: 'export',
     i: 'import',
     l: 'lint',
+    b: 'build',
     p: 'pack',
-    pn: 'pack-next'
+    pn: 'build',         // legacy alias: pn → build
+    'pack-next': 'build' // legacy alias: clay pack-next → clay build
   },
   listCommands = Object.keys(commands).concat(Object.values(commands));
 
