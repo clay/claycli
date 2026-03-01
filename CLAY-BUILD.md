@@ -192,12 +192,12 @@ flowchart LR
 | | `clay compile` | `clay build` | Δ |
 |---|---|---|---|
 | **Total time** | ~60–120s | ~33s | **~2–3× faster** |
-| **Execution** | Sequential — each step waits for the one before it | Parallel — all steps run simultaneously after media | — |
-| **JS tool** | Browserify + Babel (megabundles) | esbuild (code-split per component) | — |
-| **CSS tool** | Gulp + PostCSS 7 | PostCSS 8 programmatic API | — |
-| **Module graph** | `_registry.json` + `_ids.json` | `_manifest.json` (human-readable) | — |
-| **Component loader** | `_client-init.js` — mounts all components on load | `.clay/_view-init.js` — mounts only components in DOM | — |
-| **JS output** | `_modules-a-d.js` megabundles | Per-component files + `chunks/` (shared code split) | — |
+| **Execution** | Sequential — each step waits for the one before it | Parallel — all steps run simultaneously after media | ⚠️ Different shape; same end result |
+| **JS tool** | Browserify + Babel (megabundles) | esbuild (code-split per component) | 🔄 Replaced; esbuild is ~10–20× faster than Browserify |
+| **CSS tool** | Gulp + PostCSS 7 | PostCSS 8 programmatic API | 🔄 Replaced; same PostCSS plugin ecosystem, newer API |
+| **Module graph** | `_registry.json` + `_ids.json` | `_manifest.json` (human-readable) | ⚠️ Different format; same purpose (maps components → files) |
+| **Component loader** | `_client-init.js` — mounts all components on load | `.clay/_view-init.js` — mounts only components in DOM | ✅ Better; avoids executing code for components not on the page |
+| **JS output** | `_modules-a-d.js` megabundles | Per-component files + `chunks/` (shared code split) | ✅ Better; browsers only download the scripts a given page needs |
 ---
 
 ## 5. Feature-by-Feature Comparison
