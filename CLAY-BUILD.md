@@ -474,7 +474,7 @@ const chokidarOpts = {
 | **Fonts/vendor/media** | ~2–5s | ~1s | Direct fs-extra copy vs Gulp stream overhead |
 | **Total (full build)** | **~60–120s** | **~33s** | **2–4× faster overall** |
 | **Watch JS rebuild** | ~30–60s (full rebuild) | ~0.3–1s (incremental) | **60–200× faster** for a single file change |
-| **Watch CSS rebuild** | ~15s (full rebuild) | ~0.5–2s (changed file + variants) | ~10–30× faster |
+| **Watch CSS rebuild** | ~15–30s (full glob + ctime filter) | ~1–3s (changed file + variants only) | ~10–15× faster |
 | **Watch startup** | ~5–15s (initial build) | ~0.2s (no initial build) | Watchers start instantly |
 
 ### Memory
@@ -537,13 +537,47 @@ const chokidarOpts = {
 
 The way the codebase is compiled into browser-ready files was modernised. The underlying technology changed from Browserify (2014) to esbuild (2021). The end result — the website pages — looks and behaves identically to users.
 
-### What improved?
+### What improved for the engineering team?
 
-1. **Developer velocity:** A developer changing one CSS file in watch mode now sees their change in ~0.5s instead of ~15s.
-2. **Build reliability:** The new pipeline has no stateful cache files that can become stale. Every build produces the same output.
-3. **Faster CI:** Full builds take ~33s instead of ~90s, reducing PR feedback loops.
-4. **Easier debugging:** Build errors now show the exact file, line, and column. Previously errors were buried in Gulp stream traces.
-5. **Better code splitting:** Only the JavaScript for components actually on a page is loaded, reducing page-load JavaScript.
+1. **Developer velocity:** A developer changing one CSS file in watch mode now sees their change reflected in ~1–3s instead of ~15–30s. JS changes are even faster: ~0.3–1s instead of ~30–60s.
+2. **Build reliability:** The new pipeline has no stateful cache files that can become stale. Every build produces the same output regardless of history.
+3. **Faster CI:** Full builds take ~33s instead of ~90s, reducing the feedback loop on every pull request and deployment.
+4. **Easier debugging:** Build errors now show the exact file, line, and column. Previously errors were buried in Gulp stream traces with no location context.
+
+### What improved for the product — and why it matters to users?
+
+#### Smaller JavaScript payloads (code splitting)
+
+The old pipeline bundled all component JavaScript into megabundles (`_modules-a-d.js`, `_modules-e-h.js`, etc.). Every page loaded all of these files regardless of which components were actually on the page.
+
+The new pipeline uses **code splitting**: each component gets its own file, and shared dependencies are extracted into shared chunks. A page only loads the scripts for components it actually renders.
+
+**Why this matters:**
+- Less JavaScript downloaded on every page load
+- Less JavaScript parsed and executed by the browser before the page becomes interactive
+- This directly improves **Time to Interactive (TTI)** and **Interaction to Next Paint (INP)** — two metrics Google measures
+
+#### Core Web Vitals and SEO
+
+Google uses [Core Web Vitals](https://web.dev/vitals/) as a direct ranking signal since 2021. The three metrics are:
+
+| Metric | What it measures | How this change helps |
+|---|---|---|
+| **LCP** (Largest Contentful Paint) | How fast the main content loads | Less render-blocking JS means the browser reaches LCP sooner |
+| **INP** (Interaction to Next Paint) | How responsive the page feels to clicks/taps | Less JS to parse means the main thread is free sooner |
+| **CLS** (Cumulative Layout Shift) | Whether elements move around unexpectedly | No direct impact |
+
+Better Core Web Vitals scores can improve organic search rankings. Pages that load faster and respond faster rank higher in Google Search.
+
+#### Analytics and engagement
+
+Page performance is directly correlated with user engagement metrics tracked in analytics:
+
+- **Bounce rate:** Google's research found that as page load time increases from 1s to 3s, bounce rate increases by 32%. Reducing JS payload keeps load time down.
+- **Session depth / pages per session:** Faster pages encourage users to navigate further.
+- **Conversion rate:** For pages with CTAs (newsletter sign-ups, subscription prompts), faster time-to-interactive means the CTA becomes clickable sooner.
+
+These are not theoretical benefits — they follow from delivering less JavaScript to the browser per page view, which is what code splitting directly achieves.
 
 ### What's the risk?
 
