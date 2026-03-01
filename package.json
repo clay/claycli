@@ -26,6 +26,8 @@
       "!**/node_modules/**",
       "!**/cli/**",
       "!lib/cmd/compile/**",
+      "!lib/cmd/build/build.js",
+      "!lib/cmd/build/plugins/**",
       "!**/coverage/**",
       "!**/index.js",
       "!lib/gulp-plugins/gulp-newer/*.js",
