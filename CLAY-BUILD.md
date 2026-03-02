@@ -32,7 +32,7 @@ The legacy `clay compile` pipeline was built on **Browserify + Gulp**, tools des
 | Gulp orchestration with 20+ plugins | Complex dependency chain, hard to debug, slow npm install |
 | Sequential compilation steps | CSS, JS, templates all ran in series — total time = sum of all steps |
 | No shared chunk extraction | If two components shared a dependency, each dragged it in separately via the Browserify registry |
-| No tree shaking | Browserify bundled entire modules even if only one export was used |
+| No tree shaking | Browserify bundled entire CJS modules regardless of how much was used; no support for ESM dependency tree shaking |
 | No source maps | Build errors in production pointed to minified line numbers, not source |
 | No content-hashed filenames | Static filenames (`article.client.js`) forced full cache invalidation on every deploy |
 | Babelify transpilation overhead | Slow even on small changes |
@@ -43,7 +43,7 @@ The legacy `clay compile` pipeline was built on **Browserify + Gulp**, tools des
 
 The new `clay build` pipeline replaces Browserify/Gulp with **esbuild + PostCSS 8**:
 
-- esbuild bundles JS/Vue in **milliseconds** (not seconds) with native code-splitting and tree shaking
+- esbuild bundles JS/Vue in **milliseconds** (not seconds) with native code-splitting and tree shaking for ESM dependencies
 - PostCSS 8's programmatic API replaces Gulp's stream-based CSS pipeline
 - All build steps (JS, CSS, fonts, templates, vendor, media) run **in parallel**
 - A human-readable `_manifest.json` replaces the numeric `_registry.json`/`_ids.json` pair
@@ -227,7 +227,7 @@ flowchart LR
 | **Module runtime** | `_prelude.js` + `_postlude.js` (custom `window.require`) | Native ESM — no runtime overhead |
 | **Module graph** | `_registry.json` (numeric IDs) + `_ids.json` | `_manifest.json` (human-readable keys) |
 | **Component loader** | `_client-init.js` mounts every `.client` module in `window.modules` (page-scoped, but not DOM-presence-checked) | `_view-init.js` mounts a component only when its DOM element exists |
-| **Tree shaking** | None — entire imported modules are bundled | Yes — unused exports eliminated at build time |
+| **Tree shaking** | None — CJS modules bundled whole; no ESM analysis | For ESM dependencies (packages that ship an ESM build): unused exports eliminated. CJS dependencies (e.g. classic `lodash`) are still bundled whole in both pipelines. |
 | **Source maps** | Not generated | Yes — `*.js.map` alongside every output file |
 | **Dead code elimination** | `process.env.NODE_ENV` set at runtime; dead branches survive minification | Set at build time via `define` — `if (dev) { ... }` blocks removed in production builds |
 | **Full rebuild time** | ~30–60s | ~3–4s |
@@ -539,7 +539,7 @@ The move from Browserify/Gulp to esbuild removes a significant number of package
 | **Global variables (DS, Eventify)** | Implicit — leaked into scope via Browserify's global module scope | Already defined in claycli's default config via `esbuild define`; no action needed unless adding new globals |
 | **Server-only imports in universal code** | `rewriteServiceRequire` Browserify transform | `service-rewrite.js` esbuild plugin (same concept, same enforcement) |
 | **`process.env.NODE_ENV`** | Set in `_client-init.js` at runtime — dead branches survive into the bundle | Set via `esbuild define` at build time — `if (process.env.NODE_ENV !== 'production') {}` blocks are eliminated in minified output |
-| **Tree shaking** | None — `require('lodash')` pulled in the whole library | Automatic — only the imported exports of a module are included |
+| **Tree shaking** | None — `require('lodash')` pulled in the whole library | For ESM dependencies only — packages that ship an ESM build can be tree-shaken. CJS packages like `lodash` (not `lodash-es`) are still bundled whole. The main dead-code win is `process.env.NODE_ENV` build-time evaluation, not module-format conversion. |
 | **Modern JS syntax** | Babel target must be configured separately | Controlled by `target` in `esbuildConfig` (default: Chrome 80+, Firefox 78+, Safari 14+) — `??`, `?.`, class fields all work out of the box |
 
 **What's the same:**
@@ -592,14 +592,22 @@ The way the codebase is compiled into browser-ready files was modernised. The un
 
 #### Smaller JavaScript payloads (code splitting)
 
-Both pipelines are page-scoped — only scripts for the components on the page are served. The old pipeline walked `_registry.json` per component and served individual dep files; if two components on the same page both imported lodash, both entries listed lodash's dep file in the registry walk result, leading to redundant network requests (though the browser cached it after the first).
+Both pipelines are page-scoped and both deduplicate shared dependencies — if `article` and `gallery` both depend on lodash, only one copy is served in either pipeline.
 
-The new pipeline uses **code splitting**: shared dependencies are extracted into a single chunk file. Two components that both import lodash will reference the same `chunks/lodash-[hash].js` — downloaded once, used by both. A page only loads the scripts for components it actually renders, with zero redundant dep files.
+The difference is *where and when* that deduplication happens:
+
+- **`clay compile`**: deduplication is a **runtime registry walk** on every page request — `getComputedDeps()` traverses `_registry.json` using a shared `out` object so each dep ID is included exactly once. The result is a list of individual numeric dep files (`123.js`, `456.js`, …) with static filenames.
+- **`clay build`**: deduplication happens **at build time** — esbuild physically extracts the shared code into a named chunk file (`chunks/lodash-A1B2C3.js`). The manifest maps each component entry to its chunk list, so `resolveMedia` can serve the right files without any graph traversal at request time.
+
+**Why the build-time approach is better:**
+- Shared chunks have **content-hashed filenames** — they can be cached by CDNs and browsers indefinitely, surviving multiple deploys unchanged
+- No per-request graph traversal — script resolution is a simple manifest lookup
+- The chunk boundaries are visible and human-readable in `_manifest.json`; the old dep graph required both `_registry.json` and `_ids.json` to decode
 
 **Why this matters:**
 - Less JavaScript downloaded on every page load
 - Less JavaScript parsed and executed by the browser before the page becomes interactive
-- Dead code (dev-only branches, unused library exports via tree shaking) is eliminated at build time — not shipped to users at all
+- Dead code from dev-only branches (`process.env.NODE_ENV` evaluation) is eliminated at build time — React warnings, Vue dev checks, and similar guards are stripped entirely in production builds. ESM dependencies additionally benefit from export-level tree shaking.
 - This directly improves **Time to Interactive (TTI)** and **Interaction to Next Paint (INP)** — two metrics Google measures
 
 #### Core Web Vitals and SEO
@@ -608,21 +616,20 @@ Google uses [Core Web Vitals](https://web.dev/vitals/) as a direct ranking signa
 
 | Metric | What it measures | How this change helps |
 |---|---|---|
-| **LCP** (Largest Contentful Paint) | How fast the main content loads | Less render-blocking JS means the browser reaches LCP sooner |
-| **INP** (Interaction to Next Paint) | How responsive the page feels to clicks/taps | Less JS to parse means the main thread is free sooner |
-| **CLS** (Cumulative Layout Shift) | Whether elements move around unexpectedly | No direct impact |
+| **LCP** (Largest Contentful Paint) | How fast the main content loads | Less JS to download and parse means the browser reaches main content sooner. On repeat visits, content-hashed chunks load from cache instantly — even across deploys — directly improving LCP. |
+| **INP** (Interaction to Next Paint) | How responsive the page feels to clicks/taps | Less JS to parse means the main thread is unblocked sooner. Component modules are also loaded on-demand (`_view-init.js` dynamic imports), spreading parse cost instead of hitting it all at once. |
+| **CLS** (Cumulative Layout Shift) | Whether elements move around unexpectedly | No direct impact. |
+
+**What drives the JS size reduction:**
+- **Dead code elimination** — `process.env.NODE_ENV` is set to `'production'` at build time, stripping dev-only branches from libraries (React warnings, Vue checks, etc.) before they reach the browser. For dependencies that ship an ESM build, unused exports are also eliminated.
+- **Better minification** — esbuild's minifier produces tighter output than the old `uglify-js`
+- **Dead code elimination** — `process.env.NODE_ENV = 'production'` is baked in, so library dev-mode branches (React warnings, Vue checks, etc.) are stripped entirely
+- **No Browserify runtime** — `_prelude.js` and `_postlude.js` (the custom `window.require` runtime) are no longer served on every page
+
+**Honest caveat:** The magnitude of improvement depends on how much dead code and unused exports your bundles currently carry. The caching improvement (content-hashed filenames) is the most consistent and predictable win regardless of codebase size.
 
 Better Core Web Vitals scores can improve organic search rankings. Pages that load faster and respond faster rank higher in Google Search.
 
-#### Analytics and engagement
-
-Page performance is directly correlated with user engagement metrics tracked in analytics:
-
-- **Bounce rate:** Google's research found that as page load time increases from 1s to 3s, bounce rate increases by 32%. Reducing JS payload keeps load time down.
-- **Session depth / pages per session:** Faster pages encourage users to navigate further.
-- **Conversion rate:** For pages with CTAs (newsletter sign-ups, subscription prompts), faster time-to-interactive means the CTA becomes clickable sooner.
-
-These are not theoretical benefits — they follow from delivering less JavaScript to the browser per page view, which is what code splitting and tree shaking directly achieve.
 
 #### CDN cache efficiency (infrastructure cost)
 
@@ -634,6 +641,19 @@ The new pipeline uses **content-hashed filenames** (`components/article/client-A
 - Lower CDN bandwidth cost — most files are cache hits after the first load
 - Faster repeat page loads for returning users — cached files are reused across deploys
 - On a high-traffic site, this can meaningfully reduce monthly CDN egress costs
+
+#### Faster editing experience (Kiln)
+
+The editing interface (Kiln) loads and feels faster too — not just the published pages.
+
+In edit mode, the browser loads the Kiln interface bundle (`_kiln-plugins.js`) plus all component scripts for the page. Both are affected by this change:
+
+- **Smaller Kiln bundle:** `_kiln-plugins.js` is now compiled with esbuild instead of vueify + Babel. Vue SFCs are compiled directly without the Babel intermediate step, producing a smaller and faster-loading kiln plugins bundle.
+- **Smaller component scripts in edit mode:** The same dead code elimination and minification improvements that reduce view-mode payloads apply equally in edit mode — every component's script is smaller.
+- **Cached kiln bundle across deploys:** The Kiln bundle now has a content-hashed filename. If no kiln plugins changed between deploys, editors' browsers reuse the cached version — no re-download, instant load.
+- **Faster iteration for kiln plugin developers:** A developer working on a kiln plugin in watch mode sees changes in ~0.3–1s instead of ~30–60s. This compounds across every kiln plugin change during a development session.
+
+**Bottom line:** Editors opening a page in Kiln should notice that the interface initialises faster, especially on repeat visits or after a deploy that didn't touch kiln plugins.
 
 #### Operational confidence
 
