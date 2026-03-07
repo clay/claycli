@@ -2,8 +2,6 @@
 
 > This document covers the **`clay build`** command introduced in claycli 5.1. It explains what changed from the legacy `clay compile` command, why, how they compare, and how to run both side-by-side.
 
----
-
 ## Table of Contents
 
 1. [Why We Changed It](#1-why-we-changed-it)
@@ -19,8 +17,6 @@
 11. [For Product Managers](#11-for-product-managers)
 12. [Tests](#12-tests)
 13. [Migration Guide](#13-migration-guide)
-
----
 
 ## 1. Why We Changed It
 
@@ -53,8 +49,6 @@ The new `clay build` pipeline replaces Browserify/Gulp with **esbuild + PostCSS 
 - **Native ESM** output — no custom `window.require()` runtime, browsers handle imports natively
 - **Build-time `process.env.NODE_ENV`** — dead branches like `if (process.env.NODE_ENV !== 'production')` are eliminated at compile time, not runtime
 - Dependency footprint reduced from 20+ bundler packages to a handful
-
----
 
 ## 2. Commands At a Glance
 
@@ -90,8 +84,6 @@ clay build --minify
 
 Both commands read **`claycli.config.js`** in the root of your Clay instance, but they look at **different config keys** so they never conflict (see [Configuration](#6-configuration)).
 
----
-
 ## 3. Architecture: Old vs New
 
 ### Old: `clay compile` (Browserify + Gulp)
@@ -124,8 +116,6 @@ clay compile
 
 **Key runtime behaviour:** `getDependencies()` in view mode walks `_registry.json` for only the components amphora placed on the page — it is page-specific. `_client-init.js` then calls `window.require(key)` for every `.client` key in `window.modules`, which is populated only by the scripts that were served. The subtle issue is that it mounts every loaded `.client` module regardless of whether that component's DOM element is actually present on the page.
 
----
-
 ### New: `clay build` (esbuild + PostCSS 8)
 
 ```
@@ -153,9 +143,7 @@ clay build
     └── components/**/media/* → public/media/
 ```
 
-**Key runtime behaviour:** `_view-init.js` loads a component's `client.js` **only when that component's element exists in the DOM**. A built-in sticky-event shim ensures `auth:init` and similar events are received even by late subscribers.
-
----
+**Key runtime behaviour:** `_view-init.js` loads a component's `client.js` **only when that component's element exists in the DOM**. When `stickyEvents` is configured, a sticky-event shim ensures those events are received even by late subscribers.
 
 ## 4. Pipeline Comparison Diagram
 
@@ -211,8 +199,6 @@ flowchart LR
 | **Module graph** | `_registry.json` + `_ids.json` | `_manifest.json` (human-readable) | ⚠️ Different format; same purpose (maps components → files) |
 | **Component loader** | `_client-init.js` — mounts every loaded `.client` module, even if its DOM element is absent | `.clay/_view-init.js` — mounts only components whose DOM element is present | ✅ Better; avoids executing component code when the component isn't on the page |
 | **JS output** | Per-component files + individual dep files, page-scoped via registry walk | Per-component files + `chunks/` (shared deps extracted once) | ✅ Better; shared deps are downloaded once even when multiple components use them |
----
-
 ## 5. Feature-by-Feature Comparison
 
 ### JavaScript Bundling
@@ -237,8 +223,6 @@ flowchart LR
 
 > **Key difference:** With Browserify, top-level side-effects in a `client.js` (e.g. `new Vue(...)`) run at page load for every component whose scripts were served, regardless of whether that component's DOM element is present. With esbuild + `_view-init.js`, component code runs only when the element is found in the DOM.
 
----
-
 ### CSS Compilation
 
 | Aspect | `clay compile` (Gulp + PostCSS 7) | `clay build` (PostCSS 8) |
@@ -255,8 +239,6 @@ flowchart LR
 
 > **Key difference:** In watch mode, `clay compile` ran the full CSS glob on every change and used `gulp-changed` (ctime comparison) to skip files whose output was already up-to-date — it had no awareness of component variants. `clay build` explicitly derives the component prefix from the changed filename (e.g. `text-list_amp.css` → prefix `text-list`) and rebuilds every matching variant (`text-list.css`, `text-list_amp.css`, etc.) across all styleguides in one pass.
 
----
-
 ### Template Compilation
 
 | Aspect | `clay compile` (Gulp + clayhandlebars) | `clay build` (Node + clayhandlebars) |
@@ -270,8 +252,6 @@ flowchart LR
 
 > **Same result:** The `window.kiln.componentTemplates['name'] = ...` assignment format is identical.
 
----
-
 ### Fonts
 
 | Aspect | `clay compile` | `clay build` |
@@ -281,8 +261,6 @@ flowchart LR
 | **Asset host substitution** | `$asset-host` / `$asset-path` variables | **Identical** |
 
 > **Same result:** Font CSS and binary output is identical.
-
----
 
 ### Module / Script Resolution
 
@@ -295,8 +273,6 @@ flowchart LR
 > **Same result:** Both pipelines return a list of `<script>` src paths that amphora-html injects into the page.
 
 > **Key difference:** Both pipelines are page-scoped — only scripts for components on the page are served. The difference is granularity: `clay compile` serves individual dep files per the registry walk (with no deduplication across components); `clay build` extracts shared dependencies into chunks so a shared module is downloaded exactly once even when multiple page components use it.
-
----
 
 ## 6. Configuration
 
@@ -333,6 +309,32 @@ module.exports.esbuildConfig = function(config) {
     '@sentry/node': path.resolve('./services/client/error-tracking.js'),
   };
 };
+
+// ─── clay build only (esbuild) — sticky event shim ──────────────────────────
+
+// List of custom event names to make "sticky" in the generated _view-init.js.
+// A sticky event is one that fires exactly once and may fire before a
+// component's client.js has loaded (ESM dynamic import race condition).
+// When a handler registers for a sticky event after it has already fired,
+// the shim replays it in the next microtask.
+//
+// Criteria for an event to qualify (all three must be true):
+//   1. It fires exactly once (or the first firing is the meaningful one).
+//   2. It is consumed by code that loads asynchronously via dynamic import().
+//   3. It cannot be replaced with a pull-based pattern (e.g. a promise) without
+//      changing all consumers.
+//
+// Long-term pattern: for any qualifying event, the preferred pattern is to expose
+// a promise that consumers await or .then() on instead of listening for the
+// event. A resolved promise is always "replayable" without any shim. Once all
+// consumers have migrated to the promise pattern, remove the event from this
+// array. Remove stickyEvents entirely once the array is empty.
+//
+// Example:
+//   - 'auth:init' — fired once by our auth.js client side service after the auth network call resolves;
+//     consumed by components that need the current auth state. Future pattern:
+//     expose auth.onReady() and have components call auth.onReady().then(handler).
+module.exports.stickyEvents = ['auth:init'];
 ```
 
 ### Minimal setup for `clay build` (new tooling only)
@@ -355,8 +357,6 @@ module.exports.esbuildConfig = function(config) {
   // config.alias['server-only-package'] = path.resolve('./browser-stub.js');
 };
 ```
-
----
 
 ## 7. Running Both Side-by-Side
 
@@ -437,8 +437,6 @@ function resolveMedia(ref, locals) {
 }
 ```
 
----
-
 ## 8. Code References
 
 ### CLI entry points
@@ -475,7 +473,7 @@ function resolveMedia(ref, locals) {
 | File | Generated by | Purpose |
 |---|---|---|
 | `public/js/_manifest.json` | `lib/cmd/build/manifest.js` | Human-readable entry→file+chunks map. Replaces `_registry.json` + `_ids.json`. |
-| `.clay/_view-init.js` | `generateViewInitEntry()` in `scripts.js` | Synthetic esbuild entry point. Imports every `client.js` and mounts components on the page. Replaces `_client-init.js`. Includes sticky-event shim. |
+| `.clay/_view-init.js` | `generateViewInitEntry()` in `scripts.js` | Synthetic esbuild entry point. Imports every `client.js` and mounts components on the page. Replaces `_client-init.js`. When `stickyEvents` is non-empty, includes the sticky-event shim; sticky event names are driven by `stickyEvents` in `claycli.config.js`. Shim is omitted entirely when the array is absent or empty. |
 | `.clay/_kiln-edit-init.js` | `generateKilnEditEntry()` in `scripts.js` | Synthetic esbuild entry point. Imports every `model.js` and `kiln.js` and registers them on `window.kiln.componentModels` / `window.kiln.componentKilnjs`. Replaces the Browserify `window.modules` registry that clay-kiln previously relied on. |
 
 > **Why `.clay/` exists — and why the old pipeline didn't need it**
@@ -483,6 +481,58 @@ function resolveMedia(ref, locals) {
 > Browserify uses a runtime module registry (`window.modules` / `window.require`). Every `client.js`, `model.js`, and `kiln.js` got wrapped in a factory and registered at runtime under a string key. Clay-kiln could call `window.require('components/article/model')` at any time and the registry handed it back — no pre-wiring needed.
 >
 > esbuild is a static bundler. It only bundles files that are explicitly connected via `import`/`require` at build time. To give esbuild an entry point that pulls in every component's model and kiln files, `scripts.js` generates the `.clay/` files on the fly before each build. esbuild requires real files on disk so it can resolve relative `import` paths and mirror the entry correctly into `public/js/` with a stable manifest key. `.clay/` is that staging area — build artifacts, not source code, so it belongs in `.gitignore`.
+
+### Sticky events and the `stickyEvents` config key
+
+#### The problem — ESM dynamic-import race condition
+
+`clay build` outputs native ESM. Component `client.js` files are loaded via dynamic `import()` inside `_view-init.js`. Because dynamic imports resolve asynchronously, there is a timing window between when the page starts loading and when a component's event handler is registered.
+
+If a publisher fires a one-shot custom event during that window — after the page has started executing but before a component's `client.js` has loaded — the component's `window.addEventListener` call runs too late and the event is silently missed. The component never initializes correctly.
+
+With the old Browserify pipeline this was not a problem: all component code was bundled synchronously into a single file that executed before any global event fired.
+
+#### The current fix — sticky-event shim
+
+`_view-init.js` installs a shim as the very first thing it runs (before any component import can resolve). The shim wraps `window.addEventListener` so that:
+
+1. If a handler registers for an event type that has **already fired**, the handler is called in the next microtask with the stored `event.detail` — a "replay".
+2. If the event has **not yet fired**, nothing extra happens; the handler receives it normally when it fires.
+
+This requires **no changes** to the event publisher or to any `client.js` consumer.
+
+#### Which events are sticky — the `stickyEvents` config key
+
+An event qualifies as sticky if it meets all three criteria:
+
+1. **Fires exactly once** (or the first firing is the meaningful one).
+2. **Consumed by async code** — component `client.js` files that load via dynamic `import()` and therefore have a race window.
+3. **Cannot be replaced with a pull-based pattern** (e.g. a promise or a synchronously-readable value) without changing all consumers.
+
+The list of sticky event names is configured in `claycli.config.js`:
+
+```js
+// claycli.config.js
+module.exports.stickyEvents = ['auth:init'];
+```
+
+`generateViewInitEntry()` reads this array and emits the corresponding listener registrations into `_view-init.js`. If `stickyEvents` is absent or empty the shim block is omitted entirely — `window.addEventListener` is left unpatched.
+
+claycli itself has no hardcoded knowledge of any consuming repo's event names. The configuration belongs in `claycli.config.js`.
+
+#### Long-term pattern — promises over events
+
+The sticky-event shim is a compatibility bridge, not a design goal. The preferred long-term pattern for any qualifying event is to expose a **promise** that consumers `await` or `.then()` instead of listening for a custom event:
+
+```js
+// Instead of:
+window.addEventListener('some:event', handler);
+
+// Consumers call:
+someService.onReady().then(handler);
+```
+
+A resolved promise is always "replayable" — calling `.then()` on an already-resolved promise runs the callback in the next microtask, with no shim required. Once all consumers of a sticky event have migrated to the promise pattern, remove that event name from `stickyEvents`. Remove the key entirely once the array is empty.
 
 ### Watch mode (`clay build --watch`)
 
@@ -502,8 +552,6 @@ const chokidarOpts = {
   awaitWriteFinish: { stabilityThreshold: 50, pollInterval: 50 },
 };
 ```
-
----
 
 ## 9. Performance
 
@@ -547,8 +595,6 @@ The move from Browserify/Gulp to esbuild removes a significant number of package
 | `detective-postcss` | |
 
 **Net result:** ~20 packages removed, ~5 added. Fewer packages means faster `npm install`, smaller `node_modules`, reduced supply-chain attack surface, and fewer version-conflict headaches.
-
----
 
 ## 10. Learning Curve
 
@@ -597,8 +643,6 @@ At $30/hr fully-loaded eng cost:
 
 The bottleneck on most feature work is not writing code — it's waiting for the build. Watch mode eliminates that wait.
 
----
-
 ### For Site Reliability Engineers
 
 | Concern | `clay compile` | `clay build` |
@@ -614,8 +658,6 @@ The bottleneck on most feature work is not writing code — it's waiting for the
 | **Source maps in production** | Not generated | `*.js.map` files allow production error stacks to point to source lines |
 | **Node.js requirement** | Node ≥ 14 | Node ≥ 20 (esbuild requirement) |
 | **Error surface** | Errors can be silently swallowed by Gulp stream error handlers | Errors are explicit — build exits non-zero, CI fails fast |
-
----
 
 ## 11. For Product Managers
 
@@ -717,8 +759,6 @@ In edit mode, the browser loads the Kiln interface bundle (`_kiln-plugins.js`) p
 - Sites opt in to `clay build` by updating their `resolveMedia.js` and Makefile targets
 - `clay compile` is preserved indefinitely for backward compatibility
 
----
-
 ## 12. Tests
 
 Test files for the new pipeline live alongside each source module:
@@ -742,8 +782,6 @@ Run the full test suite (all claycli tests):
 ```bash
 npm test
 ```
-
----
 
 ## 13. Migration Guide
 
