@@ -478,23 +478,23 @@ function resolveMedia(media, locals) {
 
 | Command | File |
 |---|---|
-| `clay build` | [`cli/build.js`](cli/build.js) |
-| `clay compile` | [`cli/compile/`](cli/compile/) |
-| Command routing | [`cli/index.js`](cli/index.js) — `b`, `pn`, `pack-next` all alias to `build` |
+| `clay build` | [`cli/build.js`](https://github.com/clay/claycli/blob/jordan/yolo-update/cli/build.js) |
+| `clay compile` | [`cli/compile/`](https://github.com/clay/claycli/tree/jordan/yolo-update/cli/compile) |
+| Command routing | [`cli/index.js`](https://github.com/clay/claycli/blob/jordan/yolo-update/cli/index.js) — `b`, `pn`, `pack-next` all alias to `build` |
 
 ### Build pipeline modules
 
 | Module | File | Old equivalent |
 |---|---|---|
-| Orchestrator (JS + all assets) | [`lib/cmd/build/scripts.js`](lib/cmd/build/scripts.js) | `lib/cmd/compile/scripts.js` |
-| CSS compilation | [`lib/cmd/build/styles.js`](lib/cmd/build/styles.js) | `lib/cmd/compile/styles.js` |
-| Template compilation | [`lib/cmd/build/templates.js`](lib/cmd/build/templates.js) | `lib/cmd/compile/templates.js` |
-| Font processing | [`lib/cmd/build/fonts.js`](lib/cmd/build/fonts.js) | `lib/cmd/compile/fonts.js` |
-| Media copy | [`lib/cmd/build/media.js`](lib/cmd/build/media.js) | `lib/cmd/compile/media.js` |
-| Vendor (kiln) copy | [`lib/cmd/build/vendor.js`](lib/cmd/build/vendor.js) | Part of `lib/cmd/compile/scripts.js` |
-| Manifest writer | [`lib/cmd/build/manifest.js`](lib/cmd/build/manifest.js) | _(no equivalent — replaces `_registry.json`/`_ids.json`)_ |
-| Script dependency resolver | [`lib/cmd/build/get-script-dependencies.js`](lib/cmd/build/get-script-dependencies.js) | `lib/cmd/compile/get-script-dependencies.js` |
-| **Build module public API** | [`lib/cmd/build/index.js`](lib/cmd/build/index.js) | _(new)_ — exports all helpers including `resolveModuleScripts` |
+| Orchestrator (JS + all assets) | [`lib/cmd/build/scripts.js`](https://github.com/clay/claycli/blob/jordan/yolo-update/lib/cmd/build/scripts.js) | `lib/cmd/compile/scripts.js` |
+| CSS compilation | [`lib/cmd/build/styles.js`](https://github.com/clay/claycli/blob/jordan/yolo-update/lib/cmd/build/styles.js) | `lib/cmd/compile/styles.js` |
+| Template compilation | [`lib/cmd/build/templates.js`](https://github.com/clay/claycli/blob/jordan/yolo-update/lib/cmd/build/templates.js) | `lib/cmd/compile/templates.js` |
+| Font processing | [`lib/cmd/build/fonts.js`](https://github.com/clay/claycli/blob/jordan/yolo-update/lib/cmd/build/fonts.js) | `lib/cmd/compile/fonts.js` |
+| Media copy | [`lib/cmd/build/media.js`](https://github.com/clay/claycli/blob/jordan/yolo-update/lib/cmd/build/media.js) | `lib/cmd/compile/media.js` |
+| Vendor (kiln) copy | [`lib/cmd/build/vendor.js`](https://github.com/clay/claycli/blob/jordan/yolo-update/lib/cmd/build/vendor.js) | Part of `lib/cmd/compile/scripts.js` |
+| Manifest writer | [`lib/cmd/build/manifest.js`](https://github.com/clay/claycli/blob/jordan/yolo-update/lib/cmd/build/manifest.js) | _(no equivalent — replaces `_registry.json`/`_ids.json`)_ |
+| Script dependency resolver | [`lib/cmd/build/get-script-dependencies.js`](https://github.com/clay/claycli/blob/jordan/yolo-update/lib/cmd/build/get-script-dependencies.js) | `lib/cmd/compile/get-script-dependencies.js` |
+| **Build module public API** | [`lib/cmd/build/index.js`](https://github.com/clay/claycli/blob/jordan/yolo-update/lib/cmd/build/index.js) | _(new)_ — exports all helpers including `resolveModuleScripts` |
 
 The build module is also re-exported from the top-level programmatic API:
 
@@ -509,7 +509,7 @@ claycli.build.getEsbuildConfig(options);
 const clayBuild = require('claycli/lib/cmd/build');
 ```
 
-### Key exported functions from `lib/cmd/build/index.js`
+### Key exported functions from [`lib/cmd/build/index.js`](https://github.com/clay/claycli/blob/jordan/yolo-update/lib/cmd/build/index.js)
 
 | Function | Purpose |
 |---|---|
@@ -525,9 +525,9 @@ const clayBuild = require('claycli/lib/cmd/build');
 
 | Plugin | File | Purpose |
 |---|---|---|
-| Vue 2 SFC | [`lib/cmd/build/plugins/vue2.js`](lib/cmd/build/plugins/vue2.js) | Compile `.vue` files (replaces `@nymag/vueify` Browserify transform) |
-| Browser compat | [`lib/cmd/build/plugins/browser-compat.js`](lib/cmd/build/plugins/browser-compat.js) | Stub server-only Node.js modules (`fs`, `http`, `clay-log`, etc.) |
-| Service rewrite | [`lib/cmd/build/plugins/service-rewrite.js`](lib/cmd/build/plugins/service-rewrite.js) | Rewrite `services/server/` imports to `services/client/` (replaces Browserify `rewriteServiceRequire` transform) |
+| Vue 2 SFC | [`lib/cmd/build/plugins/vue2.js`](https://github.com/clay/claycli/blob/jordan/yolo-update/lib/cmd/build/plugins/vue2.js) | Compile `.vue` files (replaces `@nymag/vueify` Browserify transform) |
+| Browser compat | [`lib/cmd/build/plugins/browser-compat.js`](https://github.com/clay/claycli/blob/jordan/yolo-update/lib/cmd/build/plugins/browser-compat.js) | Stub server-only Node.js modules (`fs`, `http`, `clay-log`, etc.) |
+| Service rewrite | [`lib/cmd/build/plugins/service-rewrite.js`](https://github.com/clay/claycli/blob/jordan/yolo-update/lib/cmd/build/plugins/service-rewrite.js) | Rewrite `services/server/` imports to `services/client/` (replaces Browserify `rewriteServiceRequire` transform) |
 
 ### Renderer dependency: `amphora-html`
 
@@ -899,11 +899,11 @@ Test files for the new pipeline live alongside each source module:
 
 | Test file | What it covers |
 |---|---|
-| [`lib/cmd/build/manifest.test.js`](lib/cmd/build/manifest.test.js) | `writeManifest` — entry key derivation, chunk/import handling, public URL mapping |
-| [`lib/cmd/build/styles.test.js`](lib/cmd/build/styles.test.js) | `buildStyles` — CSS compilation, `changedFiles` incremental mode, `onProgress`, `onError` routing |
-| [`lib/cmd/build/templates.test.js`](lib/cmd/build/templates.test.js) | `buildTemplates` — HBS precompile, `onProgress`, error resilience in watch mode, minified bucket mode |
-| [`lib/cmd/build/media.test.js`](lib/cmd/build/media.test.js) | `copyMedia` — component + layout media copy, count tracking |
-| [`lib/cmd/build/get-script-dependencies.test.js`](lib/cmd/build/get-script-dependencies.test.js) | `hasManifest`, `getDependenciesNextForComponents` — chunk dedup, `_view-init` ordering, missing-component handling |
+| [`lib/cmd/build/manifest.test.js`](https://github.com/clay/claycli/blob/jordan/yolo-update/lib/cmd/build/manifest.test.js) | `writeManifest` — entry key derivation, chunk/import handling, public URL mapping |
+| [`lib/cmd/build/styles.test.js`](https://github.com/clay/claycli/blob/jordan/yolo-update/lib/cmd/build/styles.test.js) | `buildStyles` — CSS compilation, `changedFiles` incremental mode, `onProgress`, `onError` routing |
+| [`lib/cmd/build/templates.test.js`](https://github.com/clay/claycli/blob/jordan/yolo-update/lib/cmd/build/templates.test.js) | `buildTemplates` — HBS precompile, `onProgress`, error resilience in watch mode, minified bucket mode |
+| [`lib/cmd/build/media.test.js`](https://github.com/clay/claycli/blob/jordan/yolo-update/lib/cmd/build/media.test.js) | `copyMedia` — component + layout media copy, count tracking |
+| [`lib/cmd/build/get-script-dependencies.test.js`](https://github.com/clay/claycli/blob/jordan/yolo-update/lib/cmd/build/get-script-dependencies.test.js) | `hasManifest`, `getDependenciesNextForComponents` — chunk dedup, `_view-init` ordering, missing-component handling |
 
 Run all new-pipeline tests:
 
@@ -1073,7 +1073,7 @@ Component `client.js` files that call `window.DS.controller()` (the NYMag Clay i
 
 Additionally, for `<link rel="modulepreload">` hints (which tell the browser to fetch ESM scripts early, during HTML parsing, before reaching the `<script>` tags at `</body>`), there was no injection mechanism at all.
 
-**What was added to `lib/media.js`:**
+**What was added to [`lib/media.js`](https://github.com/clay/amphora-html/blob/jordan/yolo-update/lib/media.js):**
 
 - Two new tag constants: `MODULE_SCRIPT_TAG = 'module'` and `MODULEPRELOAD_TAG = 'modulepreload'`
 - `injectTags()` now produces `<script type="module" src="...">` and `<link rel="modulepreload" href="...">` tags
@@ -1087,7 +1087,7 @@ Additionally, for `<link rel="modulepreload">` hints (which tell the browser to 
 Everything is off by default. Activate via `configureRender({ modulepreload: true })` in your renderer setup:
 
 ```js
-// amphora/renderers.js (from the NYMag Clay instance)
+// amphora/renderers.js (from the NYMag Clay instance — github.com/nymag/sites/blob/jordan/yolo-update/amphora/renderers.js)
 const html = require('amphora-html');
 
 html.configureRender({
@@ -1142,7 +1142,7 @@ This is a backwards-compatible addition — existing plugins that ignore the ext
 The changes are on the `jordan/yolo-update` branch of `nymag/amphora-html`. Install directly from the branch:
 
 ```json
-// package.json — install from GitHub branch (no npm publish needed)
+// package.json (github.com/nymag/sites/blob/jordan/yolo-update/package.json) — install from GitHub branch (no npm publish needed)
 "amphora-html": "github:clay/amphora-html#jordan/yolo-update"
 ```
 
