@@ -7,7 +7,7 @@
 1. [Why We Changed It](#1-why-we-changed-it)
 2. [Commands At a Glance](#2-commands-at-a-glance)
 3. [Architecture: Old vs New](#3-architecture-old-vs-new)
-4. [Pipeline Comparison Diagram](#4-pipeline-comparison-diagram)
+4. [Pipeline Comparison Diagrams](#4-pipeline-comparison-diagrams)
 5. [Feature-by-Feature Comparison](#5-feature-by-feature-comparison)
 6. [Configuration](#6-configuration)
 7. [Running Both Side-by-Side](#7-running-both-side-by-side)
@@ -18,6 +18,7 @@
 12. [Tests](#12-tests)
 13. [Migration Guide](#13-migration-guide)
 14. [amphora-html Changes](#14-amphora-html-changes)
+15. [Bundler Comparison: esbuild vs Webpack vs Vite](#15-bundler-comparison-esbuild-vs-webpack-vs-vite)
 
 ## 1. Why We Changed It
 
@@ -134,10 +135,10 @@ clay build
 │                                 built with splitting:false — single self-contained file,
 │                                 avoids the 70-100 tiny chunks esbuild would otherwise produce
 │
-├── styles.js   ← PostCSS 8 programmatic API (parallel, p-limit 20)
+├── styles.js   ← PostCSS 8 programmatic API (parallel, p-limit 50)
 │   └── styleguides/**/*.css → public/css/{component}.{styleguide}.css
 │
-├── templates.js← Handlebars precompile (sequential, progress-tracked)
+├── templates.js← Handlebars precompile (parallel, p-limit 20, progress-tracked)
 │   └── components/**/template.hbs → public/js/*.template.js
 │
 ├── fonts.js    ← fs-extra copy + CSS concat
@@ -159,9 +160,13 @@ clay build
 
 **Key runtime behaviour:** `_view-init.js` loads a component's `client.js` **only when that component's element exists in the DOM**. When `stickyEvents` is configured, a sticky-event shim ensures those events are received even by late subscribers.
 
-## 4. Pipeline Comparison Diagram
+## 4. Pipeline Comparison Diagrams
 
-Both pipelines share the same source files and produce the same `public/` output. The difference is in *how* the steps are wired together.
+Both pipelines share the same source files and produce the same `public/` output. The differences are in *how* the steps are wired together, *how* the JS module system works at runtime, and *how* scripts are resolved and served per page.
+
+### 4a. Build step execution (what runs and in what order)
+
+The most immediately visible difference: sequential vs parallel execution.
 
 ```mermaid
 flowchart LR
@@ -213,7 +218,138 @@ flowchart LR
 | **Module graph** | `_registry.json` + `_ids.json` | `_manifest.json` (human-readable) | ⚠️ Different format; same purpose (maps components → files) |
 | **Component loader** | `_client-init.js` — mounts every loaded `.client` module, even if its DOM element is absent | `.clay/_view-init.js` — mounts only components whose DOM element is present | ✅ Better; avoids executing component code when the component isn't on the page |
 | **JS output** | Per-component files + individual dep files, page-scoped via registry walk | Per-component files + `chunks/` (shared deps extracted once) | ✅ Better; shared deps are downloaded once even when multiple components use them |
-## 5. Feature-by-Feature Comparison
+
+### 4b. JS module system architecture (the core architectural shift)
+
+This is the diagram that explains *why* so many other things had to change. The entire difference in `resolve-media.js`, `_view-init`, `_kiln-edit-init`, and `_globals-init` flows from this single architectural difference.
+
+```mermaid
+flowchart TB
+    subgraph OLD["🕐  clay compile — Browserify runtime module registry"]
+        direction TB
+        OS["components/**/client.js\ncomponents/**/model.js\ncomponents/**/kiln.js\nglobal/js/*.js"]:::src
+
+        OB["Browserify megabundler\n+ Babel transpile\n+ _prelude.js / _postlude.js\n(custom window.require runtime)"]:::tool
+
+        OR["_registry.json\n{ '12': ['4','7'] }\n_ids.json\n{ '12': 'article/client' }"]:::artifact
+
+        OI["_client-init.js\ncalls window.require(key)\nfor every .client in window.modules\n— regardless of DOM presence"]:::loader
+
+        OG["_deps-a.js _deps-b.js …\n(alpha-bucketed shared deps)\n_models-a.js _kiln-a.js …\n(alpha-bucketed edit files)"]:::output
+
+        OS -->|"one big bundle per alpha bucket"| OB
+        OB -->|"writes"| OR
+        OB -->|"generates"| OI
+        OB -->|"outputs"| OG
+    end
+
+    subgraph NEW["⚡  clay build — esbuild static module graph"]
+        direction TB
+        NS["components/**/client.js\ncomponents/**/model.js\ncomponents/**/kiln.js\nglobal/js/*.js"]:::src
+
+        NG["clay build generates\n.clay/_view-init.js\n.clay/_kiln-edit-init.js\n.clay/_globals-init.js\nbefore each esbuild run"]:::gen
+
+        NE["esbuild\n(Go, native code splitting)\nno transpile, no runtime registry\nESM import/export wiring"]:::tool
+
+        NM["_manifest.json\n{ 'components/article/client':\n  { file: 'client-A1B2.js',\n    imports: ['chunks/shared-C3D4.js'] } }"]:::artifact
+
+        NV["_view-init-[hash].js\nmounts component.client.js\nonly when its DOM element\nexists — lazy dynamic import()"]:::loader
+
+        NK["_kiln-edit-init-[hash].js\nregisters all model.js + kiln.js\non window.kiln.componentModels\nsplitting:false — single file"]:::output
+
+        NGL["_globals-init-[hash].js\nall global/js/*.js in one file\nsplitting:false — avoids\n70–100 tiny chunk requests"]:::output
+
+        NC["public/js/chunks/\ncontent-hashed shared chunks\nexact file, exact version,\ncacheable forever"]:::output
+
+        NS -->|"entry points"| NG
+        NG -->|"feeds"| NE
+        NE -->|"writes"| NM
+        NE -->|"outputs"| NV
+        NE -->|"outputs"| NK
+        NE -->|"outputs"| NGL
+        NE -->|"extracts shared deps into"| NC
+    end
+
+    subgraph SHARED["🔁  Same in both pipelines"]
+        direction LR
+        SCS["CSS: PostCSS plugins\nautoprefixer · postcss-import\npostcss-mixins · postcss-nested\n→ public/css/"]:::same
+        SCT["Templates: Handlebars precompile\n→ public/js/*.template.js"]:::same
+        SCF["Fonts: copy + CSS concat\n→ public/fonts/ + public/css/"]:::same
+        SCM["Media: file copy\n→ public/media/"]:::same
+        SCS ~~~ SCT ~~~ SCF ~~~ SCM
+    end
+
+    classDef src    fill:#1e3a5f,color:#93c5fd,stroke:#1d4ed8
+    classDef tool   fill:#3b1f6e,color:#c4b5fd,stroke:#7c3aed
+    classDef gen    fill:#1f3b2a,color:#6ee7b7,stroke:#059669
+    classDef artifact fill:#422006,color:#fcd34d,stroke:#b45309
+    classDef loader fill:#1c2b4a,color:#93c5fd,stroke:#2563eb
+    classDef output fill:#14532d,color:#86efac,stroke:#166534
+    classDef same   fill:#1e293b,color:#94a3b8,stroke:#334155
+```
+
+**What this diagram shows:**
+
+| Concern | `clay compile` | `clay build` | Why it matters |
+|---|---|---|---|
+| **Module registry** | Runtime: `window.modules` populated as scripts evaluate on every page load | Build-time: `_manifest.json` written once; no runtime registry | Old: any file could call `window.require('components/article/model')` at any time. New: wiring is static — esbuild traces it at build time. |
+| **Component mounting** | `_client-init.js` calls `window.require()` for every `.client` module whose script was served — runs regardless of DOM | `_view-init.js` scans the DOM first; only `import()`s a component if its element exists | New: component code never runs for components not on the page |
+| **Shared dependency handling** | Alpha-bucketed dep files (`_deps-a.js`…) — all or nothing per bucket, static filenames | Named content-hashed chunks in `public/js/chunks/` — exact code extracted by the static graph | New: unchanged shared chunks stay cached across deploys |
+| **Edit mode aggregator** | `window.modules` was the aggregator — clay-kiln called `window.require('components/article/model')` at any time | `_kiln-edit-init.js` pre-registers all model/kiln files on `window.kiln.componentModels` at page load; also shims `window.modules = window.modules \|\| {}` for clay-kiln compatibility | New: explicit pre-wiring replaces implicit runtime lookup; `window.modules` shim ensures any published clay-kiln version works without modification |
+| **Global scripts** | Individual `<script>` tags per file, ordered by HTML injection | One `_globals-init.js` file, `splitting:false` — prevents 70–100 tiny chunks from overlapping global deps | New: 1 network request instead of 70–100 |
+| **Cache strategy** | Static filenames — entire CDN cache invalidated on every deploy | Content-hashed filenames — only changed files get new URLs | New: browsers cache individual files forever; warm loads re-download zero own JS |
+
+### 4c. Per-page script resolution flow (runtime)
+
+How the server decides which JS files to inject into a page response — the `resolve-media.js` path.
+
+```mermaid
+flowchart TD
+    REQ(["HTTP request\nfor a Clay page"]):::req
+
+    subgraph AMP["amphora-html — injectScriptsAndStyles()"]
+        direction TB
+        AH["sets locals._components\n= rendered component names"]:::step
+        RM["calls resolveMedia(media, locals)"]:::step
+        INJ["injects into HTML:\n• <link rel=modulepreload> in <head>\n• <script type=module> at </body>"]:::step
+        AH --> RM --> INJ
+    end
+
+    subgraph RM_OLD["resolve-media.js — clay compile path"]
+        direction TB
+        RO1["getDependencies(scripts, assetPath)"]:::old
+        RO2["reads _registry.json\nwalks numeric dep graph\nreturns per-page dep file list\n(123.js, 456.js, …)"]:::old
+        RO3["returns static filenames\nno content hash\nno preload hints"]:::old
+        RO1 --> RO2 --> RO3
+    end
+
+    subgraph RM_NEW["resolve-media.js — clay build path"]
+        direction TB
+        RN1["clayBuild.resolveModuleScripts\n(media, assetPath, { edit })"]:::new
+        RN2["reads _manifest.json\nlooks up each component\nfollows imports[] chain\ncollects hashed chunk URLs"]:::new
+        RN3["populates:\nmedia.moduleScripts  → <script type=module>\nmedia.modulePreloads → <link rel=modulepreload>"]:::new
+        RN4["omits ?version= from module URLs\n(content hash is the cache buster)"]:::new
+        RN1 --> RN2 --> RN3 --> RN4
+    end
+
+    subgraph GATE["hasManifest() branch"]
+        direction LR
+        HM{"_manifest.json\nexists?"}:::gate
+        HM -->|"yes"| RM_NEW
+        HM -->|"no"| RM_OLD
+    end
+
+    REQ --> AMP
+    AMP --> GATE
+
+    classDef req   fill:#1e3a5f,color:#93c5fd,stroke:#1d4ed8
+    classDef step  fill:#1e293b,color:#94a3b8,stroke:#334155
+    classDef old   fill:#7f1d1d,color:#fca5a5,stroke:#991b1b
+    classDef new   fill:#14532d,color:#86efac,stroke:#166534
+    classDef gate  fill:#422006,color:#fcd34d,stroke:#b45309
+```
+
+**What `hasManifest()` gives you:** A single boolean that makes the two pipelines fully hot-swappable at runtime. Deploy with `CLAYCLI_BUILD_ENABLED=true` → `_manifest.json` appears → new path activates. Roll back by removing the flag → `_manifest.json` disappears on the next deploy → old path activates. No code changes in the site.
 
 ### JavaScript Bundling
 
@@ -242,7 +378,7 @@ flowchart LR
 | Aspect | `clay compile` (Gulp + PostCSS 7) | `clay build` (PostCSS 8) |
 |---|---|---|
 | **API** | Gulp stream pipeline | PostCSS programmatic API |
-| **Concurrency** | Sequential per-file | Parallel with `p-limit(20)` |
+| **Concurrency** | Sequential per-file | Parallel with `p-limit(50)` |
 | **PostCSS plugins** | autoprefixer, postcss-import, postcss-mixins, postcss-simple-vars, postcss-nested | Same plugins |
 | **Minification** | cssnano (when `CLAYCLI_COMPILE_MINIFIED` set) | cssnano (same flag) |
 | **Error handling** | Stream error halts the entire pipeline | Per-file error logged; remaining files continue compiling |
@@ -258,6 +394,8 @@ flowchart LR
 | Aspect | `clay compile` (Gulp + clayhandlebars) | `clay build` (Node + clayhandlebars) |
 |---|---|---|
 | **API** | Gulp stream | Direct `fs.readFile` / `hbs.precompile` |
+| **Concurrency** | Sequential per-file | Parallel with `p-limit(20)` — up to 20 templates compile concurrently |
+| **`{{{ read }}}` file I/O** | `fs.readFileSync` — blocks main thread per token | `fs.readFile` (async) — all tokens within a template read concurrently via `Promise.all` |
 | **Output** | `public/js/{name}.template.js` | **Identical** |
 | **Minified output** | `_templates-{a-d}.js` (bucketed) | **Identical** |
 | **Error handling** | Stream error calls `process.exit(1)` — crashes the entire build on a single bad template | Per-template error logged; remaining templates continue compiling |
@@ -539,7 +677,7 @@ const clayBuild = require('claycli/lib/cmd/build');
 |---|---|---|
 | `public/js/_manifest.json` | `lib/cmd/build/manifest.js` | Human-readable entry→file+chunks map. Replaces `_registry.json` + `_ids.json`. Only `import-statement` kind imports are recorded (not `dynamic-import`) so chunk lists accurately reflect files that need separate `<script>` tags. |
 | `.clay/_view-init.js` | `generateViewInitEntry()` in `scripts.js` | Synthetic esbuild entry point. Imports every `client.js` and mounts components on the page. Replaces `_client-init.js`. When `stickyEvents` is non-empty, includes the sticky-event shim; sticky event names are driven by `stickyEvents` in `claycli.config.js`. Shim is omitted entirely when the array is absent or empty. |
-| `.clay/_kiln-edit-init.js` | `generateKilnEditEntry()` in `scripts.js` | Synthetic esbuild entry point. Imports every `model.js` and `kiln.js` and registers them on `window.kiln.componentModels` / `window.kiln.componentKilnjs`. Replaces the Browserify `window.modules` registry that clay-kiln previously relied on. Built with `splitting: false` — produces a single self-contained file. |
+| `.clay/_kiln-edit-init.js` | `generateKilnEditEntry()` in `scripts.js` | Synthetic esbuild entry point. Imports every `model.js` and `kiln.js` and registers them on `window.kiln.componentModels` / `window.kiln.componentKilnjs`. Also shims `window.modules = window.modules \|\| {}` so clay-kiln's preloader doesn't crash when `window.modules` is absent (it was populated by Browserify; the esbuild pipeline does not create it). Built with `splitting: false` — produces a single self-contained file. |
 | `.clay/_globals-init.js` | `generateGlobalsInitEntry()` in `scripts.js` | Synthetic esbuild entry point. Imports all `global/js/*.js` files (excluding `*.test.js`) into a single bundle. Built with `splitting: false` so the browser loads one file instead of the 70–100 tiny shared chunks esbuild's splitter would otherwise create from overlapping global scripts. |
 | `client-env.json` | `generateClientEnv()` in `scripts.js` | JSON array of all `process.env.VAR_NAME` identifiers found in source files. Read by `amphora-html`'s `addEnvVars()` at render time to know which `process.env` values to expose to the client.
 > **Why `.clay/` exists — and why the old pipeline didn't need it**
@@ -632,8 +770,8 @@ const chokidarOpts = {
 | Step | `clay compile` | `clay build` | Notes |
 |---|---|---|---|
 | **JS bundling** | ~30–60s | ~3–4s | esbuild is written in Go; 10–20× faster than Browserify + Babel |
-| **CSS** | ~15–30s (sequential) | ~32s (parallel, 2843 files) | Same PostCSS plugins, but now parallel across all files |
-| **Templates** | ~10–20s | ~16s | Similar performance; progress tracking added |
+| **CSS** | ~15–30s (sequential) | ~31s (parallel, p-limit 50, 2845 files) | Same PostCSS plugins; bottleneck is bind-mount I/O in Docker on macOS |
+| **Templates** | ~40s (sequential, blocking `readFileSync`) | ~16s (parallel, p-limit 20, async reads) | ~2.5× faster; no longer the build bottleneck |
 | **Fonts/vendor/media** | ~2–5s | ~1s | Direct fs-extra copy vs Gulp stream overhead |
 | **Total (full build)** | **~60–120s** | **~33s** | **2–4× faster overall** |
 | **Watch JS rebuild** | ~30–60s (full rebuild) | ~0.3–1s (incremental) | **60–200× faster** for a single file change |
@@ -1147,3 +1285,146 @@ The changes are on the `jordan/yolo-update` branch of `nymag/amphora-html`. Inst
 ```
 
 Once the changes are merged and published to npm, update `package.json` to the released version and remove the patch file.
+
+---
+
+## 15. Bundler Comparison: esbuild vs Webpack vs Vite
+
+When this pipeline was designed, three serious candidates were evaluated: **esbuild**, **Webpack 5**, and **Vite**. This section records why esbuild was chosen, what each tool would have required, and the concrete trade-offs in the context of Clay's architecture.
+
+### The Clay architectural constraints that drove the decision
+
+Before comparing tools, it helps to list the properties of this codebase that an ideal bundler must handle well. These are non-negotiable — the build system has to fit the codebase, not the other way around.
+
+| Constraint | Detail |
+|---|---|
+| **Pure CommonJS source** | Every `components/*/client.js`, `services/**/*.js`, and `global/js/*.js` file is written with `'use strict'; require(...)`. No native ESM `import`/`export` in source. |
+| **220+ entry points** | One `client.js` per component/layout, all bundled together in a single esbuild pass with shared chunk extraction. |
+| **20+ Node.js module stubs** | `fs`, `path`, `stream`, `util`, `events`, `http`, `https`, `buffer`, `crypto`, and more all need to be intercepted at resolve time and replaced with browser-safe stubs or empty objects. |
+| **Clay server package stubs** | `amphora-search`, `elasticsearch`, `amphora-event-bus-redis`, and several others are `require()`d transitively by universal services. They must produce empty objects in browser bundles. |
+| **`services/server/*` → `services/client/*` rewrite** | Any import that resolves inside `services/server/` must be silently redirected to its `services/client/` counterpart — or fail the build loudly if no counterpart exists. |
+| **Non-splitting globals bundle** | `global/js/*.js` files must be bundled into a single file (`_globals-init.js`). Splitting them produces 70–100 tiny shared chunks that each generate a separate `<script>` tag. |
+| **Dollar Slice runtime** | The component system uses `window.DS` (Dollar Slice) for dependency injection — not React, Vue, or any framework with HMR support. |
+| **Fast watch rebuilds** | The previous Browserify watch cycle was 30–60 seconds. An acceptable replacement needs sub-second incremental rebuilds for day-to-day development. |
+| **`_manifest.json` generation** | The render layer (`resolveMedia`, `amphora-html`) reads a JSON manifest at request time to look up content-hashed script URLs. Whatever bundler is used must produce this manifest. |
+
+---
+
+### esbuild
+
+esbuild is a Go-based bundler that compiles JavaScript and TypeScript 10–100× faster than JavaScript-based tools. It was purpose-built for bundling — no dev server, no plugin ecosystem for application frameworks, no HMR.
+
+#### Pros (in Clay's context)
+
+- **Speed.** The full 220+ entry point build completes in ~33 seconds (down from ~90 seconds with Browserify). Incremental watch rebuilds run in 0.3–1 second. Go's parallel execution model is the reason.
+- **CJS interop is transparent.** esbuild handles circular `require()`, dynamic `require()`, and `module.exports` patterns without a plugin. This matters because every file in the Clay codebase is CommonJS — there is no ESM source to optimize for.
+- **`onResolve` / `onLoad` plugin API perfectly matches the stub pattern.** All three custom plugins (`browserCompatPlugin`, `serviceRewritePlugin`, `clay-vue2`) intercept imports by matching a filter regex and returning a custom namespace or virtual module. This is exactly what esbuild's plugin API is designed for. The implementation is direct: match a pattern, return a stub — no adapters, no wrappers.
+- **Native code splitting with a single pass.** 220+ entry points plus shared chunk extraction in one `esbuild.build()` call. The `metafile` output records exactly which entry produced which output file and which shared chunks it imports — the data structure that drives `_manifest.json` generation.
+- **`splitting: false` for specific bundles.** The `_globals-init` and `_kiln-edit-init` bundles are built with splitting disabled so they emit a single output file. esbuild makes this trivially configurable per build call.
+- **`define` substitutions are first-class.** `process.env.NODE_ENV`, `__dirname`, `__filename`, and the three implicit globals (`DS`, `Eventify`, `Fingerprint2`) are all inlined at build time with zero plugin overhead. Dead branches like `if (process.env.NODE_ENV !== 'production') {}` are eliminated during minification.
+- **Minimal dependency footprint.** The entire JS pipeline requires only `esbuild` plus the three custom plugins. Compared to Browserify's 20+ Gulp/plugin chain or Webpack's 15+ loader/plugin list, this is a significant reduction in install time, attack surface, and maintenance burden.
+
+#### Cons (in Clay's context)
+
+- **No HMR.** esbuild has no dev server and no HMR protocol. This is not a meaningful loss because Dollar Slice components do not have a component-level update protocol that HMR could hook into.
+- **`minChunkSize` does not exist.** esbuild has no equivalent to Webpack's `optimization.splitChunks.minSize`. The 218 sub-1 KB shared chunks produced by the default splitting algorithm remain in the output. This is an open upstream issue ([esbuild#1128](https://github.com/evanw/esbuild/issues/1128)) — the workaround (a post-build merge plugin) is complex and not yet worth implementing.
+- **Tree shaking is ESM-only.** esbuild can tree-shake ESM imports but not CJS `require()` calls. Since the codebase is entirely CJS, dead-code elimination is limited to `process.env.NODE_ENV` branch folding during minification. This would be true of any bundler given the CJS source.
+- **No Rollup-style `manualChunks`.** Fine-grained control over which modules land in which chunks is not available. The chunk graph is determined purely by the shared-dependency algorithm.
+- **Vue 3 not supported.** The custom `clay-vue2` plugin uses `@vue/component-compiler-utils` and `vue-template-compiler` — the Vue 2 SFC compilation chain. Vue 3's compiler is incompatible. This is not an esbuild limitation per se, but the custom plugin only exists for Vue 2.
+
+---
+
+### Webpack 5
+
+Webpack 5 is the industry-standard JavaScript bundler with the largest plugin ecosystem, Module Federation support, and years of production hardening. It was the most likely alternative to esbuild at the time this pipeline was designed.
+
+#### Pros (in Clay's context)
+
+- **Mature CJS interop.** Webpack 5's CJS handling is battle-tested across millions of projects and handles edge cases (circular requires, dynamic `require()`, conditional `require()`) reliably.
+- **`optimization.splitChunks.minSize`.** Webpack has a native threshold for chunk merging that esbuild lacks. Setting `minSize: 4096` would inline chunks smaller than 4 KB back into their importers — the open issue in esbuild's chunk count problem.
+- **Vast plugin ecosystem.** `NormalModuleReplacementPlugin` handles the `services/server/*` rewrite pattern. `ProvidePlugin` handles the `window.DS` implicit global injection. Node.js polyfills via `webpack-node-externals` or `resolve.fallback` cover the 20+ built-in stubs. All of these are solved problems with documented solutions.
+- **`resolve.alias` with exact-match support.** The Vue full-build redirect (match `vue` exactly, not `vue-router` or `vue/dist/...`) is a standard `resolve.alias` pattern in Webpack.
+
+#### Cons (in Clay's context)
+
+- **Build speed.** Webpack 5 with 220+ entry points, full dependency graphs, and minification would take several minutes for a production build. A realistic estimate based on comparable codebases is 3–8 minutes — 5–15× slower than the current 33-second esbuild build. Incremental watch rebuilds would be 10–30 seconds, not 0.3–1 second.
+- **Configuration complexity.** A Webpack config for this codebase would require: `webpack-merge` for env variants, separate config objects for the non-splitting globals bundle, `MiniCssExtractPlugin` for CSS-in-JS from Vue SFCs, `vue-loader` for SFC compilation, `babel-loader` (optional but common), `thread-loader` for parallelism, a custom plugin to write `_manifest.json` from Webpack's stats object (the stats format is significantly more complex than esbuild's metafile), and a full list of `resolve.fallback` entries for all 20+ Node built-ins. The resulting config would be 300–500 lines.
+- **`_manifest.json` generation is non-trivial.** Webpack's stats output (the equivalent of esbuild's metafile) is a deeply nested object with compilation-internal IDs, asset objects, chunk groups, and module reasons. Extracting the `{ entry → hashed output file + chunk imports }` mapping that `resolveMedia` needs would require a custom Webpack stats plugin and careful handling of the chunk group graph — meaningfully more complex than reading esbuild's flat `metafile.outputs` map.
+- **20+ dependency additions.** Adding Webpack to claycli means adding `webpack`, `webpack-cli`, `webpack-merge`, `webpack-dev-server` (if HMR is wanted), `babel-loader`, `vue-loader`, `css-loader`, `mini-css-extract-plugin`, `html-webpack-plugin` (not needed here but commonly pulled in), `node-polyfill-webpack-plugin`, and several `@webpack-contrib/*` packages. This is the same 20+ dependency problem the Browserify pipeline already suffered from.
+- **No meaningful HMR benefit.** Webpack HMR requires the runtime to support hot-reloading module boundaries. Dollar Slice (`DS.controller(...)`) has no hot-replace protocol. Full-page reloads would still be required.
+
+---
+
+### Vite
+
+Vite is a build tool built by the Vue team. It uses **esbuild for dependency pre-bundling and transpilation** in development, and **Rollup for production builds**. Comparing "Vite vs esbuild" is therefore really comparing "Rollup vs esbuild" for production.
+
+#### What Vite actually is in production
+
+```
+Vite dev server     →  esbuild (pre-bundles node_modules, transforms files on request)
+Vite build          →  Rollup (bundles, tree-shakes, code-splits, produces output files)
+```
+
+This distinction matters: Vite's signature feature (instant HMR via native browser ESM) only applies to the development server. The production build uses Rollup, which is a JavaScript bundler with different performance characteristics and a different plugin API than esbuild.
+
+#### Pros (in Clay's context)
+
+- **HMR and instant dev server** — for projects that can use it. Vite's dev server does not bundle files — it serves native ESM on request, making the dev startup nearly instant and individual file changes reflect in the browser in milliseconds without a rebuild cycle. This is Vite's single greatest advantage.
+- **Rollup tree shaking** — Rollup's tree shaking is more aggressive than esbuild's for ESM source code. It performs scope analysis across module boundaries and can eliminate dead exports that esbuild's simpler algorithm misses.
+- **Rollup `manualChunks`** — the chunk merging problem (218 sub-1 KB chunks) that esbuild cannot solve could be addressed in Rollup via a `manualChunks` function that reads output sizes and merges small modules into their largest importer.
+- **First-class Vue 3 support** — `@vitejs/plugin-vue` handles Vue 3 SFCs natively. This would be the right choice for any future Vue 3 migration.
+
+#### Cons (in Clay's context)
+
+- **HMR requires a compatible component runtime.** Vite's HMR protocol requires the framework to implement the `import.meta.hot` API — React does it via Fast Refresh, Vue 3 does it natively. Dollar Slice (`DS.controller(...)`) has no equivalent. Without Dollar Slice HMR support, every file change still requires a full page reload, and the dev server advantage disappears entirely.
+- **Vite dev server + CJS source = expensive pre-bundling.** Vite's dev server works by serving native browser ESM. Every CommonJS file must be pre-bundled by esbuild before the browser can execute it. With 220+ entry points, each with their own `require()` chains, the dep pre-bundling step on first page load would be slow and the incremental pre-bundle invalidation on file change would be unreliable. This is a known Vite limitation for large CJS codebases.
+- **Production builds use Rollup, which is slower than esbuild.** Rollup is written in JavaScript (with a Rust/WASM core for the parser in Rollup 4). A 220-entry-point build through Rollup would take 2–5 minutes compared to 33 seconds through esbuild. The watch rebuild gap is even larger.
+- **All three esbuild plugins must be rewritten as Rollup plugins.** Rollup's plugin API uses `resolveId` / `load` hooks rather than `onResolve` / `onLoad`. The logic is equivalent but every plugin must be ported: the 20+ Node built-in stubs, the clay server package stubs, the `services/server/*` → `services/client/*` rewrite, and the Vue 2 SFC compiler. This is several weeks of work for equivalent functionality.
+- **`_manifest.json` generation requires a full rewrite.** The manifest writer reads esbuild's `metafile.outputs` — a flat map of output filename → `{ entryPoint, imports }`. Rollup's equivalent is `bundle` object passed to the `generateBundle` hook, which has a different shape. The manifest writer and the `get-script-dependencies.js` reader are both tightly coupled to the esbuild metafile format. Porting them means understanding both formats deeply and updating `amphora-html` integration at the same time.
+- **`@rollup/plugin-commonjs` CJS interop has edge cases.** This plugin converts CommonJS to ESM at build time so Rollup can process it. It handles most patterns correctly, but known failure modes include circular requires (common in large Clay model files), conditional `require()` (where the required path is computed at runtime), and modules that inspect `module.id` or `__filename` at runtime. esbuild handles all of these transparently.
+
+---
+
+### Summary table
+
+| Factor | esbuild | Webpack 5 | Vite (Rollup) |
+|---|---|---|---|
+| **Full build time** | ~33s | ~3–8 min | ~2–5 min |
+| **Watch rebuild time** | 0.3–1s | 10–30s | 1–5s (build); instant (dev server, if HMR works) |
+| **CJS source interop** | Transparent | Mature, battle-tested | Plugin-based (`@rollup/plugin-commonjs`), edge cases |
+| **Node built-in stubs** | Custom plugin, 20+ stubs, direct `onResolve`/`onLoad` | `resolve.fallback` / `node-polyfill-webpack-plugin` | `resolve.alias` / `vite-plugin-node-stdlib-browser` |
+| **`services/server/*` rewrite** | Custom plugin, 2-case resolution | `NormalModuleReplacementPlugin` | Custom Rollup plugin (`resolveId` hook) |
+| **220+ entry point splitting** | Native, one pass | Native, one pass | Native (Rollup), one pass |
+| **Non-splitting bundle control** | Per-call `splitting: false` | `optimization.splitChunks` exclusions | `manualChunks` override |
+| **`minChunkSize` equivalent** | Not available (upstream open) | `optimization.splitChunks.minSize` | `manualChunks` function |
+| **`_manifest.json` generation** | Flat metafile, straightforward | Complex stats object, requires custom plugin | `generateBundle` hook, requires rewrite |
+| **Vue 2 SFC support** | Custom plugin (`clay-vue2`) | `vue-loader` | No official support (Vue 3 only) |
+| **HMR** | No | Yes (with compatible runtime) | Yes (with compatible runtime) |
+| **Dollar Slice HMR** | N/A | No | No |
+| **Config lines required** | ~100 (including all plugins) | ~400–500 | ~200–300 |
+| **New dependencies added** | 1 (`esbuild`) + 3 plugins (in-repo) | ~15 npm packages | ~10 npm packages |
+| **Tree shaking** | ESM-only (limited for CJS source) | ESM-only (limited for CJS source) | Aggressive (ESM-only; same CJS limitation) |
+| **Build-time dead-code elimination** | `define` substitutions, first-class | `DefinePlugin`, same capability | `define` (Rollup), same capability |
+
+### Why esbuild
+
+The deciding factors were:
+
+1. **Speed.** A 33-second build vs 3–8 minutes is not a marginal improvement — it changes how the development loop feels. Sub-second watch rebuilds mean a changed file reflects in the browser before you switch windows.
+
+2. **The plugin model fits the problem exactly.** Stubbing 20+ Node built-ins and rewriting `services/server/*` imports are intercept-at-resolve-time operations. esbuild's `onResolve` / `onLoad` API was designed for this pattern. Webpack and Rollup can do it too, but require more scaffolding.
+
+3. **CJS interop requires zero configuration.** Because every source file is CommonJS, the bundler needs to handle CJS well — not just for simple cases, but for circular requires, conditional requires, and `module.exports` patterns. esbuild does all of this transparently. Rollup's CJS plugin has documented failure modes for patterns present in this codebase.
+
+4. **HMR provides no benefit here.** Vite's primary advantage is HMR. Dollar Slice does not implement the `import.meta.hot` protocol, so Vite's dev server would require a full page reload on every change — identical to the current watch mode behavior. Adopting Vite would add Rollup's build complexity without gaining the dev server benefit.
+
+5. **The manifest format is already built.** The `_manifest.json` writer and the `get-script-dependencies.js` reader are both tightly coupled to esbuild's metafile format. Both work correctly today. Switching to Webpack or Rollup would require rewriting both, plus corresponding changes to `amphora-html`, for no functional improvement.
+
+### When to reconsider
+
+This decision is correct for the current state of the codebase. Revisit it if:
+
+- **Source files are converted to ESM.** If `components/**/*.js` are rewritten as native ESM modules, Rollup's tree shaking becomes significantly more powerful and Vite's dev server becomes usable. This is a large migration that would need to happen first.
+- **Dollar Slice is replaced with a framework that supports HMR.** If components migrate to Vue 3 or React, Vite's HMR becomes a real productivity gain and the dev server advantage materializes.
+- **esbuild's chunk merging limitation becomes the primary bottleneck.** If [esbuild#1128](https://github.com/evanw/esbuild/issues/1128) remains unresolved and the tiny-chunk request count proves to be a meaningful performance regression in production measurements, Rollup's `manualChunks` function is a concrete reason to reconsider. This should be evaluated with real RUM data before acting on it.
