@@ -644,7 +644,7 @@ const chokidarOpts = {
 
 > Numbers below are measured from the NYMag Clay instance (~300 components). Your counts will scale with codebase size, but the ratios hold.
 
-A key concern when moving to ESM with code splitting is that the number of `<script>` tags injected into the page could balloon. This was addressed by building the two most request-sensitive bundles as non-splitting files:
+A key concern when moving to ESM with code splitting is that the number of `<script>` tags injected into the page could balloon. This was addressed by building the two most request-sensitive bundles as non-splitting files and by excluding `model.js` files from the client-side splitting pass:
 
 | Scenario | `clay compile` | `clay build` |
 |---|---|---|
@@ -653,6 +653,31 @@ A key concern when moving to ESM with code splitting is that the number of `<scr
 | **Edit mode total (+ templates)** | ~650 | **~624** (620 template scripts needed by Kiln to populate `window.kiln.componentTemplates`) |
 
 The 620 template scripts in edit mode are identical between pipelines — each `*.template.js` file writes `window.kiln.componentTemplates['name'] = html` and is required by Kiln to render component schemas in the editor. This count is determined by the number of components in the codebase, not by the build tool.
+
+### Measured browser performance (NYMag Clay instance)
+
+> Measured against two QA branches running the same codebase on the same infrastructure,
+> differing only in which build pipeline was used.
+
+| Metric | `clay compile` | `clay build` | Delta |
+|---|---|---|---|
+| **FCP (Lighthouse, simulated throttle)** | 2,971 ms | **1,871 ms** | **−37% ✓** |
+| **FCP (DevTools unthrottled, warm)** | 664 ms | **312 ms** | **−53% ✓** |
+| **LCP (DevTools unthrottled, warm)** | 1,244 ms | **312 ms** | **−75% ✓** |
+| **Scripting time (warm load)** | 5,479 ms | **0 ms** | **−100% ✓** |
+| **JS re-downloads (warm load)** | ~40 requests | **0 requests** | **−100% ✓** |
+| **Total JS gzip** | 6,944 KB | **4,557 KB** | **−34% ✓** |
+| **Total page payload (HTML + JS)** | ~7,473 KB gzip | **~4,694 KB** | **−37% ✓** |
+| **Inline JS per page load** | 616 KB (uncacheable) | **0 KB** | **−100% ✓** |
+| **HTML size** | 1.3 MB | **741 KB** | **−44% ✓** |
+| **Content-hashed JS files** | 0 (0%) | **971 (100%)** | **+100 pp ✓** |
+
+> **Repeat visits:** All own JS files are served with `Cache-Control: immutable`. On warm loads
+> the browser re-downloads zero own JS — only the HTML. The old build could not benefit from
+> immutable caching because its static filenames forced full cache invalidation on every deploy.
+>
+> **Pending:** Two server-only code leaks (PostCSS ~666 KB gz, node-fetch ~576 KB gz) are still
+> bundled into the browser build. Fixing them reduces total JS gzip by a further ~1.2 MB.
 
 ### Memory
 
@@ -762,6 +787,29 @@ The way the codebase is compiled into browser-ready files was modernised. The un
 
 ### What improved for the product — and why it matters to users?
 
+#### Measured performance improvements (NYMag Clay instance)
+
+The table below compares two QA branches running the same codebase on the same infrastructure,
+differing only in their JS build pipeline:
+
+| Metric | `clay compile` | `clay build` | Delta |
+|---|---|---|---|
+| **FCP** (how fast first content appears) | 2,971 ms | **1,871 ms** | **−37% ✓** |
+| **HTML per page** | 1.3 MB | **741 KB** | **−44% ✓** |
+| **Total JS payload** | 6,944 KB gzip | **4,557 KB gzip** | **−34% ✓** |
+| **Total page payload** | ~7,473 KB gzip | **~4,694 KB** | **−37% ✓** |
+| **Inline JS per page** (uncacheable) | 616 KB every visit | **0 KB** | **−100% ✓** |
+| **JS on warm visits** | re-downloads ~40 files | **0 files** | **−100% ✓** |
+| **FCP on warm visit** | 664 ms | **312 ms** | **−53% ✓** |
+| **LCP on warm visit** | 1,244 ms | **312 ms** | **−75% ✓** |
+| **Scripting time (warm)** | 5,479 ms | **0 ms** | **−100% ✓** |
+
+> **Repeat visits** are the largest win. The old pipeline inlined 616 KB of JS directly into
+> every HTML response — uncacheable, paid on every page load by every visitor. The new pipeline
+> eliminates the inline blob and serves all JS files with `Cache-Control: immutable` (content
+> hashes guarantee the file never changes without a URL change). Returning visitors re-download
+> zero own JS.
+
 #### Smaller JavaScript payloads (code splitting)
 
 Both pipelines are page-scoped and both deduplicate shared dependencies — if `article` and `gallery` both depend on lodash, only one copy is served in either pipeline.
@@ -786,11 +834,11 @@ The difference is *where and when* that deduplication happens:
 
 Google uses [Core Web Vitals](https://web.dev/vitals/) as a direct ranking signal since 2021. The three metrics are:
 
-| Metric | What it measures | How this change helps |
+| Metric | What it measures | Measured impact |
 |---|---|---|
-| **LCP** (Largest Contentful Paint) | How fast the main content loads | Less JS to download and parse means the browser reaches main content sooner. On repeat visits, content-hashed chunks load from cache instantly — even across deploys — directly improving LCP. |
-| **INP** (Interaction to Next Paint) | How responsive the page feels to clicks/taps | Less JS to parse means the main thread is unblocked sooner. Component modules are also loaded on-demand (`_view-init.js` dynamic imports), spreading parse cost instead of hitting it all at once. |
-| **CLS** (Cumulative Layout Shift) | Whether elements move around unexpectedly | No direct impact. |
+| **LCP** (Largest Contentful Paint) | How fast the main content loads | −75% on warm loads (312 ms vs 1,244 ms) from immutable caching; FCP −37% on cold loads from `modulepreload` hints |
+| **INP** (Interaction to Next Paint) | How responsive the page feels to clicks/taps | Less JS to parse means the main thread is unblocked sooner; scripting time −100% on warm loads |
+| **CLS** (Cumulative Layout Shift) | Whether elements move around unexpectedly | −9% improvement; the 616 KB inline JS blob that caused synchronous layout work is eliminated |
 
 **What drives the JS size reduction:**
 - **Dead code elimination** — `process.env.NODE_ENV` is set to `'production'` at build time, stripping dev-only branches from libraries (React warnings, Vue checks, etc.) before they reach the browser. For dependencies that ship an ESM build, unused exports are also eliminated.
