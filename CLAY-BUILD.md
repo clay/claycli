@@ -16,7 +16,7 @@
 10. [Learning Curve](#10-learning-curve)
 11. [For Product Managers](#11-for-product-managers)
 12. [Tests](#12-tests)
-13. [Migration Guide](#13-migration-guide)
+13. [Migration Guide](#13-migration-guide) _(includes optional per-site rollout strategy)_
 14. [amphora-html Changes](#14-amphora-html-changes)
 15. [Bundler Comparison: esbuild vs Webpack vs Vite](#15-bundler-comparison-esbuild-vs-webpack-vs-vite)
 
@@ -168,39 +168,48 @@ Both pipelines share the same source files and produce the same `public/` output
 
 The most immediately visible difference: sequential vs parallel execution.
 
+**🕐 Legacy — `clay compile` (Browserify + Gulp, ~90s)**
+
 ```mermaid
+%%{init: {'flowchart': {'nodeSpacing': 60, 'rankSpacing': 70, 'padding': 20}}}%%
 flowchart LR
     SRC(["📁 Source Files"]):::src
 
-    subgraph LEGACY[ ]
-        direction TB
-        LH["🕐 clay compile · Browserify + Gulp · ~90s"]:::hdr
-        L1["📦 JS Bundle\nBrowserify + Babel\n30–60 s"]:::slow
-        L2["🎨 CSS\nGulp + PostCSS 7\n15–30 s"]:::slow
-        L3["📄 Templates\nGulp + Handlebars\n10–20 s"]:::med
-        L4["🔤 Fonts + 🖼 Media\nGulp copy · 2–5 s"]:::fast
-        LH ~~~ L1 -->|"waits"| L2 -->|"waits"| L3 -->|"waits"| L4
-    end
-
-    subgraph MODERN[ ]
-        direction TB
-        NH["⚡ clay build · esbuild + PostCSS 8 · ~33s"]:::hdr
-        N0["🖼 Media\nfs-extra · ~0.7 s"]:::fast
-        N1["📦 JS + Vue\nesbuild · ~3 s"]:::vfast
-        N2["🎨 CSS\nPostCSS 8 · ~32 s"]:::slow
-        N3["📄 Templates\nHandlebars · ~16 s"]:::med
-        N4["🔤 Fonts + 📚 Vendor\nfs-extra · ~1 s"]:::fast
-        NH ~~~ N0 -->|"all at once"| N1 & N2 & N3 & N4
-    end
+    L1["📦 JS Bundle<br/>Browserify + Babel<br/>30–60 s"]:::slow
+    L2["🎨 CSS<br/>Gulp + PostCSS 7<br/>15–30 s"]:::slow
+    L3["📄 Templates<br/>Gulp + Handlebars<br/>10–20 s"]:::med
+    L4["🔤 Fonts + 🖼 Media<br/>Gulp copy · 2–5 s"]:::fast
 
     OUT(["📂 public/"]):::out
 
-    SRC --> LEGACY --> OUT
-    SRC --> MODERN --> OUT
+    SRC --> L1 -->|"waits"| L2 -->|"waits"| L3 -->|"waits"| L4 --> OUT
 
     classDef src   fill:#1e293b,color:#94a3b8,stroke:#334155
     classDef out   fill:#1e293b,color:#94a3b8,stroke:#334155
-    classDef hdr   fill:#1e3a5f,color:#93c5fd,stroke:#1d4ed8,font-weight:bold
+    classDef slow  fill:#7f1d1d,color:#fca5a5,stroke:#991b1b
+    classDef med   fill:#78350f,color:#fcd34d,stroke:#92400e
+    classDef fast  fill:#14532d,color:#86efac,stroke:#166534
+```
+
+**⚡ New — `clay build` (esbuild + PostCSS 8, ~33s)**
+
+```mermaid
+%%{init: {'flowchart': {'nodeSpacing': 60, 'rankSpacing': 70, 'padding': 20}}}%%
+flowchart LR
+    SRC(["📁 Source Files"]):::src
+
+    N0["🖼 Media<br/>fs-extra · ~0.7 s"]:::fast
+    N1["📦 JS + Vue<br/>esbuild · ~3 s"]:::vfast
+    N2["🎨 CSS<br/>PostCSS 8 · ~32 s"]:::slow
+    N3["📄 Templates<br/>Handlebars · ~16 s"]:::med
+    N4["🔤 Fonts + 📚 Vendor<br/>fs-extra · ~1 s"]:::fast
+
+    OUT(["📂 public/"]):::out
+
+    SRC --> N0 -->|"all at once"| N1 & N2 & N3 & N4 --> OUT
+
+    classDef src   fill:#1e293b,color:#94a3b8,stroke:#334155
+    classDef out   fill:#1e293b,color:#94a3b8,stroke:#334155
     classDef slow  fill:#7f1d1d,color:#fca5a5,stroke:#991b1b
     classDef med   fill:#78350f,color:#fcd34d,stroke:#92400e
     classDef fast  fill:#14532d,color:#86efac,stroke:#166534
@@ -223,70 +232,71 @@ flowchart LR
 
 This is the diagram that explains *why* so many other things had to change. The entire difference in `resolve-media.js`, `_view-init`, `_kiln-edit-init`, and `_globals-init` flows from this single architectural difference.
 
+**🕐 Legacy — `clay compile` (Browserify runtime module registry)**
+
 ```mermaid
+%%{init: {'flowchart': {'nodeSpacing': 60, 'rankSpacing': 70, 'padding': 20}}}%%
 flowchart TB
-    subgraph OLD["🕐  clay compile — Browserify runtime module registry"]
-        direction TB
-        OS["components/**/client.js\ncomponents/**/model.js\ncomponents/**/kiln.js\nglobal/js/*.js"]:::src
+    OS["Source files<br/>components/**/client.js · model.js · kiln.js<br/>global/js/*.js"]:::src
 
-        OB["Browserify megabundler\n+ Babel transpile\n+ _prelude.js / _postlude.js\n(custom window.require runtime)"]:::tool
+    OB["Browserify megabundler + Babel<br/>_prelude.js / _postlude.js<br/>custom window.require runtime"]:::tool
 
-        OR["_registry.json\n{ '12': ['4','7'] }\n_ids.json\n{ '12': 'article/client' }"]:::artifact
+    OR["_registry.json  — numeric dep graph<br/>_ids.json  — module ID → filename map"]:::artifact
 
-        OI["_client-init.js\ncalls window.require(key)\nfor every .client in window.modules\n— regardless of DOM presence"]:::loader
+    OI["_client-init.js<br/>calls window.require(key) for every .client<br/>regardless of DOM presence"]:::loader
 
-        OG["_deps-a.js _deps-b.js …\n(alpha-bucketed shared deps)\n_models-a.js _kiln-a.js …\n(alpha-bucketed edit files)"]:::output
+    OG["_deps-a.js _deps-b.js …  (alpha-bucketed shared deps)<br/>_models-a.js _kiln-a.js …  (alpha-bucketed edit files)"]:::output
 
-        OS -->|"one big bundle per alpha bucket"| OB
-        OB -->|"writes"| OR
-        OB -->|"generates"| OI
-        OB -->|"outputs"| OG
-    end
+    OS -->|"one big bundle per alpha bucket"| OB
+    OB -->|"writes"| OR
+    OB -->|"generates"| OI
+    OB -->|"outputs"| OG
 
-    subgraph NEW["⚡  clay build — esbuild static module graph"]
-        direction TB
-        NS["components/**/client.js\ncomponents/**/model.js\ncomponents/**/kiln.js\nglobal/js/*.js"]:::src
-
-        NG["clay build generates\n.clay/_view-init.js\n.clay/_kiln-edit-init.js\n.clay/_globals-init.js\nbefore each esbuild run"]:::gen
-
-        NE["esbuild\n(Go, native code splitting)\nno transpile, no runtime registry\nESM import/export wiring"]:::tool
-
-        NM["_manifest.json\n{ 'components/article/client':\n  { file: 'client-A1B2.js',\n    imports: ['chunks/shared-C3D4.js'] } }"]:::artifact
-
-        NV["_view-init-[hash].js\nmounts component.client.js\nonly when its DOM element\nexists — lazy dynamic import()"]:::loader
-
-        NK["_kiln-edit-init-[hash].js\nregisters all model.js + kiln.js\non window.kiln.componentModels\nsplitting:false — single file"]:::output
-
-        NGL["_globals-init-[hash].js\nall global/js/*.js in one file\nsplitting:false — avoids\n70–100 tiny chunk requests"]:::output
-
-        NC["public/js/chunks/\ncontent-hashed shared chunks\nexact file, exact version,\ncacheable forever"]:::output
-
-        NS -->|"entry points"| NG
-        NG -->|"feeds"| NE
-        NE -->|"writes"| NM
-        NE -->|"outputs"| NV
-        NE -->|"outputs"| NK
-        NE -->|"outputs"| NGL
-        NE -->|"extracts shared deps into"| NC
-    end
-
-    subgraph SHARED["🔁  Same in both pipelines"]
-        direction LR
-        SCS["CSS: PostCSS plugins\nautoprefixer · postcss-import\npostcss-mixins · postcss-nested\n→ public/css/"]:::same
-        SCT["Templates: Handlebars precompile\n→ public/js/*.template.js"]:::same
-        SCF["Fonts: copy + CSS concat\n→ public/fonts/ + public/css/"]:::same
-        SCM["Media: file copy\n→ public/media/"]:::same
-        SCS ~~~ SCT ~~~ SCF ~~~ SCM
-    end
-
-    classDef src    fill:#1e3a5f,color:#93c5fd,stroke:#1d4ed8
-    classDef tool   fill:#3b1f6e,color:#c4b5fd,stroke:#7c3aed
-    classDef gen    fill:#1f3b2a,color:#6ee7b7,stroke:#059669
+    classDef src      fill:#1e3a5f,color:#93c5fd,stroke:#1d4ed8
+    classDef tool     fill:#3b1f6e,color:#c4b5fd,stroke:#7c3aed
     classDef artifact fill:#422006,color:#fcd34d,stroke:#b45309
-    classDef loader fill:#1c2b4a,color:#93c5fd,stroke:#2563eb
-    classDef output fill:#14532d,color:#86efac,stroke:#166534
-    classDef same   fill:#1e293b,color:#94a3b8,stroke:#334155
+    classDef loader   fill:#1c2b4a,color:#93c5fd,stroke:#2563eb
+    classDef output   fill:#14532d,color:#86efac,stroke:#166534
 ```
+
+**⚡ New — `clay build` (esbuild static module graph)**
+
+```mermaid
+%%{init: {'flowchart': {'nodeSpacing': 60, 'rankSpacing': 70, 'padding': 20}}}%%
+flowchart TB
+    NS["Source files<br/>components/**/client.js · model.js · kiln.js<br/>global/js/*.js"]:::src
+
+    NG["Pre-generated entry points<br/>.clay/_view-init.js<br/>.clay/_kiln-edit-init.js<br/>.clay/_globals-init.js"]:::gen
+
+    NE["esbuild — native code splitting<br/>no transpile · no runtime registry<br/>ESM import/export wiring"]:::tool
+
+    NM["_manifest.json<br/>{ 'components/article/client':<br/>  { file: 'client-A1B2.js', imports: ['chunks/shared-C3D4.js'] } }"]:::artifact
+
+    NV["_view-init-[hash].js<br/>mounts client.js via dynamic import()<br/>only when the component's DOM element exists"]:::loader
+
+    NK["_kiln-edit-init-[hash].js<br/>registers all model.js + kiln.js<br/>on window.kiln.componentModels<br/>splitting:false — single self-contained file"]:::output
+
+    NGL["_globals-init-[hash].js<br/>all global/js/*.js in one file<br/>splitting:false — 1 request instead of 70–100"]:::output
+
+    NC["public/js/chunks/<br/>content-hashed shared chunks<br/>cacheable forever"]:::output
+
+    NS -->|"entry points"| NG
+    NG -->|"feeds"| NE
+    NE -->|"writes"| NM
+    NE -->|"outputs"| NV
+    NE -->|"outputs"| NK
+    NE -->|"outputs"| NGL
+    NE -->|"extracts shared deps"| NC
+
+    classDef src      fill:#1e3a5f,color:#93c5fd,stroke:#1d4ed8
+    classDef gen      fill:#1f3b2a,color:#6ee7b7,stroke:#059669
+    classDef tool     fill:#3b1f6e,color:#c4b5fd,stroke:#7c3aed
+    classDef artifact fill:#422006,color:#fcd34d,stroke:#b45309
+    classDef loader   fill:#1c2b4a,color:#93c5fd,stroke:#2563eb
+    classDef output   fill:#14532d,color:#86efac,stroke:#166534
+```
+
+**🔁 Same in both pipelines:** CSS (PostCSS plugins → `public/css/`) · Templates (Handlebars precompile → `public/js/*.template.js`) · Fonts (copy + concat → `public/fonts/`) · Media (copy → `public/media/`)
 
 **What this diagram shows:**
 
@@ -304,49 +314,34 @@ flowchart TB
 How the server decides which JS files to inject into a page response — the `resolve-media.js` path.
 
 ```mermaid
+%%{init: {'flowchart': {'nodeSpacing': 60, 'rankSpacing': 70, 'padding': 20}}}%%
 flowchart TD
-    REQ(["HTTP request\nfor a Clay page"]):::req
+    REQ(["HTTP request for a Clay page"]):::req
 
-    subgraph AMP["amphora-html — injectScriptsAndStyles()"]
-        direction TB
-        AH["sets locals._components\n= rendered component names"]:::step
-        RM["calls resolveMedia(media, locals)"]:::step
-        INJ["injects into HTML:\n• <link rel=modulepreload> in <head>\n• <script type=module> at </body>"]:::step
-        AH --> RM --> INJ
-    end
+    AH["amphora-html<br/>sets locals._components = rendered component names"]:::step
+    RM["calls resolveMedia(media, locals)"]:::step
+    HM{"_manifest.json exists?<br/>hasManifest()"}:::gate
 
-    subgraph RM_OLD["resolve-media.js — clay compile path"]
-        direction TB
-        RO1["getDependencies(scripts, assetPath)"]:::old
-        RO2["reads _registry.json\nwalks numeric dep graph\nreturns per-page dep file list\n(123.js, 456.js, …)"]:::old
-        RO3["returns static filenames\nno content hash\nno preload hints"]:::old
-        RO1 --> RO2 --> RO3
-    end
+    REQ --> AH --> RM --> HM
 
-    subgraph RM_NEW["resolve-media.js — clay build path"]
-        direction TB
-        RN1["clayBuild.resolveModuleScripts\n(media, assetPath, { edit })"]:::new
-        RN2["reads _manifest.json\nlooks up each component\nfollows imports[] chain\ncollects hashed chunk URLs"]:::new
-        RN3["populates:\nmedia.moduleScripts  → <script type=module>\nmedia.modulePreloads → <link rel=modulepreload>"]:::new
-        RN4["omits ?version= from module URLs\n(content hash is the cache buster)"]:::new
-        RN1 --> RN2 --> RN3 --> RN4
-    end
+    HM -->|"no — clay compile path 🔴"| RO1
+    HM -->|"yes — clay build path 🟢"| RN1
 
-    subgraph GATE["hasManifest() branch"]
-        direction LR
-        HM{"_manifest.json\nexists?"}:::gate
-        HM -->|"yes"| RM_NEW
-        HM -->|"no"| RM_OLD
-    end
+    RO1["getDependencies(scripts, assetPath)"]:::old
+    RO2["reads _registry.json<br/>walks numeric dep graph<br/>returns static filenames: 123.js, 456.js …"]:::old
+    RO3["injects plain script tags<br/>no content hash · no preload hints<br/>full CDN invalidation on every deploy"]:::old
+    RO1 --> RO2 --> RO3
 
-    REQ --> AMP
-    AMP --> GATE
+    RN1["clayBuild.resolveModuleScripts<br/>(media, assetPath, { edit })"]:::new
+    RN2["reads _manifest.json<br/>looks up each rendered component<br/>follows imports[] → hashed chunk URLs"]:::new
+    RN3["populates moduleScripts + modulePreloads<br/>omits ?version= — content hash is the cache buster<br/>injects script type=module + link rel=modulepreload"]:::new
+    RN1 --> RN2 --> RN3
 
-    classDef req   fill:#1e3a5f,color:#93c5fd,stroke:#1d4ed8
-    classDef step  fill:#1e293b,color:#94a3b8,stroke:#334155
-    classDef old   fill:#7f1d1d,color:#fca5a5,stroke:#991b1b
-    classDef new   fill:#14532d,color:#86efac,stroke:#166534
-    classDef gate  fill:#422006,color:#fcd34d,stroke:#b45309
+    classDef req  fill:#1e3a5f,color:#93c5fd,stroke:#1d4ed8
+    classDef step fill:#1e293b,color:#94a3b8,stroke:#334155
+    classDef gate fill:#422006,color:#fcd34d,stroke:#b45309
+    classDef old  fill:#7f1d1d,color:#fca5a5,stroke:#991b1b
+    classDef new  fill:#14532d,color:#86efac,stroke:#166534
 ```
 
 **What `hasManifest()` gives you:** A single boolean that makes the two pipelines fully hot-swappable at runtime. Deploy with `CLAYCLI_BUILD_ENABLED=true` → `_manifest.json` appears → new path activates. Roll back by removing the flag → `_manifest.json` disappears on the next deploy → old path activates. No code changes in the site.
@@ -1198,6 +1193,77 @@ Benefits:
 - `window.DS` global dependency eliminated for these files
 
 Component `client.js` files that call `window.DS.controller()` (the NYMag Clay instance has ~120 such files) can be migrated independently in a follow-up; they do not block this refactor since they run after `_globals-init` has already executed and `window.DS` is set.
+
+### Optional: Per-site rollout strategy
+
+If your Clay instance serves multiple sites and you want to validate the new pipeline on one site before flipping all of them, you can use `CLAYCLI_BUILD_SITES` to gate the pipeline per site slug.
+
+**When to use this:** Your instance has many sites (5+) and you want incremental validation — migrate one site, observe it in production for a week, then add the next.
+
+**When not to use this:** Your instance serves one or two sites, or you have a robust feature-branch + staging workflow that gives you enough confidence. The dual-pipeline overhead isn't worth it for a short validation window.
+
+#### How it works
+
+`CLAYCLI_BUILD_SITES` is a comma-separated list of site slugs. When set in `resolve-media.js`, each page request checks `locals.site.slug` against the list. Sites in the list are served esbuild output; all others fall back to Browserify.
+
+```js
+// services/resolve-media.js
+const CLAYCLI_BUILD_SITES = process.env.CLAYCLI_BUILD_SITES
+  ? new Set(process.env.CLAYCLI_BUILD_SITES.split(',').map(s => s.trim()))
+  : null; // null = all sites use the new pipeline
+
+function useNewPipeline(site) {
+  if (!clayBuild.hasManifest()) return false;
+  if (CLAYCLI_BUILD_SITES === null) return true;
+  return CLAYCLI_BUILD_SITES.has(site.slug);
+}
+```
+
+Because both pipelines' output must exist simultaneously, the Dockerfile (or CI build step) needs to run both `clay build` and `clay compile` when `CLAYCLI_BUILD_SITES` is set:
+
+```dockerfile
+# Run both pipelines during the per-site rollout window
+elif [ "$CLAYCLI_BUILD_ENABLED" = "true" ] && [ -n "$CLAYCLI_BUILD_SITES" ]; then
+    npm run build:assets && npm run build:pack-next;
+```
+
+#### Trade-offs
+
+| Factor | Per-site rollout | Full flip |
+|---|---|---|
+| **Risk** | Low — one site at a time, instant per-site rollback via env var | Higher — all sites change at once |
+| **Rollback** | Remove slug from `CLAYCLI_BUILD_SITES`, no redeploy needed | Revert `CLAYCLI_BUILD_ENABLED`, redeploy |
+| **CI build time** | +25–30% (both pipelines run) | No change (single pipeline) |
+| **CDN** | Both output sets uploaded, no conflicts (different filenames) | Single output set |
+| **Operational complexity** | Two code paths active in `resolve-media.js` during migration | Single code path |
+| **Recommended window** | 4–6 weeks maximum | One-shot flip |
+
+#### Suggested migration schedule
+
+1. Enable for one lower-traffic site (e.g. `grubstreet`). Validate pipeline indicator, component mounting, ads, Kiln, auth, and caching over 1–2 weeks.
+2. Add 2–3 mid-traffic sites. Observe for another week.
+3. Add remaining high-traffic sites.
+4. Remove `CLAYCLI_BUILD_SITES` entirely once all sites pass QA — `clay build` becomes the universal pipeline.
+5. Drop `clay compile` from the Dockerfile and remove the Browserify build script.
+
+#### Pipeline indicator (optional but recommended)
+
+Add a small self-detecting log to your `global/js/aaa-module-mounting.js` (or equivalent first-running global script) to confirm which pipeline loaded on any given page:
+
+```js
+// Fires on every full-page load — no component changes needed
+(function logPipeline() {
+  var isEsbuild = typeof window.require === 'undefined';
+  console.log(
+    isEsbuild
+      ? '%c[clay pipeline] esbuild (clay build)'
+      : '%c[clay pipeline] Browserify (clay compile)',
+    isEsbuild ? 'color:#22c55e;font-weight:bold' : 'color:#f59e0b;font-weight:bold'
+  );
+}());
+```
+
+`window.require` is created by Browserify's runtime (`_prelude.js`) and is never present in the esbuild pipeline. This check works regardless of which bundle the script runs in, and correctly detects the active pipeline on the first script execution.
 
 ## 14. amphora-html Changes
 
