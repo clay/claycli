@@ -451,8 +451,25 @@ module.exports.esbuildConfig = function(config) {
   // config is the full esbuild BuildOptions object.
   //
   // Example below is from the NYMag Clay instance (nymag/sites claycli.config.js).
-  // Your aliases will differ depending on which server-only packages your
-  // universal/ services import.
+  // Your aliases and define entries will differ depending on which packages and
+  // global conventions your project uses.
+
+  // ── Project-specific global variables ────────────────────────────────────
+  // If your components use libraries as free variables (no import statement),
+  // declare them here so esbuild rewrites those references to window.* at
+  // build time.  The runtime side — actually putting the values on window —
+  // must be done by a global/js/*.js file (e.g. aaa-module-mounting.js) that
+  // runs before any component client.js loads.
+  //
+  // Claycli's core deliberately does not assume any specific global libraries
+  // (DS, Eventify, Fingerprint2, etc.) because not every Clay project uses them.
+  config.define = Object.assign({}, config.define, {
+    DS: 'window.DS',
+    Eventify: 'window.Eventify',
+    Fingerprint2: 'window.Fingerprint2',
+  });
+
+  // ── Aliases for server-only packages ─────────────────────────────────────
   config.alias = {
     ...config.alias,
     // Redirect server-only packages to browser stubs
@@ -851,7 +868,7 @@ The move from Browserify/Gulp to esbuild removes a significant number of package
 | **Understanding the output** | `_registry.json` with numeric IDs, requires `_ids.json` to decode | `_manifest.json` is human-readable JSON — open it and immediately understand which files are loaded for which component |
 | **Adding a new package** | May require a Browserify transform or browser-field shim in the consuming repo | Add to `esbuildConfig.alias` in `claycli.config.js`, or it is automatically stubbed by `browser-compat.js` |
 | **Vue SFCs** | `@nymag/vueify` Browserify transform | Custom esbuild plugin using same `vue-template-compiler` — identical output |
-| **Global variables (DS, Eventify)** | Implicit — leaked into scope via Browserify's global module scope | Already defined in claycli's default config via `esbuild define`; no action needed unless adding new globals |
+| **Global variables (DS, Eventify)** | Implicit — leaked into scope via Browserify's global module scope | Must be declared in your project's `esbuildConfig` hook via `config.define`. Claycli does not assume any specific global libraries — see [Configuration](#6-configuration) for an example. |
 | **Server-only imports in universal code** | `rewriteServiceRequire` Browserify transform | `service-rewrite.js` esbuild plugin (same concept, same enforcement) |
 | **`process.env.NODE_ENV`** | Set in `_client-init.js` at runtime — dead branches survive into the bundle | Set via `esbuild define` at build time — `if (process.env.NODE_ENV !== 'production') {}` blocks are eliminated in minified output |
 | **Tree shaking** | None — `require('lodash')` pulled in the whole library | For ESM dependencies only — packages that ship an ESM build can be tree-shaken. CJS packages like `lodash` (not `lodash-es`) are still bundled whole. The main dead-code win is `process.env.NODE_ENV` build-time evaluation, not module-format conversion. |
