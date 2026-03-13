@@ -124,8 +124,10 @@ clay compile
 clay build
 │
 ├── scripts.js    ← esbuild (JS + Vue SFCs, code-split)
-│   ├── Entry points: every components/**/client.js, model.js, kiln.js
-│   │                 (global/js/*.js excluded — bundled into _globals-init)
+│   ├── Entry points (splitting pass): components/**/client.js, layouts/**/client.js,
+│   │                 services/kiln/index.js, .clay/_view-init.js
+│   │                 (model.js and kiln.js are excluded — see _kiln-edit-init below;
+│   │                  global/js/*.js excluded — see _globals-init below)
 │   ├── Code-split chunks: shared dependencies extracted automatically
 │   ├── _manifest.json ← human-readable entry→file+chunks map
 │   ├── .clay/_view-init.js ← generated bootstrap (mounts components, sticky events)
@@ -264,11 +266,15 @@ flowchart TB
 ```mermaid
 %%{init: {'flowchart': {'nodeSpacing': 60, 'rankSpacing': 70, 'padding': 20}}}%%
 flowchart TB
-    NS["Source files<br/>components/**/client.js · model.js · kiln.js<br/>global/js/*.js"]:::src
+    NS1["Source files (splitting pass)<br/>components/**/client.js · layouts/**/client.js<br/>services/kiln/index.js"]:::src
+
+    NS2["Source files (non-splitting pass)<br/>components/**/model.js · kiln.js<br/>global/js/*.js"]:::src
 
     NG["Pre-generated entry points<br/>.clay/_view-init.js<br/>.clay/_kiln-edit-init.js<br/>.clay/_globals-init.js"]:::gen
 
-    NE["esbuild — native code splitting<br/>no transpile · no runtime registry<br/>ESM import/export wiring"]:::tool
+    NE["esbuild pass A — splitting: true<br/>client.js + _view-init<br/>shared chunk extraction"]:::tool
+
+    NE2["esbuild pass B — splitting: false<br/>_kiln-edit-init · _globals-init<br/>self-contained single files"]:::tool
 
     NM["_manifest.json<br/>{ 'components/article/client':<br/>  { file: 'client-A1B2.js', imports: ['chunks/shared-C3D4.js'] } }"]:::artifact
 
@@ -280,13 +286,15 @@ flowchart TB
 
     NC["public/js/chunks/<br/>content-hashed shared chunks<br/>cacheable forever"]:::output
 
-    NS -->|"entry points"| NG
+    NS1 -->|"entry points"| NG
+    NS2 -->|"entry points"| NG
     NG -->|"feeds"| NE
+    NG -->|"feeds"| NE2
     NE -->|"writes"| NM
     NE -->|"outputs"| NV
-    NE -->|"outputs"| NK
-    NE -->|"outputs"| NGL
     NE -->|"extracts shared deps"| NC
+    NE2 -->|"outputs"| NK
+    NE2 -->|"outputs"| NGL
 
     classDef src      fill:#1e3a5f,color:#93c5fd,stroke:#1d4ed8
     classDef gen      fill:#1f3b2a,color:#6ee7b7,stroke:#059669
@@ -883,7 +891,7 @@ The move from Browserify/Gulp to esbuild removes a significant number of package
 **What's different:**
 - Component code runs lazily (only when the component's DOM element is present) instead of at page load
 - JS entry points are explicit per-component files, not a single megabundle shared across all components
-- Standard Clay globals (`DS`, `Eventify`, `Fingerprint2`) are already handled in claycli's defaults; only site-specific globals need configuring
+- Site-specific globals (`DS`, `Eventify`, `Fingerprint2`, etc.) must be declared in your project's `esbuildConfig` hook via `config.define` — claycli does not assume any particular global libraries. See [Configuration](#6-configuration) for an example.
 
 ### Real-world time savings — watch mode ROI
 
@@ -1404,7 +1412,7 @@ esbuild is a Go-based bundler that compiles JavaScript and TypeScript 10–100×
 - **`onResolve` / `onLoad` plugin API perfectly matches the stub pattern.** All three custom plugins (`browserCompatPlugin`, `serviceRewritePlugin`, `clay-vue2`) intercept imports by matching a filter regex and returning a custom namespace or virtual module. This is exactly what esbuild's plugin API is designed for. The implementation is direct: match a pattern, return a stub — no adapters, no wrappers.
 - **Native code splitting with a single pass.** 220+ entry points plus shared chunk extraction in one `esbuild.build()` call. The `metafile` output records exactly which entry produced which output file and which shared chunks it imports — the data structure that drives `_manifest.json` generation.
 - **`splitting: false` for specific bundles.** The `_globals-init` and `_kiln-edit-init` bundles are built with splitting disabled so they emit a single output file. esbuild makes this trivially configurable per build call.
-- **`define` substitutions are first-class.** `process.env.NODE_ENV`, `__dirname`, `__filename`, and the three implicit globals (`DS`, `Eventify`, `Fingerprint2`) are all inlined at build time with zero plugin overhead. Dead branches like `if (process.env.NODE_ENV !== 'production') {}` are eliminated during minification.
+- **`define` substitutions are first-class.** `process.env.NODE_ENV`, `__dirname`, `__filename`, and any project-specific implicit globals (e.g. `DS`, `Eventify`, `Fingerprint2` — declared in the site's `esbuildConfig` hook) are all inlined at build time with zero plugin overhead. Dead branches like `if (process.env.NODE_ENV !== 'production') {}` are eliminated during minification.
 - **Minimal dependency footprint.** The entire JS pipeline requires only `esbuild` plus the three custom plugins. Compared to Browserify's 20+ Gulp/plugin chain or Webpack's 15+ loader/plugin list, this is a significant reduction in install time, attack surface, and maintenance burden.
 
 #### Cons (in Clay's context)
