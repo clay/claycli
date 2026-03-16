@@ -19,6 +19,7 @@
 13. [Migration Guide](#13-migration-guide) _(includes optional per-site rollout strategy)_
 14. [amphora-html Changes](#14-amphora-html-changes)
 15. [Bundler Comparison: esbuild vs Webpack vs Vite](#15-bundler-comparison-esbuild-vs-webpack-vs-vite)
+16. [Services Pattern and Browser Bundle Hygiene](#16-services-pattern-and-browser-bundle-hygiene)
 
 ## 1. Why We Changed It
 
@@ -1519,3 +1520,83 @@ This decision is correct for the current state of the codebase. Revisit it if:
 - **Source files are converted to ESM.** If `components/**/*.js` are rewritten as native ESM modules, Rollup's tree shaking becomes significantly more powerful and Vite's dev server becomes usable. This is a large migration that would need to happen first.
 - **Dollar Slice is replaced with a framework that supports HMR.** If components migrate to Vue 3 or React, Vite's HMR becomes a real productivity gain and the dev server advantage materializes.
 - **esbuild's chunk merging limitation becomes the primary bottleneck.** If [esbuild#1128](https://github.com/evanw/esbuild/issues/1128) remains unresolved and the tiny-chunk request count proves to be a meaningful performance regression in production measurements, Rollup's `manualChunks` function is a concrete reason to reconsider. This should be evaluated with real RUM data before acting on it.
+
+---
+
+## 16. Services Pattern and Browser Bundle Hygiene
+
+One of the most important — and least obvious — benefits of switching to `clay build` is that esbuild makes service-layer architectural violations **visible and loud**, rather than silently bundling everything as Browserify did.
+
+### The three-tier services contract
+
+Clay instances typically organize their service code into three tiers:
+
+| Tier | Location | Constraint |
+|---|---|---|
+| **Server** | `services/server/` | Node.js only. May use any server package — databases, search clients, file-system APIs, logging transports. |
+| **Client** | `services/client/` | Browser only. Communicates with server services over HTTP/REST. No Node built-ins. |
+| **Universal** | `services/universal/` | Safe to run in **both** environments. **Must not** import server-only packages at module level. |
+
+The `serviceRewritePlugin` built into `claycli` relies on this contract: when it encounters a `require('services/server/foo')` in a browser-bundled file, it redirects to `require('services/client/foo')` automatically. If no client counterpart exists, the build errors rather than silently including the server package.
+
+This pattern keeps browser bundles lean and predictable, and it makes the boundary between server and client code explicit in the file system rather than in runtime guards scattered through the code.
+
+### How Browserify masked violations
+
+The old `clay compile` pipeline (Browserify) bundled components, models, and Kiln plugins into large alpha-bucketed megabundles. It never complained about `require('fs')` or `require('pg')` in a browser-targeted file — it simply included the modules, and if they happened to throw at runtime they were caught quietly by the Browserify runtime sandbox. Violations accumulated silently over years.
+
+When a Clay instance migrates to `clay build`, esbuild evaluates every `require()` at build time. Any server-only module that reaches the browser bundle — because a `services/universal/` file imported it at the top level, or because a `model.js` file called `require('clay-log')` directly — produces either an explicit build error (for Node built-ins like `fs`, `path`, `stream`) or a runtime crash (for Node-only packages that esbuild bundles but that call Node APIs when they execute). These errors are the signal, not the problem.
+
+### The wrong fix: adding stubs
+
+It is tempting to add stubs to `claycli`'s `browser-compat.js` for every package that appears as a build error. The plugin already stubs Node.js built-ins (`fs`, `path`, `stream`, etc.) because those are truly unavoidable — many server packages reference them at module level even when the code path that uses them never runs in the browser. Stubs for those are appropriate.
+
+Stubs for **Clay application packages** (logging libraries, database clients, search clients) are not appropriate. They silence the symptom without fixing the cause, and they introduce two long-term problems:
+
+1. **Future violations go undetected.** A new file that imports the stubbed package will compile and ship with an empty implementation, producing no error and no correct behavior. The developer gets no feedback.
+2. **The correct client implementation never runs.** If a component genuinely needs search results in the browser, the answer is a `services/client/search.js` that calls the search API over HTTP — not an empty stub that silently returns `undefined`.
+
+### The right fix: respect the contract
+
+When a server-only package appears in the browser bundle, the correct diagnostic question is: **how is this package being imported in a browser-bundled file?** The answer is almost always one of:
+
+1. A `services/universal/` file imports the package directly at module level (the file is misclassified or needs a lazy require inside an environment guard).
+2. A `model.js`, `kiln.js`, or Kiln plugin file imports the package directly instead of routing through a `services/universal/` or `services/client/` wrapper.
+3. A `services/server/` file is being imported from a `services/universal/` file (which should instead import from `services/client/` or use the `serviceRewritePlugin` redirect).
+
+The fix in each case is:
+
+- Move the import to a `services/server/` file and create a corresponding `services/client/` stub.
+- Or, for packages that have legitimate browser-safe paths, lazy-require the package inside an environment guard (`if (typeof window === 'undefined') { ... }`).
+
+### Consequences of not enforcing the contract
+
+The following effects have been measured in a real Clay instance that migrated from `clay compile` to `clay build` and initially relied on stubs rather than fixing service-layer violations:
+
+| Effect | Root cause | Magnitude |
+|---|---|---|
+| Server-only packages silently shipped to the browser | Stubs intercepting resolution before `serviceRewritePlugin` | Measured: `amphora-storage-postgres`, `amphora-search`, `elasticsearch`, `clay-log` were all in the bundle |
+| Browser bundle contained empty stub implementations | `browser-compat.js` stubs returning no-op functions | Client components calling search or DB APIs silently received `undefined` |
+| Large shared chunks on the critical path | Server transitive dependencies bundled into shared chunks used by most entries | Chunks were −28% smaller (gzip) after removing stubs and fixing violations |
+| Build revealed duplicate module sets | Server and client versions of the same module being included separately | 93 potential duplicate sets collapsed to 0 after fixes |
+| Lighthouse JS bytes inflated | Dead stub code counted by Lighthouse as JS payload | JS bytes dropped 24% after fixing violations properly |
+
+> Note: the specific package names above are drawn from one Clay deployment for illustration. The pattern — server packages leaking into browser bundles via misclassified universal services — is general and can arise in any Clay instance.
+
+### What `claycli` provides
+
+`claycli` contributes two tools to enforce the services contract:
+
+**`serviceRewritePlugin`** — an esbuild `onResolve` plugin that intercepts any `require('services/server/*')` path in a browser-bundled file and redirects it to `services/client/*`. Both absolute paths (`require('services/server/foo')`) and relative paths (`require('../server/foo')`) are handled. If no `services/client/` counterpart exists, the build errors with a clear message.
+
+**`browser-compat.js`** — an esbuild plugin that stubs Node.js built-ins (`fs`, `path`, `stream`, `os`, `crypto`, `net`, `tls`, `dns`, and others). These stubs are appropriate because Node built-ins are referenced at module level by many npm packages even when the code that uses them never runs in the browser. They are **not** a catch-all for application-level packages.
+
+### Checklist: migrating an existing Clay instance
+
+When moving an existing instance from `clay compile` to `clay build`, check for service-layer violations before going to production:
+
+- [ ] Search for `require('clay-log')` (or your logging library) in any `services/universal/` file and in any `model.js` / `kiln.js` / Kiln Vue plugin. Replace with lazy requires inside server branches or route through a universal log wrapper.
+- [ ] Search for direct imports of `services/server/*` in `services/universal/` files. Each one should either be moved to `services/server/` with a `services/client/` stub, or the import should be guarded by `if (typeof window === 'undefined')`.
+- [ ] Verify that every method exported from `services/server/foo.js` is also exported from `services/client/foo.js` (even if the client version returns a rejected promise or a no-op). Silent `undefined` errors at runtime from missing client methods are harder to debug than build errors.
+- [ ] After fixing violations, **do not add the affected packages to `browser-compat.js`**. If esbuild still errors, the import chain has another entry point that has not yet been fixed.
+- [ ] Run `clay build --log-level=verbose` and check the esbuild warnings. Each warning typically points to a specific file and line where a server-only dependency is being pulled in.
