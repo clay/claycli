@@ -25,7 +25,8 @@ const yargs = require('yargs'),
     p: 'pack',
     pn: 'build',         // legacy alias: pn → build
     'pack-next': 'build', // legacy alias: clay pack-next → clay build
-    vite: 'vite',        // Rollup pipeline: clay vite
+    r: 'rollup',
+    rollup: 'rollup',    // Rollup + esbuild transform (parallel to clay build)
   },
   listCommands = Object.keys(commands).concat(Object.values(commands));
 

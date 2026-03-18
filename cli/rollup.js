@@ -1,6 +1,6 @@
 'use strict';
 
-const { build, watch } = require('../lib/cmd/vite');
+const { build, watch } = require('../lib/cmd/rollup');
 const log = require('./log').setup({ file: __filename });
 
 function builder(yargs) {
@@ -24,7 +24,7 @@ function builder(yargs) {
       description: 'Additional entry-point file paths (supplements the default component globs)',
       default: [],
     })
-    .example('$0', 'Build all component scripts with Rollup')
+    .example('$0', 'Build all component scripts with Rollup (+ esbuild transform)')
     .example('$0 --watch', 'Rebuild on every file change')
     .example('$0 --minify', 'Build and minify for production');
 }
@@ -73,6 +73,6 @@ async function handler(argv) {
 
 exports.aliases = [];
 exports.builder = builder;
-exports.command = 'vite';
-exports.describe = 'Compile component scripts and assets with Rollup';
+exports.command = 'rollup';
+exports.describe = 'Compile component scripts and assets with Rollup (esbuild transform)';
 exports.handler = handler;
