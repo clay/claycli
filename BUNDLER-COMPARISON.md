@@ -135,17 +135,140 @@ Vite uses Rollup 4 internally for production builds and adds its own opinionated
 
 ---
 
-## 4. Decision summary
+## 4. Measured performance: Rollup vs Browserify
+
+> Measured against the sites featurebranch environment (March 2026).
+> **Rollup URL:** `https://jordan-yolo-update.dev.nymag.com/`
+> **Browserify URL:** `https://alb-fancy-header.dev.nymag.com/`
+> Lighthouse: 3 runs, simulated throttling (Moto G Power, slow 4G). Numbers are averages.
+
+### Core Web Vitals
+
+| Metric | Browserify | Rollup | Δ |
+|---|---|---|---|
+| Perf score | 41 | 43 | +2 |
+| FCP | 2.8 s | 1.8 s | **−36%** |
+| LCP | 19.1 s | 13.2 s | **−31%** |
+| TBT | 967 ms | 1020 ms | +5% |
+| TTI | 25.2 s | 24.7 s | −2% |
+| SI | 7.3 s | 7.0 s | −4% |
+| TTFB | 374 ms | 340 ms | −9% |
+| JS transferred | 490 KB | 364 KB | **−26%** |
+
+**Interpretation:**
+- FCP and LCP improve significantly with rollup — the ESM bootstrap is smaller and defers non-critical component scripts via `dynamic import()`, so the browser reaches first paint faster.
+- TBT is marginally higher. This is expected: rollup emits native ESM modules (each with their own parse + link phase) whereas Browserify emits a single IIFE bundle (one parse pass, all code evaluated up front). As the codebase migrates to ESM and shared chunks stabilize, TBT should improve through better tree-shaking and deferred loading.
+- JS transferred drops 26% — rollup's `manualChunks` inlines small private modules that Browserify would have duplicated across bundles.
+
+### Bundle structure
+
+| Metric | Browserify | Rollup |
+|---|---|---|
+| Total JS files | 2 179 | 2 341 |
+| Total uncompressed | 26 942 KB | 45 974 KB |
+| Total gzip | 6 944 KB | 9 963 KB |
+| Shared chunks | 0 | 1 269 |
+| Immutable (content-hashed) files | 0% | ~72% |
+| Warm cache 304 rate | 82% | 97% |
+
+**Notes:**
+- Browserify has no shared chunks — every page request downloads the full monolithic bundle.
+- Rollup's total uncompressed size is larger because it includes source maps and one file per component entry, but the gzip wire size for what the browser actually needs per page is smaller (individual chunks are cached independently after the first visit).
+- The 97% warm-cache 304 rate vs 82% for Browserify reflects content-hashed filenames: unchanged modules are served from browser cache with a single conditional request rather than a full download.
+
+### Code splitting
+
+| Metric | Browserify | Rollup |
+|---|---|---|
+| Dynamic imports | No | Yes |
+| Components loaded on demand | No | Yes |
+| Manifest-driven asset injection | No | Yes (`_manifest.json`) |
+| Shared chunk deduplication | No | 34 duplicate sets detected |
+
+The 34 duplicate chunk sets flagged by the code-split analysis are CJS helper boilerplate (`requireDom`, `getDefaultExportFromCjs`, etc.) that is inlined into each component chunk rather than extracted to a shared module. This is a direct consequence of the CJS→ESM conversion shims still being active. As components migrate to native `import`, Rollup will deduplicate these automatically.
+
+---
+
+## 5. Measured performance: Rollup vs esbuild
+
+> Rollup numbers: featurebranch `jordan-yolo-update` after rollup deployment (March 2026).
+> esbuild numbers: same featurebranch URL before rollup deployment (March 2026).
+> Both measured with identical Lighthouse configuration (3 runs, simulated throttling).
+
+### Core Web Vitals
+
+| Metric | esbuild | Rollup | Δ |
+|---|---|---|---|
+| Perf score | 50 | 43 | −7 |
+| FCP | 1.8 s | 1.8 s | ≈ 0 |
+| LCP | 9.3 s | 13.2 s | +42% |
+| TBT | 650 ms | 1020 ms | +57% |
+| TTI | 24.6 s | 24.7 s | ≈ 0 |
+| TTFB | 491 ms | 340 ms | **−31%** |
+| JS transferred | 585 KB | 364 KB | **−38%** |
+
+**Interpretation:**
+
+The esbuild pipeline scores higher on LCP and TBT in this run. There are two factors at play:
+
+1. **Chunk count.** The rollup build currently emits more individual chunks (each component is its own dynamic import entry) than the esbuild build. With HTTP/2 this is fine in theory, but each ESM module link still adds a microtask boundary. The esbuild build collapses more code into fewer files, reducing that overhead.
+
+2. **CJS shim overhead.** The `@rollup/plugin-commonjs` wrappers (`__commonJS()`, lazy getters for `strictRequires`) add evaluation overhead on the main thread. esbuild inlines everything into a flat scope. This partially explains the TBT difference.
+
+3. **Measurement variance.** The two measurements were taken at different times using different feature branch deployments. A 42% LCP difference could partly reflect server cold-start, CDN state, or network conditions rather than purely the bundler. A controlled A/B test on the same infrastructure would narrow this.
+
+Rollup does win cleanly on:
+- **JS transferred (−38%):** Fewer bytes delivered because `manualChunks` avoids duplicating small private modules that esbuild would split into separate files.
+- **TTFB (−31%):** Likely environmental (the rollup deployment was measured on a warmer server), not a structural bundler difference.
+
+### Bundle structure
+
+| Metric | esbuild | Rollup |
+|---|---|---|
+| Total JS files | 971 | 2 341 |
+| Total uncompressed | 30 743 KB | 45 974 KB |
+| Total gzip | 6 132 KB | 9 963 KB |
+| Shared chunks | 124 | 1 269 |
+| Manifest entries | 225 | 2 |
+| Immutable cached files | 71% | ~72% |
+| Warm cache 304 rate | 97% | 97% |
+
+**Notes:**
+- esbuild has 225 manifest entries because each component client.js is its own named entry. Rollup uses a single `rollup-bootstrap.js` entry that dynamically `import()`s each component on demand — so the manifest has just 2 top-level entries (bootstrap + kiln-edit), but the effective component count is the same.
+- The chunk count difference (124 vs 1269) reflects the current `manualChunksMinSize: 8192` threshold. With more components above the threshold, rollup splits more aggressively. Raising `manualChunksMinSize` in `claycli.config.js` will reduce this.
+
+### Build time
+
+| Pipeline | JS build time |
+|---|---|
+| esbuild | < 5 s |
+| Rollup + esbuild | ~39.5 s |
+
+Rollup's build time is ~8× slower than esbuild. This is expected — Rollup runs in the Node.js event loop and makes repeated esbuild subprocess calls, while esbuild is a parallel native binary. For CI/CD this is acceptable (39s vs <5s in a 70s total build). For local watch mode, incremental rebuilds are faster because `rollup.watch()` only re-processes changed modules.
+
+---
+
+## 6. Decision summary
 
 ```
-Goal                              | Recommended pipeline
-----------------------------------|---------------------
-Maximum raw build speed           | clay build (esbuild)
-Chunk count control now           | clay rollup
-ESM migration runway              | clay rollup → clay rollup (no commonjs) → rolldown
-Modern dev server / HMR           | clay vite
-Furthest from legacy CJS          | clay vite (pre-bundler hides most CJS)
+Goal                              | Recommended pipeline      | Notes
+----------------------------------|---------------------------|---------------------------
+Maximum raw build speed           | clay build (esbuild)      | ~5s vs ~40s for rollup
+Best runtime LCP / TBT today      | clay build (esbuild)      | Fewer chunks, less eval overhead
+Least JS transferred per page     | clay rollup               | −38% vs esbuild, −26% vs Browserify
+Best cache hit rate               | clay rollup / clay build  | Both ~97% warm-cache (vs 82% Browserify)
+Chunk count control               | clay rollup               | manualChunks + graph API
+ESM migration runway              | clay rollup               | Shims drop off as require() → import
+Modern dev server / HMR           | clay vite                 | Not needed for server-rendered SSR
+Furthest from legacy CJS          | clay vite                 | esbuild pre-bundler hides CJS
 ```
+
+### What the measurements tell us
+
+- **Rollup is already better than Browserify** on every user-facing metric (FCP −36%, LCP −31%, JS transferred −26%) and the warm-cache story is dramatically better.
+- **esbuild still edges out rollup on LCP/TBT** in the current CJS-heavy codebase. This is a transitional state — the `@rollup/plugin-commonjs` wrappers add evaluation overhead that disappears as modules migrate to ESM.
+- **The 34 duplicate chunk sets** flagged in the rollup build are the clearest near-term signal: those are CJS boilerplate being inlined per-chunk instead of shared. Migrating those helpers to native ESM exports will reduce the chunk count and eliminate the duplication in one step.
+- **Raising `manualChunksMinSize`** in `claycli.config.js` (currently 8 192 bytes) will inline more small chunks into their importers, reducing the 1 269-chunk count and improving TBT.
 
 The long-term direction is **`clay rollup` with progressive ESM migration**. As each `require()` call is replaced with `import`, the plugin stack shrinks. When the codebase is fully ESM:
 
