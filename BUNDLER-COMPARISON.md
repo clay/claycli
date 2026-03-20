@@ -139,10 +139,15 @@ Vite uses Rollup 4 internally for production builds and adds its own opinionated
 
 > Measured against the sites featurebranch environment (March 2026).
 > **Rollup URL:** `https://jordan-yolo-update.dev.nymag.com/`
-> **Browserify URL:** `https://alb-fancy-header.dev.nymag.com/`
-> Lighthouse: 3 runs, simulated throttling (Moto G Power, slow 4G). Numbers are averages.
+> **Browserify URL:** `https://alb-fancy-header.dev.nymag.com/` (legacy `alb-fancy-header` branch)
+>
+> Two measurement tools were used:
+> - **Lighthouse** — 3 runs, simulated throttling (Moto G Power, slow 4G). Good for controlled CWV comparison.
+> - **WebPageTest** — 3 runs, real Chrome 143, real network from Dulles VA (latency ~170ms). Good for real-world request waterfall and total page weight.
+>
+> **Note on URL parity:** The two test URLs serve different featurebranch deployments with potentially different page content (articles, images). Total byte counts are not strictly comparable — focus on JS-specific and timing metrics.
 
-### Core Web Vitals
+### Core Web Vitals (Lighthouse — simulated throttle)
 
 | Metric | Browserify | Rollup | Δ |
 |---|---|---|---|
@@ -159,6 +164,26 @@ Vite uses Rollup 4 internally for production builds and adds its own opinionated
 - FCP and LCP improve significantly with rollup — the ESM bootstrap is smaller and defers non-critical component scripts via `dynamic import()`, so the browser reaches first paint faster.
 - TBT is marginally higher. This is expected: rollup emits native ESM modules (each with their own parse + link phase) whereas Browserify emits a single IIFE bundle (one parse pass, all code evaluated up front). As the codebase migrates to ESM and shared chunks stabilize, TBT should improve through better tree-shaking and deferred loading.
 - JS transferred drops 26% — rollup's `manualChunks` inlines small private modules that Browserify would have duplicated across bundles.
+
+### Core Web Vitals (WebPageTest — real network, Chrome 143, Dulles VA)
+
+| Metric | Browserify | Rollup | Δ |
+|---|---|---|---|
+| TTFB | 980 ms | 933 ms | −5% |
+| Start Render | 1 667 ms | 1 576 ms | **−5%** |
+| FCP | 1 658 ms | 1 578 ms | **−5%** |
+| LCP | 4 302 ms | 6 142 ms | +43% ⚠ |
+| TBT | 1 416 ms | 1 212 ms | **−14%** |
+| Speed Index | 4 015 | 5 188 | +29% ⚠ |
+| Fully Loaded | 16 869 ms | 21 568 ms | +28% ⚠ |
+| Total requests | 195 | 250 | +28% |
+| Total bytes | 4.6 MB | 12.1 MB | +163% ⚠ |
+
+**Interpretation of WPT findings:**
+- TTFB, FCP, and TBT improve slightly with rollup — consistent with the Lighthouse results.
+- LCP, Speed Index, and Fully Loaded are worse. The primary driver is **request count**: 250 requests vs 195. Even on HTTP/2, loading 1 269 chunk files (vs Browserify's handful of monolithic bundles) creates waterfall depth that pushes LCP out.
+- **Total bytes (12.1 MB vs 4.6 MB):** This difference is partly page content (different article pages on different URLs, different images) and partly the rollup build being **unminified** on this featurebranch — `CLAYCLI_COMPILE_MINIFIED` is not set in the featurebranch build args. Minified rollup output would be significantly smaller.
+- The LCP regression vs Browserify (not vs esbuild) on WPT is the most actionable signal. Two levers address it directly: (1) raise `manualChunksMinSize` to inline more component chunks below the threshold, and (2) enable `CLAYCLI_COMPILE_MINIFIED=true` in the featurebranch build.
 
 ### Bundle structure
 
