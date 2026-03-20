@@ -1,0 +1,159 @@
+# Bundler Pipeline Comparison
+
+This document compares the three build pipelines available in claycli:
+
+- **`clay build`** — esbuild-only (the original pipeline)
+- **`clay rollup`** — Rollup 4 + esbuild (the new pipeline)
+- **`clay vite`** — Vite 5 (Rollup-based, the experimental pipeline)
+
+Think of the relationship like this: `clay build` is to `clay rollup` as Browserify+Gulp is to Webpack — both produce a working bundle, but the underlying model differs fundamentally in how they handle module graphs, code splitting, and long-term evolvability.
+
+---
+
+## 1. esbuild-only (`clay build`)
+
+### What it does
+
+esbuild receives all entry points at once, performs its own tree-shaking and dead-code elimination using a multi-pass scan, and emits split chunks based on shared import boundaries. Custom plugins hook into `onResolve`/`onLoad` callbacks.
+
+### Strengths
+
+- Extremely fast (native Go binary, parallelized by default)
+- Simple plugin API — everything is a transform or a resolver
+- No plugin ordering concerns for common tasks
+
+### Limitations
+
+- **No `manualChunks` equivalent.** esbuild splits at every shared module boundary regardless of size, producing hundreds of tiny files (e.g. 500+ chunks observed in the sites build). This hurts HTTP/2 multiplexing, cache granularity, and parse time.
+- **No circular-CJS awareness.** esbuild inlines all CJS modules into a flat IIFE scope, which sidesteps circular dependency ordering entirely — but also means CJS modules that depend on runtime initialization order can behave unexpectedly.
+- **Limited chunk control.** There is no way to say "inline this module into its only importer" or "put these two modules in the same chunk" without switching to a bundler that exposes a module-graph API.
+- **CJS-to-ESM interop is opaque.** esbuild wraps CJS modules in its own `__commonJS()` helpers but the wrapping logic is not user-configurable.
+
+### Plugin stack
+
+```
+onResolve: browser-compat, service-rewrite, alias
+onLoad:    (none — plugins return null and let esbuild read the file)
+transform: esbuild built-in (parses + defines)
+```
+
+---
+
+## 2. Rollup + esbuild (`clay rollup`)
+
+### What it does
+
+Rollup 4 drives module graph resolution, tree-shaking, and chunk assignment. esbuild is used only as a fast **in-process transformer** for two sub-tasks:
+
+1. Define substitution (`process.env.NODE_ENV`, `__filename`, `global`, etc.) — runs as a Rollup `transform` hook before `@rollup/plugin-commonjs`
+2. Optional minification — runs as a Rollup `renderChunk` hook so no extra disk I/O is needed
+
+This is structurally similar to how a Gulp pipeline would wire Browserify for bundling and then pipe the output through a separate minifier: each tool does one thing it is best at.
+
+### Strengths
+
+- **`manualChunks` control.** Rollup exposes the full module graph via `getModuleInfo()`. The `manualChunksPlugin` walks each module's importer chain and inlines small private modules (below `manualChunksMinSize`, default 4 KB) back into their sole consumer. This directly addresses the "500 tiny chunks" problem from esbuild.
+- **Explicit plugin ordering.** Every transform step is a named plugin in a defined sequence. There are no hidden passes.
+- **`strictRequires: 'auto'`** in `@rollup/plugin-commonjs` detects circular CJS dependencies at build time and wraps only the participating `require()` calls in lazy getters, deferring export reads until both modules have fully initialized. This is the correct solution for `auth.js ↔ gtm.js`-style cycles without requiring site-level code changes.
+- **ESM-native output.** The emitted code is real ESM (`import`/`export`), not a synthetic IIFE. Browsers receive `<link rel="modulepreload">` hints and cache individual chunks independently.
+- **AST-based `hoistRequires` in `vue2Plugin`.** `require()` calls inside `.vue` script blocks are rewritten to top-level `import` declarations using `acorn` + `magic-string`, so the CJS plugin never needs to touch `.vue` files for require-hoisting — it only participates in the module graph walk.
+
+### Tradeoffs vs esbuild
+
+| | esbuild (`clay build`) | Rollup+esbuild (`clay rollup`) |
+|---|---|---|
+| Build speed | Fastest (Go native) | Slower (JS event loop + Go subprocess) |
+| Chunk count control | None | Full (manualChunks + graph API) |
+| CJS circular deps | Implicit inline (flat scope) | Explicit lazy getter (strictRequires) |
+| Plugin ordering | Implicit (esbuild decides) | Explicit (array order) |
+| CJS→ESM conversion | esbuild-internal, opaque | @rollup/plugin-commonjs, configurable |
+| Output format | ESM (with esbuild helpers) | Native ESM |
+| Minification | Built-in | Via esbuild.transform() in renderChunk |
+
+### Plugin stack
+
+```
+resolveId: clay-alias, clay-missing-module, clay-browser-compat, clay-service-rewrite
+transform: clay-vue2 (AST hoistRequires), clay-esbuild-transform (defines)
+load:      clay-browser-compat (stubs), clay-missing-module (stubs)
+resolveId: @rollup/plugin-node-resolve (browser field)
+transform: @rollup/plugin-commonjs (require() → import)
+renderChunk: clay-esbuild-transform (optional minify)
+```
+
+### Current tech debt and ESM migration path
+
+The following items are **temporary compatibility shims** that exist only because the source codebase is still CommonJS. They will be removed as JS files migrate to ESM:
+
+| Item | Why it exists | Removed when |
+|---|---|---|
+| `@rollup/plugin-commonjs` | Converts `require()` to Rollup-compatible `import` | All `.js` files use `import`/`export` |
+| `strictRequires: 'auto'` | Handles circular `require()` cycles | No CJS circular deps remain |
+| `transformMixedEsModules: true` | Allows `.vue` files to mix ESM and CJS | `.vue` scripts use `import` only |
+| `hoistRequires` in vue2Plugin | Rewrites `require()` in `.vue` to `import` | `.vue` scripts use `import` only |
+| `inlineDynamicImports: true` (kiln pass) | Kiln plugin `.vue` files evaluate at top level before init | Kiln plugins are proper ESM modules |
+| Two-pass build (view + kiln) | Kiln edit bundle cannot split because of top-level evaluation | `kilnSplit: true` can be enabled |
+| `process.env` defines | Node globals used in universal/client code | Code is properly environment-separated |
+| `serviceRewritePlugin` | Bridges `services/server/*` → `services/client/*` | Client/server service contracts are explicit |
+| `browserCompatPlugin` | Stubs `http`, `fs`, `path`, `stream`, etc. | No server-only imports reach the client bundle |
+
+**The primary goal of the Rollup pipeline is not just "replace esbuild" but to create a migration runway.** Each item above represents a step on the path to a fully ESM codebase where `@rollup/plugin-commonjs` and its shims are simply deleted, leaving a clean Rollup 4 (or Rolldown) pipeline with native module resolution.
+
+---
+
+## 3. Vite (`clay vite`)
+
+### What it does
+
+Vite uses Rollup 4 internally for production builds and adds its own opinionated layer on top: `optimizeDeps` (esbuild pre-bundling of `node_modules`), a dev server with HMR, and a plugin API that maps Rollup hooks plus Vite-specific hooks (`configureServer`, `transformIndexHtml`, etc.).
+
+### Strengths
+
+- `optimizeDeps` pre-bundles CJS `node_modules` via esbuild *before* Rollup sees them. This means `@rollup/plugin-commonjs` never needs to handle `node_modules` — only project source code — which eliminates the `strictRequires` / `hasOwnProperty` / null-prototype concerns entirely.
+- HMR in dev mode is significantly faster than polling-based `rollup.watch()`.
+- The plugin ecosystem (e.g. `@vitejs/plugin-vue`) is more actively maintained than the standalone Rollup equivalents.
+
+### Tradeoffs vs Rollup+esbuild
+
+| | Rollup+esbuild (`clay rollup`) | Vite (`clay vite`) |
+|---|---|---|
+| `node_modules` CJS handling | @rollup/plugin-commonjs on everything | esbuild pre-bundle (opt-out) |
+| CJS null-prototype issues | Possible (requires `.cjs` extension care) | Avoided by pre-bundler |
+| Plugin API surface | Rollup hooks only | Rollup hooks + Vite extensions |
+| Dev server | `rollup.watch()` + chokidar | Native HMR dev server |
+| Build output control | Full manualChunks API | Same (uses Rollup internally) |
+| Build speed | Rollup JS speed | Same for production; faster for dev |
+| Complexity | Lower (no Vite server layer) | Higher (two runtimes: esbuild dev + Rollup prod) |
+| Portability | Standalone Node.js pipeline | Requires Vite and its peer deps |
+
+### Why `clay rollup` was chosen over `clay vite` for this phase
+
+- **Simpler dependency surface.** The Rollup pipeline requires `rollup`, `@rollup/plugin-commonjs`, `@rollup/plugin-node-resolve`, and `esbuild` — all already available or lightweight. Vite adds its own dev server machinery, middleware layer, and pre-bundler lifecycle that is unnecessary for a server-rendered site that does not use Vite's HMR.
+- **Explicit CJS control.** Vite's `optimizeDeps` pre-bundling is a black box with its own include/exclude heuristics. The Rollup pipeline exposes every CJS conversion decision explicitly via `@rollup/plugin-commonjs` options and the `commonjsExclude` hook in `claycli.config.js`.
+- **Avoiding two different bundlers.** In Vite's production build, esbuild handles `node_modules` and Rollup handles source — two separate passes with separate module graphs. The Rollup pipeline uses one consistent graph traversal.
+- **`clay vite` remains available** for teams that want Vite's dev server or are further along on ESM migration. The pipelines are not mutually exclusive; `CLAYCLI_BUNDLER=vite` switches to it.
+
+---
+
+## 4. Decision summary
+
+```
+Goal                              | Recommended pipeline
+----------------------------------|---------------------
+Maximum raw build speed           | clay build (esbuild)
+Chunk count control now           | clay rollup
+ESM migration runway              | clay rollup → clay rollup (no commonjs) → rolldown
+Modern dev server / HMR           | clay vite
+Furthest from legacy CJS          | clay vite (pre-bundler hides most CJS)
+```
+
+The long-term direction is **`clay rollup` with progressive ESM migration**. As each `require()` call is replaced with `import`, the plugin stack shrinks. When the codebase is fully ESM:
+
+1. Remove `hoistRequires` from `vue2Plugin`
+2. Remove `transformMixedEsModules`, `strictRequires`, `requireReturnsDefault` from `@rollup/plugin-commonjs`
+3. Remove `@rollup/plugin-commonjs` entirely
+4. Remove `@rollup/plugin-node-resolve` (Rollup 4+ handles `node_modules` natively for ESM)
+5. Enable `kilnSplit: true` to collapse the two-pass build into one
+6. Optionally migrate to **Rolldown** (the Rust-port of Rollup) for esbuild-level speed with zero additional tooling
+
+At that point the pipeline is: `rollup → output`. No esbuild subprocess. No CJS shims. No two passes.
