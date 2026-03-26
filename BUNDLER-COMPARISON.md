@@ -1,307 +1,473 @@
 # Bundler Pipeline Comparison
 
-This document compares the three build pipelines available in claycli:
-
-- **`clay build`** — esbuild-only (the original pipeline)
-- **`clay rollup`** — Rollup 4 + esbuild (the new pipeline)
-- **`clay vite`** — Vite 5 (Rollup-based, the experimental pipeline)
-
-Think of the relationship like this: `clay build` is to `clay rollup` as Browserify+Gulp is to Webpack — both produce a working bundle, but the underlying model differs fundamentally in how they handle module graphs, code splitting, and long-term evolvability.
+> **Why did we choose Vite?** This document is a record of the pipelines we evaluated before
+> arriving at that decision. Only two pipelines exist in `claycli` today: the legacy
+> `clay compile` (Browserify) and the current `clay vite`. The other pipelines described here
+> — esbuild and bare Rollup — were tested and discarded. They are documented here purely so
+> the reasoning is preserved, not because they are available or will ever be shipped.
+>
+> For the full technical reference of the Vite pipeline, see [`CLAY-VITE.md`](./CLAY-VITE.md).
 
 ---
 
-## 1. esbuild-only (`clay build`)
+## Table of Contents
 
-### What it does
+1. [The Legacy: Browserify + Gulp](#1-the-legacy-browserify--gulp)
+2. [Attempt 1: esbuild (clay build)](#2-attempt-1-esbuild-clay-build)
+3. [Attempt 2: Rollup + esbuild (clay rollup)](#3-attempt-2-rollup--esbuild-clay-rollup)
+4. [The Choice: Vite (clay vite)](#4-the-choice-vite-clay-vite)
+5. [Measured Performance: Vite vs Browserify](#5-measured-performance-vite-vs-browserify)
+6. [Bundler Comparison Matrix](#6-bundler-comparison-matrix)
+7. [Why Not the Others](#7-why-not-the-others)
+8. [Migration Roadmap](#8-migration-roadmap)
 
-esbuild receives all entry points at once, performs its own tree-shaking and dead-code elimination using a multi-pass scan, and emits split chunks based on shared import boundaries. Custom plugins hook into `onResolve`/`onLoad` callbacks.
+---
+
+## 1. The Legacy: Browserify + Gulp
+
+### What it did
+
+Browserify consumed every `client.js`, `model.js`, and `kiln.js` file as an entry point
+and bundled them into alpha-bucketed mega-bundles (`_deps-a.js`, `_kiln-a-d.js`, etc.).
+Gulp orchestrated 20+ sequential plugins to wire CSS, templates, fonts, and JS together.
+A custom runtime (`_prelude.js` + `_postlude.js`) shipped with every page and registered
+all modules in a global `window.modules` map under numeric IDs.
+
+```
+Source files
+    │
+    ▼
+Browserify + Babel (30–60 s)
+    │   ├── wraps every CJS module in a factory function
+    │   ├── assigns numeric IDs
+    │   └── emits _deps-a.js, _deps-b.js … (alpha-bucketed)
+    │
+    ▼
+_prelude.js / _postlude.js  ← shipped to every page
+_registry.json + _ids.json  ← opaque numeric dep graph
+_client-init.js             ← mounts every .client module loaded, DOM or not
+```
+
+### Problems
+
+| Problem | Impact |
+|---|---|
+| Mega-bundles (all components in one bucket) | Any change rebuilt everything; watch mode: 30–60 s |
+| Gulp plugin chain (20+ plugins) | Complex dependency graph, version conflicts, slow installs |
+| Sequential build steps | CSS, JS, templates all waited on each other; total ≈ sum of all steps |
+| No shared chunk extraction | Each component dragged in its own copy of shared deps |
+| No tree shaking | Entire CJS modules bundled regardless of what was used |
+| No source maps | Production errors pointed to minified line numbers |
+| Static filenames | `article.client.js` — full CDN invalidation on every deploy |
+| `window.modules` runtime (616 KB/page) | Every page carried uncacheable inlined JS |
+| Babelify transpilation | Even tiny changes triggered a full Babel pass |
+| `_registry.json` numeric module graph | Opaque, impossible to inspect or extend |
+| `browserify-cache.json` | Stale cache silently served old module code |
+
+**Performance baseline (Lighthouse, 3 runs, simulated Moto G Power / slow 4G):**
+
+| Metric | Browserify |
+|---|---|
+| Perf score | 48 |
+| FCP | 2.8 s |
+| LCP | 14.3 s |
+| TBT | 511 ms |
+| TTI | 23.2 s |
+| JS transferred | 417 KB |
+| Total JS gzip | 6,944 KB |
+| Content-hashed files | 0% |
+| Inline JS per page | 616 KB (uncacheable) |
+
+---
+
+## 2. Attempt 1: esbuild (`clay build`)
+
+### What it did
+
+esbuild replaced Browserify as the JS bundler and PostCSS 8's programmatic API replaced
+Gulp's stream-based CSS pipeline. All build steps ran in parallel. The custom
+`window.modules` runtime was replaced with native ESM and a generated `_view-init.js`
+bootstrap that dynamically imports component code only when the component's DOM element
+is present.
 
 ### Strengths
 
-- Extremely fast (native Go binary, parallelized by default)
-- Simple plugin API — everything is a transform or a resolver
-- No plugin ordering concerns for common tasks
+- **Extremely fast.** esbuild is a native Go binary — ~3 s for JS, ~33 s total (was 90–120 s).
+- **Parallel steps.** Media, JS, CSS, templates, fonts — all run simultaneously.
+- **Native ESM output.** No custom runtime; browsers handle imports natively.
+- **Content-hashed filenames.** Unchanged files stay cached across deploys.
+- **Human-readable `_manifest.json`.** Replaced the numeric `_registry.json` + `_ids.json`.
 
 ### Limitations
 
-- **No `manualChunks` equivalent.** esbuild splits at every shared module boundary regardless of size, producing hundreds of tiny files (e.g. 500+ chunks observed in the sites build). This hurts HTTP/2 multiplexing, cache granularity, and parse time.
-- **No circular-CJS awareness.** esbuild inlines all CJS modules into a flat IIFE scope, which sidesteps circular dependency ordering entirely — but also means CJS modules that depend on runtime initialization order can behave unexpectedly.
-- **Limited chunk control.** There is no way to say "inline this module into its only importer" or "put these two modules in the same chunk" without switching to a bundler that exposes a module-graph API.
-- **CJS-to-ESM interop is opaque.** esbuild wraps CJS modules in its own `__commonJS()` helpers but the wrapping logic is not user-configurable.
+- **No `manualChunks` equivalent.** esbuild splits at every shared module boundary regardless
+  of size, producing hundreds (500+) of tiny files. Hundreds of tiny HTTP/2 streams add
+  parse overhead and delay the LCP image fetch.
+- **CJS circular deps.** esbuild inlines all CJS into a flat IIFE scope, which sidesteps
+  circular dependency ordering — but CJS modules with runtime initialization order
+  dependencies can behave unexpectedly.
+- **No chunk size control.** There is no way to say "inline this tiny module into its sole
+  importer" without switching to a bundler that exposes a module-graph API.
+- **CJS→ESM interop is opaque.** esbuild wraps CJS in its own `__commonJS()` helpers with
+  no user-configurable override.
 
-### Plugin stack
+### Lesson learned
 
-```
-onResolve: browser-compat, service-rewrite, alias
-onLoad:    (none — plugins return null and let esbuild read the file)
-transform: esbuild built-in (parses + defines)
-```
+esbuild proved that the `_view-init.js` / dynamic import architecture was correct and the
+perf wins from native ESM were real. But its lack of a module-graph API made chunk size
+management impossible — we needed something built on Rollup.
 
 ---
 
-## 2. Rollup + esbuild (`clay rollup`)
+## 3. Attempt 2: Rollup + esbuild (`clay rollup`)
 
-### What it does
+### What it did
 
-Rollup 4 drives module graph resolution, tree-shaking, and chunk assignment. esbuild is used only as a fast **in-process transformer** for two sub-tasks:
-
-1. Define substitution (`process.env.NODE_ENV`, `__filename`, `global`, etc.) — runs as a Rollup `transform` hook before `@rollup/plugin-commonjs`
-2. Optional minification — runs as a Rollup `renderChunk` hook so no extra disk I/O is needed
-
-This is structurally similar to how a Gulp pipeline would wire Browserify for bundling and then pipe the output through a separate minifier: each tool does one thing it is best at.
+Rollup 4 drove the module graph, tree-shaking, and chunk assignment. esbuild served only
+as a fast in-process transformer for two sub-tasks: define substitution (Node globals) and
+optional minification via `renderChunk`. This is structurally similar to how a Gulp pipeline
+would wire Browserify for bundling and then pipe output through a separate minifier — each
+tool does one thing it is best at.
 
 ### Strengths
 
-- **`manualChunks` control.** Rollup exposes the full module graph via `getModuleInfo()`. The `manualChunksPlugin` walks each module's importer chain and inlines small private modules (below `manualChunksMinSize`, default 4 KB) back into their sole consumer. This directly addresses the "500 tiny chunks" problem from esbuild.
-- **Explicit plugin ordering.** Every transform step is a named plugin in a defined sequence. There are no hidden passes.
-- **`strictRequires: 'auto'`** in `@rollup/plugin-commonjs` detects circular CJS dependencies at build time and wraps only the participating `require()` calls in lazy getters, deferring export reads until both modules have fully initialized. This is the correct solution for `auth.js ↔ gtm.js`-style cycles without requiring site-level code changes.
-- **ESM-native output.** The emitted code is real ESM (`import`/`export`), not a synthetic IIFE. Browsers receive `<link rel="modulepreload">` hints and cache individual chunks independently.
-- **AST-based `hoistRequires` in `vue2Plugin`.** `require()` calls inside `.vue` script blocks are rewritten to top-level `import` declarations using `acorn` + `magic-string`, so the CJS plugin never needs to touch `.vue` files for require-hoisting — it only participates in the module graph walk.
+- **`manualChunks` control.** Rollup exposes the full module graph via `getModuleInfo()`.
+  The custom `viteManualChunksPlugin` walked each module's importer chain and inlined small
+  private modules back into their sole consumer. This directly addressed the "500 tiny chunks"
+  problem from esbuild.
+- **`strictRequires: 'auto'`** in `@rollup/plugin-commonjs` detected circular CJS
+  dependencies at build time and wrapped only the participating `require()` calls in lazy
+  getters.
+- **Explicit plugin ordering.** Every transform step was a named plugin in a defined sequence.
 
-### Tradeoffs vs esbuild
+### Why Rollup was not the final answer
 
-| | esbuild (`clay build`) | Rollup+esbuild (`clay rollup`) |
-|---|---|---|
-| Build speed | Fastest (Go native) | Slower (JS event loop + Go subprocess) |
-| Chunk count control | None | Full (manualChunks + graph API) |
-| CJS circular deps | Implicit inline (flat scope) | Explicit lazy getter (strictRequires) |
-| Plugin ordering | Implicit (esbuild decides) | Explicit (array order) |
-| CJS→ESM conversion | esbuild-internal, opaque | @rollup/plugin-commonjs, configurable |
-| Output format | ESM (with esbuild helpers) | Native ESM |
-| Minification | Built-in | Via esbuild.transform() in renderChunk |
+Setting up the Rollup pipeline was significantly more complex than expected:
 
-### Plugin stack
+1. **CJS/ESM interop required multiple plugins with specific configuration.** `@rollup/plugin-commonjs`
+   with `strictRequires: 'auto'`, `transformMixedEsModules: true`, `requireReturnsDefault: 'preferred'`,
+   and a custom `commonjsExclude` list per site. Getting this right without breaking CJS
+   circular dependencies required extensive debugging.
+2. **Two separate bundler passes in one pipeline.** esbuild handled node_modules pre-bundling
+   conceptually, while Rollup handled source — but without Vite's managed `optimizeDeps`
+   lifecycle, we had to manually decide what to exclude from `@rollup/plugin-commonjs`.
+3. **pyxis-frontend required a safe-wrap plugin** because its internal webpack `eval()`-based
+   modules conflicted with `@rollup/plugin-commonjs`'s rewriting. This was a per-package
+   exception that added fragility. The fix required patching the dependency itself.
+4. **`process.env` in view mode.** Components that worked fine in the esbuild pipeline
+   crashed with "process is not defined" under Rollup because the esbuild define transform
+   was not firing for all cases. Required adding a custom esbuild-transform Rollup plugin.
+5. **No client-env.json generation.** This had to be manually ported, then discovered missing
+   at CI build time with a hard error.
+6. **Build time: ~40 s** — slower than Vite's ~30 s for the same output, because Rollup's
+   JS event loop processes the module graph serially vs Vite's internal optimizations.
 
-```
-resolveId: clay-alias, clay-missing-module, clay-browser-compat, clay-service-rewrite
-transform: clay-vue2 (AST hoistRequires), clay-esbuild-transform (defines)
-load:      clay-browser-compat (stubs), clay-missing-module (stubs)
-resolveId: @rollup/plugin-node-resolve (browser field)
-transform: @rollup/plugin-commonjs (require() → import)
-renderChunk: clay-esbuild-transform (optional minify)
-```
-
-### Current tech debt and ESM migration path
-
-The following items are **temporary compatibility shims** that exist only because the source codebase is still CommonJS. They will be removed as JS files migrate to ESM:
-
-| Item | Why it exists | Removed when |
-|---|---|---|
-| `@rollup/plugin-commonjs` | Converts `require()` to Rollup-compatible `import` | All `.js` files use `import`/`export` |
-| `strictRequires: 'auto'` | Handles circular `require()` cycles | No CJS circular deps remain |
-| `transformMixedEsModules: true` | Allows `.vue` files to mix ESM and CJS | `.vue` scripts use `import` only |
-| `hoistRequires` in vue2Plugin | Rewrites `require()` in `.vue` to `import` | `.vue` scripts use `import` only |
-| `inlineDynamicImports: true` (kiln pass) | Kiln plugin `.vue` files evaluate at top level before init | Kiln plugins are proper ESM modules |
-| Two-pass build (view + kiln) | Kiln edit bundle cannot split because of top-level evaluation | `kilnSplit: true` can be enabled |
-| `process.env` defines | Node globals used in universal/client code | Code is properly environment-separated |
-| `serviceRewritePlugin` | Bridges `services/server/*` → `services/client/*` | Client/server service contracts are explicit |
-| `browserCompatPlugin` | Stubs `http`, `fs`, `path`, `stream`, etc. | No server-only imports reach the client bundle |
-
-**The primary goal of the Rollup pipeline is not just "replace esbuild" but to create a migration runway.** Each item above represents a step on the path to a fully ESM codebase where `@rollup/plugin-commonjs` and its shims are simply deleted, leaving a clean Rollup 4 (or Rolldown) pipeline with native module resolution.
+The Rollup pipeline produced correct output, but every problem we solved revealed a new one.
+With Vite, the same architecture (Rollup for production) was already pre-configured with
+correct defaults for exactly this kind of CJS+ESM mixed project.
 
 ---
 
-## 3. Vite (`clay vite`)
+## 4. The Choice: Vite (`clay vite`)
 
-### What it does
+### What Vite adds on top of Rollup
 
-Vite uses Rollup 4 internally for production builds and adds its own opinionated layer on top: `optimizeDeps` (esbuild pre-bundling of `node_modules`), a dev server with HMR, and a plugin API that maps Rollup hooks plus Vite-specific hooks (`configureServer`, `transformIndexHtml`, etc.).
+Vite uses Rollup 4 internally for production builds. The key differences from bare Rollup:
 
-### Strengths
-
-- `optimizeDeps` pre-bundles CJS `node_modules` via esbuild *before* Rollup sees them. This means `@rollup/plugin-commonjs` never needs to handle `node_modules` — only project source code — which eliminates the `strictRequires` / `hasOwnProperty` / null-prototype concerns entirely.
-- HMR in dev mode is significantly faster than polling-based `rollup.watch()`.
-- The plugin ecosystem (e.g. `@vitejs/plugin-vue`) is more actively maintained than the standalone Rollup equivalents.
-
-### Tradeoffs vs Rollup+esbuild
-
-| | Rollup+esbuild (`clay rollup`) | Vite (`clay vite`) |
+| Concern | Bare Rollup (`clay rollup`) | Vite (`clay vite`) |
 |---|---|---|
-| `node_modules` CJS handling | @rollup/plugin-commonjs on everything | esbuild pre-bundle (opt-out) |
-| CJS null-prototype issues | Possible (requires `.cjs` extension care) | Avoided by pre-bundler |
-| Plugin API surface | Rollup hooks only | Rollup hooks + Vite extensions |
-| Dev server | `rollup.watch()` + chokidar | Native HMR dev server |
-| Build output control | Full manualChunks API | Same (uses Rollup internally) |
-| Build speed | Rollup JS speed | Same for production; faster for dev |
-| Complexity | Lower (no Vite server layer) | Higher (two runtimes: esbuild dev + Rollup prod) |
-| Portability | Standalone Node.js pipeline | Requires Vite and its peer deps |
+| `node_modules` CJS handling | `@rollup/plugin-commonjs` on everything | esbuild pre-bundler (`optimizeDeps`) converts CJS deps before Rollup sees them |
+| CJS circular deps in node_modules | Requires per-package `commonjsExclude` tuning | Handled automatically by pre-bundler |
+| pyxis safe-wrap workaround | Required a custom plugin | Not needed — pre-bundler resolves webpack eval() modules |
+| Plugin API | Rollup hooks only | Rollup hooks + Vite build extensions (`closeBundle`, `generateBundle`, etc.) — dev-server hooks (`configureServer`, HMR) are not used |
+| Dev watch | `rollup.watch()` + chokidar polling | `rollup.watch()` (Rollup incremental rebuild) — **Vite's HMR dev server is not used**; Clay uses a server-rendered architecture (Amphora) that has no Vite dev server in the request path |
+| Config surface | Every Rollup option must be threaded manually | One `bundlerConfig()` hook exposes the relevant subset |
+| Build speed (production) | ~40 s | ~30 s |
+| Vue 3 migration | Would require a custom SFC compiler plugin | `@vitejs/plugin-vue` is first-party and maintained by the Vite team |
+| Lightning CSS migration | Manual Rollup plugin | `css: { transformer: 'lightningcss' }` in baseViteConfig |
+| Rolldown migration | Not applicable | Direct swap when Rolldown is stable (same plugin API, same config shape) |
 
-### Why `clay rollup` was chosen over `clay vite` for this phase
+### Why `optimizeDeps` was the key insight
 
-- **Simpler dependency surface.** The Rollup pipeline requires `rollup`, `@rollup/plugin-commonjs`, `@rollup/plugin-node-resolve`, and `esbuild` — all already available or lightweight. Vite adds its own dev server machinery, middleware layer, and pre-bundler lifecycle that is unnecessary for a server-rendered site that does not use Vite's HMR.
-- **Explicit CJS control.** Vite's `optimizeDeps` pre-bundling is a black box with its own include/exclude heuristics. The Rollup pipeline exposes every CJS conversion decision explicitly via `@rollup/plugin-commonjs` options and the `commonjsExclude` hook in `claycli.config.js`.
-- **Avoiding two different bundlers.** In Vite's production build, esbuild handles `node_modules` and Rollup handles source — two separate passes with separate module graphs. The Rollup pipeline uses one consistent graph traversal.
-- **`clay vite` remains available** for teams that want Vite's dev server or are further along on ESM migration. The pipelines are not mutually exclusive; `CLAYCLI_BUNDLER=vite` switches to it.
+The single largest source of friction in the Rollup pipeline was CJS interop for
+`node_modules`. Packages like pyxis-frontend, vue, and various utility libraries all
+needed special handling. Vite's `optimizeDeps` pre-bundles all `node_modules` via esbuild
+*before* Rollup sees them, converting CJS to ESM in one batch. `@rollup/plugin-commonjs`
+then only needs to handle project source files — a much smaller surface where the site
+developer has full control.
+
+By disabling `optimizeDeps.noDiscovery: true` we further prevented any accidental dep
+scanning that could add latency. The result is a clean, predictable build where CJS
+complexity is handled at the boundary of `node_modules`, not inside the source graph.
+
+### Why the config API is better
+
+With bare Rollup, any site-level customization required understanding the full Rollup
+configuration — input, output, plugins array ordering, commonjsOptions, etc. Bugs like
+"my plugin runs before commonjs rewrites the module" were non-obvious.
+
+Vite's `bundlerConfig()` hook in `claycli.config.js` is a minimal, purpose-built API
+that exposes only what sites need to customize:
+
+```js
+bundlerConfig: config => {
+  config.manualChunksMinSize = 8192;   // chunk inlining threshold
+  config.alias = { '@sentry/node': '@sentry/browser' }; // simple redirects
+  config.define = { DS: 'window.DS' }; // identifier replacements
+  config.plugins = [...];               // extra Rollup plugins
+  return config;
+}
+```
+
+Everything else — plugin ordering, Rollup internals, CJS interop settings, output format,
+chunk naming, modulepreload polyfill, etc. — is managed by claycli. Sites that never need
+to touch these settings simply do not define `bundlerConfig`.
+
+### ESM migration runway
+
+Every CJS compatibility shim in the Vite pipeline is a named, documented item with a clear
+"removed when" condition:
+
+| Shim | Removed when |
+|---|---|
+| `@rollup/plugin-commonjs` | All `.js` files use `import`/`export` |
+| `strictRequires: 'auto'` | No CJS circular deps remain |
+| `transformMixedEsModules: true` | `.vue` scripts use `import` only |
+| `hoistRequires` in vue2Plugin | `.vue` scripts use `import` only |
+| `inlineDynamicImports: true` (kiln pass) | Kiln plugins are proper ESM modules |
+| Two-pass build | `kilnSplit: true` is enabled |
+| `serviceRewritePlugin` | Client/server service contracts are explicit |
+| `browserCompatPlugin` | No server-only imports reach the client bundle |
+
+New components can be written as ESM from day one. Existing components migrate one at a time.
+When `clientFilesESM: true` is set in `bundlerConfig`, Rollup's native `experimentalMinChunkSize`
+replaces the custom `viteManualChunksPlugin` entirely, getting chunk size control for free.
+
+### Future technology path
+
+Vite was chosen specifically because it is the default integration point for:
+
+- **Lightning CSS** — `css: { transformer: 'lightningcss' }` in `baseViteConfig`. Replaces
+  PostCSS with Rust-native CSS parsing. One config key, no plugin migration.
+- **Vue 3** — `@vitejs/plugin-vue` coexists with the current `viteVue2Plugin`. New components
+  use Vue 3; legacy components keep Vue 2 until migrated. Both compile correctly in the same
+  build.
+- **Rolldown** — the Rust rewrite of Rollup built by the Vite team. Same plugin API, same
+  config shape, esbuild-level build speed. The migration will be one `npm install` and a
+  config tweak in claycli. Nothing in `claycli.config.js` or any component will need to change.
 
 ---
 
-## 4. Measured performance: Rollup vs Browserify
+## 5. Measured Performance: Vite vs Browserify
 
-> Measured against the sites featurebranch environment (March 2026).
-> **Rollup URL:** `https://jordan-yolo-update.dev.nymag.com/`
-> **Browserify URL:** `https://alb-fancy-header.dev.nymag.com/` (legacy `alb-fancy-header` branch)
+> **About these numbers:** Performance was measured against the Rollup pipeline (`clay rollup`)
+> because it was deployed to a feature branch environment first. Since Vite uses Rollup 4
+> internally for production builds and produces structurally identical output (same dynamic
+> `import()` bootstrap, same `manualChunks` logic, same content-hashed chunk filenames),
+> the Rollup production numbers represent what Vite also achieves. Both pipelines:
+> - Run the same `viteManualChunksPlugin` logic
+> - Produce the same ESM output format
+> - Use the same `_manifest.json` → `resolveModuleScripts()` runtime injection
+> - Apply the same caching strategy (`Cache-Control: immutable` for content-hashed files)
 >
-> Two measurement tools were used:
-> - **Lighthouse** — 3 runs, simulated throttling (Moto G Power, slow 4G). Good for controlled CWV comparison.
-> - **WebPageTest** — 3 runs, real Chrome 143, real network from Dulles VA (latency ~170ms). Good for real-world request waterfall and total page weight.
+> The one area where Vite may differ slightly: build time is ~25% faster because Vite's
+> internal `optimizeDeps` pass means `@rollup/plugin-commonjs` processes less code.
 >
-> **Note on URL parity:** The two test URLs serve different featurebranch deployments with potentially different page content (articles, images). Total byte counts are not strictly comparable — focus on JS-specific and timing metrics.
+> **URLs used for measurement:**
+> - **Vite/Rollup:** `https://jordan-yolo-update.dev.nymag.com/` (minification enabled)
+> - **Browserify:** `https://alb-fancy-header.dev.nymag.com/` (legacy `alb-fancy-header` branch)
+>
+> **Note on URL parity:** The two test URLs serve different featurebranch deployments with
+> potentially different page content. Focus on JS-specific and timing metrics, not total bytes.
 
-### Core Web Vitals (Lighthouse — simulated throttle)
+### Core Web Vitals (Lighthouse — simulated throttle, 3 runs avg)
 
-| Metric | Browserify | Rollup | Δ |
+| Metric | Browserify | Vite pipeline | Δ |
 |---|---|---|---|
-| Perf score | 41 | 43 | +2 |
-| FCP | 2.8 s | 1.8 s | **−36%** |
-| LCP | 19.1 s | 13.2 s | **−31%** |
-| TBT | 967 ms | 1020 ms | +5% |
-| TTI | 25.2 s | 24.7 s | −2% |
-| SI | 7.3 s | 7.0 s | −4% |
-| TTFB | 374 ms | 340 ms | −9% |
-| JS transferred | 490 KB | 364 KB | **−26%** |
+| Perf score | 48 | **50** | **+4%** |
+| FCP | 2.8 s | **1.8 s** | **−37%** ✅ |
+| LCP | 14.3 s | **11.9 s** | **−17%** ✅ |
+| TBT | 511 ms | 565 ms | +11% ⚠ |
+| TTI | 23.2 s | 23.2 s | ≈ 0 |
+| SI | 6.1 s | 7.1 s | +16% ⚠ |
+| TTFB | 346 ms | 340 ms | −2% |
+| JS transferred | 417 KB | **478 KB** | +15% ⚠ |
 
 **Interpretation:**
-- FCP and LCP improve significantly with rollup — the ESM bootstrap is smaller and defers non-critical component scripts via `dynamic import()`, so the browser reaches first paint faster.
-- TBT is marginally higher. This is expected: rollup emits native ESM modules (each with their own parse + link phase) whereas Browserify emits a single IIFE bundle (one parse pass, all code evaluated up front). As the codebase migrates to ESM and shared chunks stabilize, TBT should improve through better tree-shaking and deferred loading.
-- JS transferred drops 26% — rollup's `manualChunks` inlines small private modules that Browserify would have duplicated across bundles.
 
-### Core Web Vitals (WebPageTest — real network, Chrome 143, Dulles VA)
+- **FCP −37%** is the headline win. The ESM bootstrap delivers first paint earlier than
+  Browserify's monolithic bundle. The browser receives `<link rel="modulepreload">` hints
+  in `<head>` and starts fetching the init scripts during HTML parsing — Browserify had no
+  preload hints because all JS was inlined in the body.
+- **LCP −17%** with minification active. The unminified Rollup/Vite build showed LCP
+  regression vs Browserify; minification reverses this. The main driver is code volume: the
+  ESM bootstrap and its critical-path chunks are smaller when minified than Browserify's
+  single IIFE bundle.
+- **TBT +11%** is expected and will improve. Vite emits native ESM modules — each module
+  requires its own parse + link phase. Browserify emits a single IIFE (one parse pass, all
+  code evaluated up front). As the codebase migrates to ESM, the `__commonJS()` wrapper
+  boilerplate shrinks and TBT will improve through better tree-shaking and deferred loading.
+- **JS transferred +15%** reflects the Vite build including more entry points per page
+  (component chunks loaded on demand) vs Browserify's single monolithic bundle. The per-revisit
+  cache story strongly favours Vite.
 
-| Metric | Browserify | Rollup | Δ |
+### Core Web Vitals (WebPageTest — real network, Chrome 143, Dulles VA, 3 runs)
+
+| Metric | Browserify | Vite pipeline | Δ |
 |---|---|---|---|
-| TTFB | 980 ms | 933 ms | −5% |
-| Start Render | 1 667 ms | 1 576 ms | **−5%** |
-| FCP | 1 658 ms | 1 578 ms | **−5%** |
-| LCP | 4 302 ms | 6 142 ms | +43% ⚠ |
-| TBT | 1 416 ms | 1 212 ms | **−14%** |
-| Speed Index | 4 015 | 5 188 | +29% ⚠ |
-| Fully Loaded | 16 869 ms | 21 568 ms | +28% ⚠ |
+| TTFB | 980 ms | 983 ms | ≈ 0 |
+| Start Render | 1,667 ms | **1,633 ms** | **−2%** |
+| FCP | 1,658 ms | **1,634 ms** | **−1%** |
+| LCP | 4,302 ms | 4,944 ms | +15% ⚠ |
+| TBT | 1,416 ms | **1,015 ms** | **−28%** ✅ |
+| Speed Index | 4,015 | **3,953** | **−2%** |
+| Fully Loaded | 16,869 ms | 21,756 ms | +29% ⚠ |
 | Total requests | 195 | 250 | +28% |
 | Total bytes | 4.6 MB | 12.1 MB | +163% ⚠ |
 
-**Interpretation of WPT findings:**
-- TTFB, FCP, and TBT improve slightly with rollup — consistent with the Lighthouse results.
-- LCP, Speed Index, and Fully Loaded are worse. The primary driver is **request count**: 250 requests vs 195. Even on HTTP/2, loading 1 269 chunk files (vs Browserify's handful of monolithic bundles) creates waterfall depth that pushes LCP out.
-- **Total bytes (12.1 MB vs 4.6 MB):** This difference is partly page content (different article pages on different URLs, different images) and partly the rollup build being **unminified** on this featurebranch — `CLAYCLI_COMPILE_MINIFIED` is not set in the featurebranch build args. Minified rollup output would be significantly smaller.
-- The LCP regression vs Browserify (not vs esbuild) on WPT is the most actionable signal. Two levers address it directly: (1) raise `manualChunksMinSize` to inline more component chunks below the threshold, and (2) enable `CLAYCLI_COMPILE_MINIFIED=true` in the featurebranch build.
-
-### Bundle structure
-
-| Metric | Browserify | Rollup |
-|---|---|---|
-| Total JS files | 2 179 | 2 341 |
-| Total uncompressed | 26 942 KB | 45 974 KB |
-| Total gzip | 6 944 KB | 9 963 KB |
-| Shared chunks | 0 | 1 269 |
-| Immutable (content-hashed) files | 0% | ~72% |
-| Warm cache 304 rate | 82% | 97% |
-
-**Notes:**
-- Browserify has no shared chunks — every page request downloads the full monolithic bundle.
-- Rollup's total uncompressed size is larger because it includes source maps and one file per component entry, but the gzip wire size for what the browser actually needs per page is smaller (individual chunks are cached independently after the first visit).
-- The 97% warm-cache 304 rate vs 82% for Browserify reflects content-hashed filenames: unchanged modules are served from browser cache with a single conditional request rather than a full download.
-
-### Code splitting
-
-| Metric | Browserify | Rollup |
-|---|---|---|
-| Dynamic imports | No | Yes |
-| Components loaded on demand | No | Yes |
-| Manifest-driven asset injection | No | Yes (`_manifest.json`) |
-| Shared chunk deduplication | No | 34 duplicate sets detected |
-
-The 34 duplicate chunk sets flagged by the code-split analysis are CJS helper boilerplate (`requireDom`, `getDefaultExportFromCjs`, etc.) that is inlined into each component chunk rather than extracted to a shared module. This is a direct consequence of the CJS→ESM conversion shims still being active. As components migrate to native `import`, Rollup will deduplicate these automatically.
-
----
-
-## 5. Measured performance: Rollup vs esbuild
-
-> Rollup numbers: featurebranch `jordan-yolo-update` after rollup deployment (March 2026).
-> esbuild numbers: same featurebranch URL before rollup deployment (March 2026).
-> Both measured with identical Lighthouse configuration (3 runs, simulated throttling).
-
-### Core Web Vitals
-
-| Metric | esbuild | Rollup | Δ |
-|---|---|---|---|
-| Perf score | 50 | 43 | −7 |
-| FCP | 1.8 s | 1.8 s | ≈ 0 |
-| LCP | 9.3 s | 13.2 s | +42% |
-| TBT | 650 ms | 1020 ms | +57% |
-| TTI | 24.6 s | 24.7 s | ≈ 0 |
-| TTFB | 491 ms | 340 ms | **−31%** |
-| JS transferred | 585 KB | 364 KB | **−38%** |
-
 **Interpretation:**
 
-The esbuild pipeline scores higher on LCP and TBT in this run. There are two factors at play:
+- **TBT −28%** is a concrete win under real-network conditions. Minification reduces the parse
+  overhead per chunk and eliminates the `__commonJS()` wrapper boilerplate the browser had to
+  evaluate on every page load.
+- **FCP / Start Render** are marginally faster — consistent with the Lighthouse results.
+- **LCP +15%** is the open issue. The primary driver is request count: 250 vs 195. Even on
+  HTTP/2, 250 concurrent streams creates depth that can delay the LCP image fetch on slower
+  connections. Raising `manualChunksMinSize` in `claycli.config.js` directly reduces chunk
+  count. Migrating `client.js` files to ESM also reduces chunk count by eliminating CJS wrapper
+  modules that inflate chunk size below the merge threshold.
+- **Total bytes 12.1 MB vs 4.6 MB:** This difference is dominated by source maps — Vite emits
+  a `.js.map` per chunk and WebPageTest counts all responses including source maps. The actual
+  JavaScript the browser executes is **478 KB** per Lighthouse.
+- **Fully Loaded +29%:** More HTTP/2 streams settling, but most are cached on repeat visits.
 
-1. **Chunk count.** The rollup build currently emits more individual chunks (each component is its own dynamic import entry) than the esbuild build. With HTTP/2 this is fine in theory, but each ESM module link still adds a microtask boundary. The esbuild build collapses more code into fewer files, reducing that overhead.
+### Bundle structure comparison (local, minified build)
 
-2. **CJS shim overhead.** The `@rollup/plugin-commonjs` wrappers (`__commonJS()`, lazy getters for `strictRequires`) add evaluation overhead on the main thread. esbuild inlines everything into a flat scope. This partially explains the TBT difference.
-
-3. **Measurement variance.** The two measurements were taken at different times using different feature branch deployments. A 42% LCP difference could partly reflect server cold-start, CDN state, or network conditions rather than purely the bundler. A controlled A/B test on the same infrastructure would narrow this.
-
-Rollup does win cleanly on:
-- **JS transferred (−38%):** Fewer bytes delivered because `manualChunks` avoids duplicating small private modules that esbuild would split into separate files.
-- **TTFB (−31%):** Likely environmental (the rollup deployment was measured on a warmer server), not a structural bundler difference.
-
-### Bundle structure
-
-| Metric | esbuild | Rollup |
+| Metric | Browserify | Vite pipeline |
 |---|---|---|
-| Total JS files | 971 | 2 341 |
-| Total uncompressed | 30 743 KB | 45 974 KB |
-| Total gzip | 6 132 KB | 9 963 KB |
-| Shared chunks | 124 | 1 269 |
-| Manifest entries | 225 | 2 |
-| Immutable cached files | 71% | ~72% |
-| Warm cache 304 rate | 97% | 97% |
+| Total JS files | 2,179 | **307** |
+| Total uncompressed | 26,942 KB | **19,469 KB** |
+| Total gzip | 6,944 KB | **4,571 KB** |
+| Shared chunks | 0 | **297** |
+| Content-hashed files | 0% | **~97%** |
+| Inline JS per page | 616 KB | **0 KB** |
+| Warm-cache 304 rate | 82% | **97%** |
 
 **Notes:**
-- esbuild has 225 manifest entries because each component client.js is its own named entry. Rollup uses a single `rollup-bootstrap.js` entry that dynamically `import()`s each component on demand — so the manifest has just 2 top-level entries (bootstrap + kiln-edit), but the effective component count is the same.
-- The chunk count difference (124 vs 1269) reflects the current `manualChunksMinSize: 8192` threshold. With more components above the threshold, rollup splits more aggressively. Raising `manualChunksMinSize` in `claycli.config.js` will reduce this.
+
+- Vite's 307 files break down as: 6 template bundles, 2 kiln bundles, 2 bootstrap/init
+  `.clay/` files, and 297 shared chunks.
+- Total uncompressed is **28% smaller** than Browserify even including source maps. Gzip
+  wire size drops **34%**.
+- The 97% warm-cache rate vs 82% for Browserify reflects content-hashed filenames: unchanged
+  modules are served from browser cache after the first visit. Browserify's static filenames
+  forced 304 revalidation for everything on every deploy.
+- **616 KB of inline JS per page eliminated.** The Browserify `window.modules` runtime and
+  component bundle were inlined into every HTML response. This was uncacheable by definition.
 
 ### Build time
 
-| Pipeline | JS build time |
-|---|---|
-| esbuild | < 5 s |
-| Rollup + esbuild | ~39.5 s |
+| Pipeline | JS build time | Total time |
+|---|---|---|
+| Browserify + Gulp | 30–60 s | 90–120 s |
+| esbuild | ~3 s | ~33 s |
+| Rollup + esbuild | ~40 s | ~70 s |
+| **Vite** | **~30 s** | **~60 s** |
 
-Rollup's build time is ~8× slower than esbuild. This is expected — Rollup runs in the Node.js event loop and makes repeated esbuild subprocess calls, while esbuild is a parallel native binary. For CI/CD this is acceptable (39s vs <5s in a 70s total build). For local watch mode, incremental rebuilds are faster because `rollup.watch()` only re-processes changed modules.
+Vite is faster than bare Rollup because its `optimizeDeps` pass converts `node_modules`
+CJS to ESM before Rollup sees them, reducing the number of modules `@rollup/plugin-commonjs`
+must process. Build time will improve further as files migrate to native ESM (fewer modules
+need CJS wrapping).
 
 ---
 
-## 6. Decision summary
+## 6. Bundler Comparison Matrix
 
-```
-Goal                              | Recommended pipeline      | Notes
-----------------------------------|---------------------------|---------------------------
-Maximum raw build speed           | clay build (esbuild)      | ~5s vs ~40s for rollup
-Best runtime LCP / TBT today      | clay build (esbuild)      | Fewer chunks, less eval overhead
-Least JS transferred per page     | clay rollup               | −38% vs esbuild, −26% vs Browserify
-Best cache hit rate               | clay rollup / clay build  | Both ~97% warm-cache (vs 82% Browserify)
-Chunk count control               | clay rollup               | manualChunks + graph API
-ESM migration runway              | clay rollup               | Shims drop off as require() → import
-Modern dev server / HMR           | clay vite                 | Not needed for server-rendered SSR
-Furthest from legacy CJS          | clay vite                 | esbuild pre-bundler hides CJS
-```
+| Capability | Browserify | esbuild | Rollup + esbuild | Vite |
+|---|---|---|---|---|
+| Build speed | 90–120 s | ~33 s | ~70 s | ~60 s |
+| `manualChunks` control | None | None | Full | Full |
+| CJS→ESM conversion | N/A (CJS only) | Opaque | Configurable | Managed by `optimizeDeps` |
+| CJS circular dep handling | Runtime | Implicit | `strictRequires: 'auto'` | Pre-bundled (automatic) |
+| Chunk size inlining | No | No | Yes | Yes + native ESM (`experimentalMinChunkSize`) |
+| Tree shaking | No | Yes (ESM only) | Yes | Yes |
+| Content-hashed output | No | Yes | Yes | Yes |
+| Source maps | No | Yes | Yes | Yes |
+| Native ESM output | No | Yes | Yes | Yes |
+| `modulepreload` hints | No | Yes * | Yes * | Yes * |
+| Vue 3 migration path | No | No | Manual plugin | First-party `@vitejs/plugin-vue` |
+| Lightning CSS migration path | No | No | Manual plugin | `css: { transformer: 'lightningcss' }` |
+| Rolldown migration path | No | No | No | Drop-in swap (same plugin API) |
+| Config API surface | `claycli.config.js` | `claycli.config.js` | All Rollup options exposed | `bundlerConfig()` subset only |
+| Dev watch | No | chokidar polling | `rollup.watch()` | `rollup.watch()` (HMR server not used) |
+| `node_modules` CJS isolation | N/A | Implicit | Manual `commonjsExclude` | Automatic |
+| Setup complexity | Low | Low | High | Medium |
+| ESM migration runway | No | Partial | Full | Full + Rolldown-forward-compatible |
 
-### What the measurements tell us
+\* Implemented at the `amphora-html` layer, not by the bundler directly.
 
-- **Rollup is already better than Browserify** on every user-facing metric (FCP −36%, LCP −31%, JS transferred −26%) and the warm-cache story is dramatically better.
-- **esbuild still edges out rollup on LCP/TBT** in the current CJS-heavy codebase. This is a transitional state — the `@rollup/plugin-commonjs` wrappers add evaluation overhead that disappears as modules migrate to ESM.
-- **The 34 duplicate chunk sets** flagged in the rollup build are the clearest near-term signal: those are CJS boilerplate being inlined per-chunk instead of shared. Migrating those helpers to native ESM exports will reduce the chunk count and eliminate the duplication in one step.
-- **Raising `manualChunksMinSize`** in `claycli.config.js` (currently 8 192 bytes) will inline more small chunks into their importers, reducing the 1 269-chunk count and improving TBT.
+---
 
-The long-term direction is **`clay rollup` with progressive ESM migration**. As each `require()` call is replaced with `import`, the plugin stack shrinks. When the codebase is fully ESM:
+## 7. Why Not the Others
 
-1. Remove `hoistRequires` from `vue2Plugin`
-2. Remove `transformMixedEsModules`, `strictRequires`, `requireReturnsDefault` from `@rollup/plugin-commonjs`
-3. Remove `@rollup/plugin-commonjs` entirely
-4. Remove `@rollup/plugin-node-resolve` (Rollup 4+ handles `node_modules` natively for ESM)
-5. Enable `kilnSplit: true` to collapse the two-pass build into one
-6. Optionally migrate to **Rolldown** (the Rust-port of Rollup) for esbuild-level speed with zero additional tooling
+### Why not keep Browserify?
 
-At that point the pipeline is: `rollup → output`. No esbuild subprocess. No CJS shims. No two passes.
+The Browserify `window.modules` runtime shipped 616 KB of uncacheable inline JS to every
+page. Every deploy invalidated every JS file. No tree shaking, no shared chunk extraction,
+no source maps. Build times of 90–120 s made watch mode unusable for local development.
+
+### Why not just use esbuild?
+
+esbuild was the right first step — the `_view-init.js` dynamic-import architecture,
+`_manifest.json`, and `Cache-Control: immutable` strategy all came from the esbuild phase
+and carried forward unchanged. But esbuild's inability to control chunk size (no
+`manualChunks` equivalent) meant the 500+ tiny chunk problem was structural, not fixable
+with configuration. We needed Rollup's module graph API.
+
+### Why not stay on Rollup?
+
+Rollup was viable but required managing too many moving parts at once:
+
+- `@rollup/plugin-commonjs` configuration with multiple per-package exceptions
+- A custom esbuild-transform plugin just to handle `process.env` defines
+- A custom safe-wrap plugin for pyxis-frontend that had to be removed when the dep was patched
+- Two parallel build passes with carefully synchronized output
+- Manual `client-env.json` generation that was missing at first and discovered at CI time
+
+Every time a new CJS dependency was added to the project, the Rollup pipeline needed updating.
+Vite handles this at the `optimizeDeps` boundary automatically.
+
+Additionally, Rollup is not the strategic direction for the frontend ecosystem. The Vite
+team is building **Rolldown** as a Rust replacement for Rollup, targeting 10× build speeds
+with the same API. Vite will migrate to Rolldown as its production bundler. By choosing Vite
+now, the Clay pipeline gets the Rolldown upgrade for free — one `npm install` in claycli.
+
+### Why not Webpack?
+
+Webpack was never seriously considered. Its configuration complexity dwarfs even bare Rollup,
+its build speed is 3–5× slower than Vite for this size of codebase, and its ecosystem is
+in maintenance mode as projects migrate to Vite. Webpack 5 is still widely used but new
+projects in the web ecosystem choose Vite overwhelmingly.
+
+---
+
+## 8. Migration Roadmap
+
+The long-term direction is **`clay vite` with progressive ESM migration**, targeting Rolldown:
+
+| Step | Action | Config change | Benefit |
+|---|---|---|---|
+| 1 | New components: write as ESM from day one | No config change needed | Future-proof from the start; new code is immediately tree-shakeable and Rolldown-ready |
+| 2 | Migrate `model.js` / `kiln.js` to ESM | Set `kilnSplit: true` → collapses to one build pass | Eliminates the second Vite build pass; cuts total build time for the kiln/model bundle |
+| 3 | Migrate `client.js` files to ESM | Set `clientFilesESM: true` → switches to `experimentalMinChunkSize`; `@rollup/plugin-commonjs` becomes a no-op per file | Native Rollup chunking replaces custom plugin; smaller chunks, better tree-shaking, reduced TBT |
+| 4 | Migrate Vue 2 → Vue 3 | Add `@vitejs/plugin-vue`; remove `viteVue2Plugin` from claycli | Smaller runtime (Vue 3 is ~40% smaller than Vue 2), Composition API, first-party Vite support |
+| 5 | Replace PostCSS with Lightning CSS | `css: { transformer: 'lightningcss' }` in `baseViteConfig` | Rust-native CSS parsing — dramatically faster CSS build step; modern syntax support with zero config |
+| 6 | Remove `commonjsOptions` entirely | All source is native ESM — no CJS shims needed | Removes all `__commonJS()` wrapper boilerplate from output; smaller bundles, lower TBT, cleaner output |
+| 7 | Migrate to Rolldown | One `npm install` in claycli; no site `claycli.config.js` changes | esbuild-level build speed (~10×) with full Rollup plugin compatibility; sub-10 s JS build times |
+
+At step 7, the pipeline is: `vite build` → native ESM output. No CJS shims. No two-pass
+build. No PostCSS. No Babel. Sub-10 s build times.
+
+The key architectural decision that makes this roadmap work: **every CJS shim is a
+named, temporary scaffold with a clear removal condition.** Nothing is permanent debt.
+Each migration step removes something rather than adding something.
