@@ -372,7 +372,7 @@ Vite was chosen specifically because it is the default integration point for:
 | Browserify + Gulp | 30–60 s | 90–120 s |
 | esbuild | ~3 s | ~33 s |
 | Rollup + esbuild | ~40 s | ~70 s |
-| **Vite** | **~30 s** | **~60 s** |
+| **Vite** | **~30 s** | **~30 s** (client-env now free via Rollup plugin) |
 
 Vite is faster than bare Rollup because its `optimizeDeps` pass converts `node_modules`
 CJS to ESM before Rollup sees them, reducing the number of modules `@rollup/plugin-commonjs`
