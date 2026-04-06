@@ -875,13 +875,35 @@ The watch implementation uses **Rollup watch mode** for JS incremental rebuilds 
 **chokidar** for CSS, fonts, and templates. Key behaviours:
 
 - **JS rebuild:** Rollup reprocesses only changed modules and their dependents
-- **Bootstrap regeneration:** when a new `client.js` is added, the bootstrap is regenerated
-  automatically so the new component appears in the next rebuild
+- **Kiln rebuild (two-pass mode):** a separate parallel Rollup watcher handles `kiln.js` /
+  `model.js` changes incrementally — no cold full build on every edit
+- **Bootstrap regeneration:** when a new `client.js` is added or removed, the bootstrap is
+  regenerated automatically so the new component appears in the next rebuild
 - **client-env.json regeneration:** the `clay-client-env` Rollup plugin automatically
   collects any new `process.env.VAR` reference as Rollup re-transforms the changed
   module — no separate file scan, no extra I/O step
-  to keep `process.env` variable references in sync
 - **usePolling: true** — required for Docker + macOS volume mounts where inotify is unreliable
+- **Heartbeat logging:** if a rebuild takes longer than 3 seconds the terminal prints
+  `[asset] still building... (Xs)` every 3 s so you know the process is not stuck
+- **Per-asset colour coding:** each asset type (`[js]`, `[kiln]`, `[styles]`, `[fonts]`,
+  `[templates]`) has a unique color so you can scan the log at a glance
+
+#### Signal files (local dev only, `NODE_ENV=localhost`)
+
+`clay vite --watch` writes small signal files to `.clay/` after each rebuild.
+The app server (`scripts/local/start.js` + `amphora/renderers.js`) watches them:
+
+| Signal file | Written after | Consumed by | Effect |
+|---|---|---|---|
+| `.clay/template-signal` | template rebuild | `renderers.js` `fs.watchFile` | `html.init()` + `refreshTemplates()` in-process (~100ms) |
+| `.clay/reload-signal` | CSS rebuild | `start.js` `fs.watchFile` | `nodemon.restart()` — full server restart (~3s) |
+
+**Why CSS needs a full restart:** CSS output files have stable names (no content hash), so
+the browser caches the old version. A server restart changes the ETag, forcing a re-fetch.
+
+**TODO:** Once CSS migrates to Lightning CSS with content-hashed filenames, the
+`reload-signal` and the nodemon restart can be removed — the new URL naturally busts
+the cache, exactly as JS chunks do today.
 
 ## 9. Performance
 
@@ -989,7 +1011,7 @@ smaller `node_modules`, reduced supply-chain attack surface.
 | **Rollback safety** | If build fails, `browserify-cache.json` may be left partial | If build fails, previous `_manifest.json` is untouched |
 | **Source maps in production** | Not generated | `*.js.map` for every output chunk |
 | **Node.js requirement** | Node ≥ 14 | Node ≥ 20 |
-| **Error surface** | Gulp errors can be silently swallowed | Errors are explicit — build exits non-zero, CI fails fast |
+| **Error surface** | Gulp errors can be silently swallowed | All steps still run when one fails; process exits non-zero after all steps complete — CI fails fast with a clear summary |
 
 ## 11. For Product Managers
 
@@ -1035,7 +1057,7 @@ Tests for the Vite pipeline live in the same location as other claycli tests:
 
 ```
 lib/cmd/vite/
-├── scripts.test.js      ← unit tests for config helpers, buildAll, watch
+├── scripts.test.js        ← unit tests for config helpers, buildAll, watch, signal writes
 ├── plugins/
 │   ├── browser-compat.test.js
 │   ├── service-rewrite.test.js
