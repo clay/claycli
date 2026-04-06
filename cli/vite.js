@@ -39,16 +39,17 @@ async function handler(argv) {
     try {
       const ctx = await watch({
         ...options,
+        // Called once after the first successful build — correct place for the
+        // "ready" message because watch() resolves before BUNDLE_END fires.
+        onReady() {
+          log('info', 'Watching for changes — press Ctrl+C to stop');
+        },
+        // Only report errors here; successful rebuilds are already logged by
+        // scripts.js with the module-count suffix to avoid duplicate output.
         onRebuild(errors) {
-          if (errors.length > 0) {
-            errors.forEach(e => log('error', e.message || String(e)));
-          } else {
-            log('info', '[js] Rebuilt successfully');
-          }
+          errors.forEach(e => log('error', e.message || String(e)));
         },
       });
-
-      log('info', 'Watching for changes — press Ctrl+C to stop');
 
       process.on('SIGINT', () => {
         ctx.dispose().then(() => process.exit(0));
