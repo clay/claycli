@@ -1,7 +1,7 @@
 # claycli
 A CLI For Clay!
 
-[![CI](https://github.com/nymag/clay-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/nymag/clay-cli/actions/workflows/ci.yml) [![Coverage Status](https://coveralls.io/repos/github/clay/claycli/badge.svg?branch=master)](https://coveralls.io/github/clay/claycli?branch=master)
+[![CI](https://github.com/clay/claycli/actions/workflows/ci.yml/badge.svg)](https://github.com/clay/claycli/actions/workflows/ci.yml) [![Coverage Status](https://coveralls.io/repos/github/clay/claycli/badge.svg?branch=master)](https://coveralls.io/github/clay/claycli?branch=master)
 
 # Installation
 
