@@ -4,6 +4,11 @@ const _ = require('lodash'),
   options = require('./cli-options'),
   refs = require('../lib/cmd/refs');
 
+/**
+ * Configure `clay refs` CLI arguments.
+ * @param {object} yargs
+ * @returns {object}
+ */
 function builder(yargs) {
   return yargs
     .usage('Usage: $0 refs <url-or-prefix>')
@@ -49,6 +54,11 @@ function builder(yargs) {
     });
 }
 
+/**
+ * Dispatch refs action and print results.
+ * @param {object} argv
+ * @returns {Promise<void>}
+ */
 async function handler(argv) {
   const result = await runAction(argv);
 
@@ -68,6 +78,10 @@ async function handler(argv) {
   else if (_.has(result, 'dryRun') && result.dryRun) console.log(chalk.yellow('Dry-run only. Re-run with --apply to mutate data.')); // eslint-disable-line no-console
 }
 
+/**
+ * Validate action-specific required args before execution.
+ * @param {object} argv
+ */
 function validateArgs(argv) {
   if (argv.action === 'replace' && (!argv.ref || !argv.to)) {
     throw new Error('--ref and --to are required for --action replace');
@@ -78,6 +92,11 @@ function validateArgs(argv) {
   }
 }
 
+/**
+ * Route action string to refs command implementation.
+ * @param {object} argv
+ * @returns {Promise<object>}
+ */
 function runAction(argv) {
   validateArgs(argv);
 

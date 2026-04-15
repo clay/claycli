@@ -3,6 +3,11 @@ const chalk = require('chalk'),
   options = require('./cli-options'),
   doctor = require('../lib/cmd/doctor');
 
+/**
+ * Configure `clay doctor` CLI arguments.
+ * @param {object} yargs
+ * @returns {object}
+ */
 function builder(yargs) {
   return yargs
     .usage('Usage: $0 doctor <url>')
@@ -28,6 +33,11 @@ function builder(yargs) {
     });
 }
 
+/**
+ * Run diagnosis or safe-fix mode and render output.
+ * @param {object} argv
+ * @returns {Promise<void>}
+ */
 async function handler(argv) {
   if (argv.fix) {
     const result = await doctor.safeFix(argv.url, {

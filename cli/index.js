@@ -15,6 +15,7 @@ const yargs = require('yargs'),
   notifier = updateNotifier({
     pkg
   }),
+  // Map short aliases and full command names to command modules.
   commands = {
     c: 'compile',
     cfg: 'config',

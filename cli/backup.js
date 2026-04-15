@@ -2,6 +2,11 @@
 const chalk = require('chalk'),
   tools = require('../lib/cmd/dev-tools');
 
+/**
+ * Configure `clay backup` CLI arguments.
+ * @param {object} yargs
+ * @returns {object}
+ */
 function builder(yargs) {
   return yargs
     .usage('Usage: $0 backup <url>')
@@ -17,6 +22,11 @@ function builder(yargs) {
     });
 }
 
+/**
+ * Create a page snapshot and render output.
+ * @param {object} argv
+ * @returns {Promise<void>}
+ */
 async function handler(argv) {
   const result = await tools.backupPage(argv.url, argv.output);
 

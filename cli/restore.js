@@ -3,6 +3,11 @@ const chalk = require('chalk'),
   options = require('./cli-options'),
   tools = require('../lib/cmd/dev-tools');
 
+/**
+ * Configure `clay restore` CLI arguments.
+ * @param {object} yargs
+ * @returns {object}
+ */
 function builder(yargs) {
   return yargs
     .usage('Usage: $0 restore <url>')
@@ -24,6 +29,11 @@ function builder(yargs) {
     });
 }
 
+/**
+ * Restore a snapshot into a target environment.
+ * @param {object} argv
+ * @returns {Promise<void>}
+ */
 async function handler(argv) {
   const key = tools.getKey(argv.key),
     result = await tools.restoreSnapshot(argv.file, argv.url, key, argv.publish);

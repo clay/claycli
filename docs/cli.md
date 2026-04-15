@@ -40,6 +40,11 @@ For smaller `Clay` installations (or, ironically, for very large teams where dev
 
 * [`config`](#config)
 * [`lint`](#lint)
+* [`doctor`](#doctor)
+* [`refs`](#refs)
+* [`backup`](#backup)
+* [`restore`](#restore)
+* [`rescue`](#rescue)
 * [`import`](#import)
 * [`export`](#export)
 * [`compile`](#compile)
@@ -208,6 +213,167 @@ $ clay lint my-cool-article
 
 # lint single schema
 $ clay lint < components/article/schema.yml
+```
+
+## Doctor
+
+Diagnose broken references on a page and optionally run a safe auto-fix. `doctor` combines recursive lint checks with direct reference existence checks so developers can quickly identify and remediate corrupted page data.
+
+```bash
+clay doctor [--key <api key>] [--concurrency <number>] [--fix] [--apply] [--publish] [--json] <url>
+```
+
+### Arguments
+
+* `-k, --key` specifies an api key or key alias for the target environment
+* `-c, --concurrency` controls concurrent reference checks
+* `--fix` switches from diagnostics-only mode to safe fix mode
+* `--apply` applies safe fix mutations (default is dry-run)
+* `--publish` publishes the page after apply
+* `--json` returns structured output
+
+### Safe Fix Behavior
+
+When `--fix` is enabled, `doctor` applies deterministic repair operations:
+
+* remove missing refs from arrays
+* reset objects with missing `_ref` values to `{}`
+
+If `--apply` is omitted, no writes are made and the command prints a dry-run mutation plan.
+
+### Examples
+
+```bash
+# Diagnose a page in qa
+$ clay doctor https://domain.com/_pages/homepage -k qa
+
+# Generate a dry-run repair plan
+$ clay doctor https://domain.com/_pages/homepage -k qa --fix
+
+# Apply safe repairs and publish
+$ clay doctor https://domain.com/_pages/homepage -k qa --fix --apply --publish
+```
+
+## Refs
+
+Perform targeted reference operations for incident response and cleanup workflows.
+
+```bash
+clay refs [--key <api key>] [--concurrency <number>] [--action <action>] [options] <url-or-prefix>
+```
+
+Supported actions:
+
+* `prune` removes/resets missing refs from a page
+* `replace` swaps one ref for another in a page payload
+* `reset` overwrites a single ref URI with an empty object
+* `where-used` returns pages that contain a given ref
+
+### Arguments
+
+* `-k, --key` specifies an api key or key alias for the target environment
+* `-c, --concurrency` controls concurrent reference checks for page-scoped actions
+* `--action` required operation (`prune`, `replace`, `reset`, `where-used`)
+* `--ref` required for `replace`, `reset`, and `where-used`
+* `--to` required for `replace`
+* `--apply` applies mutations (default is dry-run for mutating actions)
+* `--publish` publishes page after `prune` / `replace` when `--apply` is set
+* `--where-used` (with `reset`) also returns pages containing the ref
+* `--size` max hits for where-used search (default `1000`)
+* `--json` returns structured output
+
+### Examples
+
+```bash
+# Dry-run prune missing refs in qa
+$ clay refs https://domain.com/_pages/homepage --action prune -k qa
+
+# Apply prune + publish
+$ clay refs https://domain.com/_pages/homepage --action prune -k qa --apply --publish
+
+# Replace a broken ref with a valid instance
+$ clay refs https://domain.com/_pages/homepage --action replace --ref /_components/a/instances/1 --to /_components/a/instances/2 -k qa --apply
+
+# Reset a broken instance and also show pages using it
+$ clay refs stg --action reset --ref /_components/foo/instances/bar -k qa --apply --where-used
+
+# Find usage only
+$ clay refs stg --action where-used --ref /_components/foo/instances/bar -k qa
+```
+
+## Backup
+
+Create a snapshot file of a page and associated dispatches before repairs.
+
+```bash
+clay backup [--output <path>] [--json] <url>
+```
+
+### Arguments
+
+* `-o, --output` custom snapshot output path
+* `--json` returns structured output
+
+### Examples
+
+```bash
+# Generate timestamped snapshot in current directory
+$ clay backup https://domain.com/_pages/homepage
+
+# Write snapshot to explicit file
+$ clay backup https://domain.com/_pages/homepage --output homepage-before-fix.clay
+```
+
+## Restore
+
+Restore a previously created dispatch snapshot into a target environment.
+
+```bash
+clay restore [--key <api key>] --file <snapshot> [--publish] [--json] <site prefix>
+```
+
+### Arguments
+
+* `-k, --key` specifies an api key or key alias for the target environment
+* `-f, --file` snapshot file created by `clay backup`
+* `--publish` publishes imported items
+* `--json` returns structured output
+
+### Examples
+
+```bash
+# Restore to qa site prefix
+$ clay restore https://qa.domain.com --file homepage-before-fix.clay -k qa
+
+# Restore and publish
+$ clay restore https://qa.domain.com --file homepage-before-fix.clay -k qa --publish
+```
+
+## Rescue
+
+Run a full remediation workflow in one command: backup -> diagnose -> safe-fix (dry-run by default).
+
+```bash
+clay rescue [--key <api key>] [--concurrency <number>] [--output <path>] [--apply] [--publish] [--json] <url>
+```
+
+### Arguments
+
+* `-k, --key` specifies an api key or key alias for the target environment
+* `-c, --concurrency` controls concurrent reference checks
+* `-o, --output` custom backup output path
+* `--apply` applies safe fix mutations (default is dry-run)
+* `--publish` publishes the page after apply
+* `--json` returns structured output
+
+### Examples
+
+```bash
+# Full rescue plan (no writes)
+$ clay rescue https://domain.com/_pages/homepage -k qa
+
+# Full rescue apply + publish
+$ clay rescue https://domain.com/_pages/homepage -k qa --apply --publish
 ```
 
 ## Import

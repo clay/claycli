@@ -3,6 +3,11 @@ const chalk = require('chalk'),
   options = require('./cli-options'),
   rescue = require('../lib/cmd/rescue');
 
+/**
+ * Configure `clay rescue` CLI arguments.
+ * @param {object} yargs
+ * @returns {object}
+ */
 function builder(yargs) {
   return yargs
     .usage('Usage: $0 rescue <url>')
@@ -29,6 +34,11 @@ function builder(yargs) {
     });
 }
 
+/**
+ * Run backup + diagnose + safe-fix workflow and render output.
+ * @param {object} argv
+ * @returns {Promise<void>}
+ */
 async function handler(argv) {
   const result = await rescue.run(argv.url, argv);
 
