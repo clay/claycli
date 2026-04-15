@@ -18,10 +18,20 @@ const yargs = require('yargs'),
   commands = {
     c: 'compile',
     cfg: 'config',
+    d: 'doctor',
     e: 'export',
     i: 'import',
     l: 'lint',
-    p: 'pack'
+    p: 'pack',
+    rf: 'refs',
+    b: 'backup',
+    rs: 'restore',
+    rsc: 'rescue',
+    doctor: 'doctor',
+    refs: 'refs',
+    backup: 'backup',
+    restore: 'restore',
+    rescue: 'rescue'
   },
   listCommands = Object.keys(commands).concat(Object.values(commands));
 
