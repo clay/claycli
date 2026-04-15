@@ -1,6 +1,7 @@
 'use strict';
 const chalk = require('chalk'),
   options = require('./cli-options'),
+  { ensureLayoutConfirmation } = require('./layout-confirmation'),
   rescue = require('../lib/cmd/rescue');
 
 /**
@@ -28,6 +29,12 @@ function builder(yargs) {
       describe: 'publish page after apply',
       type: 'boolean'
     })
+    .option('layout', {
+      alias: 'l',
+      describe: 'include layout refs in checks and mutations',
+      type: 'boolean'
+    })
+    .option('yes-layout', options.yesLayout)
     .option('json', {
       describe: 'output machine-readable json',
       type: 'boolean'
@@ -40,6 +47,8 @@ function builder(yargs) {
  * @returns {Promise<void>}
  */
 async function handler(argv) {
+  await ensureLayoutConfirmation(argv, 'rescue');
+
   const result = await rescue.run(argv.url, argv);
 
   if (argv.json) {

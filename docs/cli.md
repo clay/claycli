@@ -230,6 +230,8 @@ clay doctor [--key <api key>] [--concurrency <number>] [--fix] [--apply] [--publ
 * `--fix` switches from diagnostics-only mode to safe fix mode
 * `--apply` applies safe fix mutations (default is dry-run)
 * `--publish` publishes the page after apply
+* `-l, --layout` include layout refs in checks and mutations (default excludes layout refs)
+* `--yes-layout` bypasses interactive layout confirmation (required in non-interactive shells)
 * `--json` returns structured output
 
 ### Safe Fix Behavior
@@ -278,6 +280,8 @@ Supported actions:
 * `--to` required for `replace`
 * `--apply` applies mutations (default is dry-run for mutating actions)
 * `--publish` publishes page after `prune` / `replace` when `--apply` is set
+* `-l, --layout` include layout refs in checks and mutations (default excludes layout refs)
+* `--yes-layout` bypasses interactive layout confirmation (required in non-interactive shells)
 * `--where-used` (with `reset`) also returns pages containing the ref
 * `--size` max hits for where-used search (default `1000`)
 * `--json` returns structured output
@@ -364,6 +368,8 @@ clay rescue [--key <api key>] [--concurrency <number>] [--output <path>] [--appl
 * `-o, --output` custom backup output path
 * `--apply` applies safe fix mutations (default is dry-run)
 * `--publish` publishes the page after apply
+* `-l, --layout` include layout refs in checks and mutations (default excludes layout refs)
+* `--yes-layout` bypasses interactive layout confirmation (required in non-interactive shells)
 * `--json` returns structured output
 
 ### Examples

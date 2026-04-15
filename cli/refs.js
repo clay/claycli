@@ -2,6 +2,7 @@
 const _ = require('lodash'),
   chalk = require('chalk'),
   options = require('./cli-options'),
+  { ensureLayoutConfirmation } = require('./layout-confirmation'),
   refs = require('../lib/cmd/refs');
 
 /**
@@ -39,6 +40,12 @@ function builder(yargs) {
       describe: 'publish page after apply',
       type: 'boolean'
     })
+    .option('layout', {
+      alias: 'l',
+      describe: 'include layout refs in checks and mutations',
+      type: 'boolean'
+    })
+    .option('yes-layout', options.yesLayout)
     .option('where-used', {
       describe: 'when resetting, also return pages that reference this ref',
       type: 'boolean'
@@ -60,6 +67,8 @@ function builder(yargs) {
  * @returns {Promise<void>}
  */
 async function handler(argv) {
+  await ensureLayoutConfirmation(argv, 'refs');
+
   const result = await runAction(argv);
 
   if (argv.json) {

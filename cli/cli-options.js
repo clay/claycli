@@ -43,6 +43,10 @@ module.exports = {
     describe: 'export layout when exporting page(s)',
     type: 'boolean'
   },
+  yesLayout: {
+    describe: 'confirm that layout refs may be modified',
+    type: 'boolean'
+  },
   yaml: {
     alias: 'yaml', // -y, --yaml
     describe: 'parse bootstrap format',

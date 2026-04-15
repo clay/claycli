@@ -1,6 +1,7 @@
 'use strict';
 const chalk = require('chalk'),
   options = require('./cli-options'),
+  { ensureLayoutConfirmation } = require('./layout-confirmation'),
   doctor = require('../lib/cmd/doctor');
 
 /**
@@ -27,6 +28,12 @@ function builder(yargs) {
       describe: 'publish page after apply',
       type: 'boolean'
     })
+    .option('layout', {
+      alias: 'l',
+      describe: 'include layout refs in checks and mutations',
+      type: 'boolean'
+    })
+    .option('yes-layout', options.yesLayout)
     .option('json', {
       describe: 'output machine-readable json',
       type: 'boolean'
@@ -39,12 +46,15 @@ function builder(yargs) {
  * @returns {Promise<void>}
  */
 async function handler(argv) {
+  await ensureLayoutConfirmation(argv, 'doctor');
+
   if (argv.fix) {
     const result = await doctor.safeFix(argv.url, {
       key: argv.key,
       apply: argv.apply,
       publish: argv.publish,
-      concurrency: argv.concurrency
+      concurrency: argv.concurrency,
+      layout: argv.layout
     });
 
     if (argv.json) {
@@ -63,7 +73,8 @@ async function handler(argv) {
 
   const diagnosis = await doctor.diagnose(argv.url, {
     key: argv.key,
-    concurrency: argv.concurrency
+    concurrency: argv.concurrency,
+    layout: argv.layout
   });
 
   if (argv.json) {
