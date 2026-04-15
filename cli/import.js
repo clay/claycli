@@ -2,6 +2,8 @@
 const _ = require('lodash'),
   pluralize = require('pluralize'),
   chalk = require('chalk'),
+  b64 = require('base-64'),
+  nodeUrl = require('url'),
   options = require('./cli-options'),
   reporter = require('../lib/reporters'),
   importItems = require('../lib/cmd/import');
@@ -45,10 +47,21 @@ function handler(argv) {
       }
     })
     .toArray((results) => {
-      const pages = _.map(_.filter(results, (result) => result.type === 'success' && _.includes(result.message, 'pages')), (page) => `${page.message}.html`);
+      const protocol = nodeUrl.parse(argv.url).protocol || 'https:',
+        pages = _.map(_.filter(results, (result) => result.type === 'success' && _.includes(result.message, 'pages')), (page) => `${page.message}.html`),
+        publicUrls = _.map(
+          _.filter(results, (result) => result.type === 'success' && _.includes(result.message, '_uris/')),
+          (result) => {
+            const encoded = result.message.split('/_uris/')[1];
+
+            return `${protocol}//${b64.decode(encoded)}`;
+          }
+        );
 
       reporter.logSummary(argv.reporter, 'import', (successes) => {
-        if (successes && pages.length) {
+        if (successes && pages.length && publicUrls.length) {
+          return { success: true, message: `Imported ${pluralize('page', pages.length, true)}\n${chalk.gray(pages.join('\n'))}\n${chalk.cyan('Public URL(s):\n' + publicUrls.join('\n'))}` };
+        } else if (successes && pages.length) {
           return { success: true, message: `Imported ${pluralize('page', pages.length, true)}\n${chalk.gray(pages.join('\n'))}` };
         } else if (successes) {
           return { success: true, message: `Imported ${pluralize('uri', successes, true)}` };
