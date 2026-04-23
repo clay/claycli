@@ -135,6 +135,7 @@
     "through2": "^4.0.2",
     "uglify-js": "^3.4.6",
     "uglifyify": "^5.0.2",
+    "undici": "^6.19.8",
     "unreachable-branch-transform": "^0.5.1",
     "update-notifier": "^5.1.0",
     "vue-loader": "^15.9.6",
