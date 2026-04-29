@@ -21,7 +21,9 @@ const yargs = require('yargs'),
     e: 'export',
     i: 'import',
     l: 'lint',
-    p: 'pack'
+    p: 'pack',
+    v: 'vite',
+    vite: 'vite',
   },
   listCommands = Object.keys(commands).concat(Object.values(commands));
 
