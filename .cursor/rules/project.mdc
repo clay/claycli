@@ -1,0 +1,19 @@
+---
+description: "Clay CLI project conventions — CommonJS Node.js CLI tool with Jest testing"
+alwaysApply: true
+---
+
+# Clay CLI Project Conventions
+
+This is a Node.js CLI tool using CommonJS modules. See `AGENTS.md` at the repository root for full project instructions.
+
+## Quick Reference
+
+- **Modules:** CommonJS only (`require`/`module.exports`), never ESM
+- **Style:** 2-space indent, single quotes, semicolons, `'use strict'` in every file
+- **Test:** `npm test` (lint + Jest), `npm run watch` for watch mode
+- **Lint:** `npm run lint` (ESLint)
+- **Tests:** Co-located `*.test.js` files next to source
+- **HTTP:** `isomorphic-fetch` (mocked via `jest-fetch-mock` in tests)
+- **Streams:** Highland.js for data processing pipelines
+- **Complexity:** Max cyclomatic complexity 8, max nesting depth 4, max params 4

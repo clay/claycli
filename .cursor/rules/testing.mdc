@@ -1,0 +1,33 @@
+---
+description: "Jest testing conventions for Clay CLI"
+alwaysApply: false
+globs:
+  - "**/*.test.js"
+---
+
+# Testing Conventions
+
+Jest test files for Clay CLI. Tests are co-located with source files (`foo.test.js` next to `foo.js`).
+
+## Setup
+
+Global test setup lives in `setup-jest.js` at the repo root. It:
+- Mocks `home-config` globally (used by config commands)
+- Sets up `jest-fetch-mock` as the global `fetch` (replaces `isomorphic-fetch`)
+
+Do NOT re-mock `home-config` or `isomorphic-fetch` in individual test files — the global setup handles this.
+
+## Conventions
+
+- Use `jest-fetch-mock` for HTTP request mocking — `fetch` is globally available
+- Use `mock-fs` for filesystem mocking — call `mockFs.restore()` in `afterEach`
+- Use `jest-mock-console` for console output assertions
+- Use `jest.fn()` and `jest.mock()` for module mocking — `automock` is disabled
+- Prefer `describe`/`it` blocks for test organization
+- Each test file should require its module under test with a fresh `require`
+
+## Patterns
+
+- Mock setup in `beforeEach`, cleanup in `afterEach`
+- Assert on function return values and side effects, not implementation details
+- Test both success and error paths for async operations
