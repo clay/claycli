@@ -29,6 +29,8 @@ function builder(yargs) {
       description: 'Build only selected steps: js, styles, fonts, templates, vendor, media',
       default: [],
       coerce: values => {
+        // Normalize both "--only a,b" and repeated "--only a --only b"
+        // into the same array shape for the downstream build orchestrator.
         const list = Array.isArray(values) ? values : [values];
 
         return list
@@ -44,6 +46,8 @@ function builder(yargs) {
 }
 
 async function handler(argv) {
+  // Keep CLI validation close to parsing so bad values fail fast before we
+  // do any build preparation work.
   const validOnly = new Set(['all', 'js', 'styles', 'fonts', 'templates', 'vendor', 'media']);
   const only = (argv.only || []).filter(Boolean);
   const invalid = only.filter(item => !validOnly.has(item));
