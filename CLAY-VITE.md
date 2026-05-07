@@ -51,12 +51,11 @@ the 2014–2018 JavaScript ecosystem. Over time these became pain points:
 
 The new `clay vite` pipeline replaces Browserify/Gulp with **Vite 5 + PostCSS 8**:
 
-- **Vite** uses Rollup 4 internally for production builds, adding `optimizeDeps` pre-bundling
-  (esbuild converts CJS `node_modules` before Rollup sees them) and a well-maintained plugin
+- **Vite** uses Rollup 4 internally for production builds and a well-maintained plugin
   ecosystem. We use Vite exclusively for its **production build** — the Vite dev server and
   HMR are not used. Clay runs a full server-rendered architecture (Amphora) where the browser
   never speaks directly to a Vite dev server; watch mode uses Rollup's incremental rebuild
-  instead.
+  instead. (`optimizeDeps` is intentionally disabled in this flow.)
 - PostCSS 8's programmatic API replaces Gulp's stream-based CSS pipeline
 - All build steps (JS, CSS, fonts, templates, vendor, media) run **in parallel**
 - A human-readable `_manifest.json` replaces the numeric `_registry.json` / `_ids.json` pair
@@ -97,12 +96,29 @@ clay vite --watch
 
 # Minified production build
 clay vite --minify
+
+# Build only selected steps (comma-separated)
+clay vite --only styles,templates
+
+# Build only JS
+clay vite --only js
 ```
 
 Both commands read **`claycli.config.js`** in the root of your Clay instance, but they look at
 **different config keys** so they never conflict (see [Configuration](#6-configuration)).
 
 The environment variable `CLAYCLI_VITE_ENABLED=true` enables the Vite pipeline in Dockerfiles and CI.
+
+For faster local iteration during dual-pipeline rollout, you can also scope work:
+
+```bash
+# Full build, but CSS only for selected styleguides (+ _default automatically)
+CLAYCLI_VITE_CSS_SITES=nymag,strategist clay vite
+
+# Run only specific build steps
+clay vite --only styles
+clay vite --only js
+```
 
 ## 3. Architecture: Old vs New
 
@@ -550,6 +566,48 @@ Both commands are fully independent. You can run either one without affecting th
 When `CLAYCLI_VITE_ENABLED` is **unset** (or not `"true"`), the old `clay compile` pipeline runs
 everywhere with zero changes needed.
 
+### Local iteration controls (new)
+
+These controls are intended for local/QA iteration while Browserify and Vite run in parallel.
+
+| Control | Scope | Behavior |
+|---|---|---|
+| `CLAYCLI_VITE_SITES=<csv>` | JS pipeline rollout (site integration) | Used by site-level wrappers (for example in `sites`) to enable Vite JS for selected sites during canary rollout |
+| `CLAYCLI_VITE_CSS_SITES=<csv>` | CSS full builds | Compiles only selected styleguides, always includes `_default`; use `all` (or unset) for normal behavior |
+| `clay vite --only <steps>` | Build orchestration | Runs only selected steps: `js`, `styles`, `fonts`, `templates`, `vendor`, `media` |
+
+#### `CLAYCLI_VITE_CSS_SITES`
+
+```bash
+# Compile CSS only for these sites (+ _default implicitly)
+CLAYCLI_VITE_CSS_SITES=wwwthecut,curbed,intelligencer clay vite
+
+# Explicit "compile all styleguides"
+CLAYCLI_VITE_CSS_SITES=all clay vite
+```
+
+Notes:
+
+- This filter applies to full CSS builds.
+- Watch-mode incremental CSS rebuilds use `changedFiles` and are intentionally not filtered, so local edits still rebuild correctly.
+- `_default` is always included when a site list is provided to preserve shared imports.
+
+#### `clay vite --only`
+
+```bash
+# Fast template-only loop (media still runs first for template reads)
+clay vite --only templates
+
+# Build multiple steps
+clay vite --only js,styles
+```
+
+Notes:
+
+- `--only templates` still runs `media` first because templates may inline files from `public/media`.
+- Invalid values are rejected by the CLI with a clear error.
+- `--only all` is equivalent to a normal full build.
+
 ### How to switch pipelines in the Dockerfile
 
 ```dockerfile
@@ -586,34 +644,34 @@ RUN if [ "$CLAYCLI_VITE_ENABLED" = "true" ]; then \
 
 | Command | File |
 |---|---|
-| `clay vite` | [`cli/vite.js`](https://github.com/clay/claycli/blob/jordan/yolo-update/cli/vite.js) |
-| `clay compile` | [`cli/compile/`](https://github.com/clay/claycli/tree/jordan/yolo-update/cli/compile) |
+| `clay vite` | [`cli/vite.js`](./cli/vite.js) |
+| `clay compile` | [`cli/compile/`](./cli/compile) |
 
 ### Vite pipeline modules
 
 | Module | File | Purpose |
 |---|---|---|
-| Orchestrator | [`lib/cmd/vite/scripts.js`](https://github.com/clay/claycli/blob/jordan/yolo-update/lib/cmd/vite/scripts.js) | Main build + watch orchestration; `getViteConfig`, `baseViteConfig`, `buildAll`, `watch` |
-| Bootstrap generator | [`lib/cmd/vite/generate-bootstrap.js`](https://github.com/clay/claycli/blob/jordan/yolo-update/lib/cmd/vite/generate-bootstrap.js) | Generates `.clay/vite-bootstrap.js` with component mount runtime |
-| Globals init generator | [`lib/cmd/vite/generate-globals-init.js`](https://github.com/clay/claycli/blob/jordan/yolo-update/lib/cmd/vite/generate-globals-init.js) | Generates `.clay/_globals-init.js` |
-| Kiln edit generator | [`lib/cmd/vite/generate-kiln-edit.js`](https://github.com/clay/claycli/blob/jordan/yolo-update/lib/cmd/vite/generate-kiln-edit.js) | Generates `.clay/_kiln-edit-init.js` |
-| CSS compilation | [`lib/cmd/vite/styles.js`](https://github.com/clay/claycli/blob/jordan/yolo-update/lib/cmd/vite/styles.js) | PostCSS pipeline; `buildStyles`, `SRC_GLOBS` |
-| Template compilation | [`lib/cmd/vite/templates.js`](https://github.com/clay/claycli/blob/jordan/yolo-update/lib/cmd/vite/templates.js) | Handlebars precompile; `buildTemplates`, `TEMPLATE_GLOB_PATTERN` |
-| Font processing | [`lib/cmd/vite/fonts.js`](https://github.com/clay/claycli/blob/jordan/yolo-update/lib/cmd/vite/fonts.js) | Font copy + CSS generation; `buildFonts`, `FONTS_SRC_GLOB` |
-| Media copy | [`lib/cmd/vite/media.js`](https://github.com/clay/claycli/blob/jordan/yolo-update/lib/cmd/vite/media.js) | Copies media files to `public/media/`; `copyMedia` |
-| Vendor copy | [`lib/cmd/vite/vendor.js`](https://github.com/clay/claycli/blob/jordan/yolo-update/lib/cmd/vite/vendor.js) | Copies `clay-kiln` dist files to `public/js/`; `copyVendor` |
-| Manifest writer | [`lib/cmd/vite/scripts.js`](https://github.com/clay/claycli/blob/jordan/yolo-update/lib/cmd/vite/scripts.js) | `buildManifest`, `writeManifest` — writes `_manifest.json` |
-| Script dependency resolver | [`lib/cmd/vite/index.js`](https://github.com/clay/claycli/blob/jordan/yolo-update/lib/cmd/vite/index.js) | `resolveModuleScripts`, `hasManifest` — runtime helpers for `resolve-media.js` |
+| Orchestrator | [`lib/cmd/vite/scripts.js`](./lib/cmd/vite/scripts.js) | Main build + watch orchestration; `getViteConfig`, `baseViteConfig`, `buildAll`, `watch` |
+| Bootstrap generator | [`lib/cmd/vite/generate-bootstrap.js`](./lib/cmd/vite/generate-bootstrap.js) | Generates `.clay/vite-bootstrap.js` with component mount runtime |
+| Globals init generator | [`lib/cmd/vite/generate-globals-init.js`](./lib/cmd/vite/generate-globals-init.js) | Generates `.clay/_globals-init.js` |
+| Kiln edit generator | [`lib/cmd/vite/generate-kiln-edit.js`](./lib/cmd/vite/generate-kiln-edit.js) | Generates `.clay/_kiln-edit-init.js` |
+| CSS compilation | [`lib/cmd/vite/styles.js`](./lib/cmd/vite/styles.js) | PostCSS pipeline; `buildStyles`, `SRC_GLOBS` |
+| Template compilation | [`lib/cmd/vite/templates.js`](./lib/cmd/vite/templates.js) | Handlebars precompile; `buildTemplates`, `TEMPLATE_GLOB_PATTERN` |
+| Font processing | [`lib/cmd/vite/fonts.js`](./lib/cmd/vite/fonts.js) | Font copy + CSS generation; `buildFonts`, `FONTS_SRC_GLOB` |
+| Media copy | [`lib/cmd/vite/media.js`](./lib/cmd/vite/media.js) | Copies media files to `public/media/`; `copyMedia` |
+| Vendor copy | [`lib/cmd/vite/vendor.js`](./lib/cmd/vite/vendor.js) | Copies `clay-kiln` dist files to `public/js/`; `copyVendor` |
+| Manifest writer | [`lib/cmd/vite/scripts.js`](./lib/cmd/vite/scripts.js) | `buildManifest`, `writeManifest` — writes `_manifest.json` |
+| Script dependency resolver | [`lib/cmd/vite/index.js`](./lib/cmd/vite/index.js) | `resolveModuleScripts`, `hasManifest` — runtime helpers for `resolve-media.js` |
 
 ### Vite plugins
 
 | Plugin | File | Purpose |
 |---|---|---|
-| Vue 2 SFC | [`lib/cmd/vite/plugins/vue2.js`](https://github.com/clay/claycli/blob/jordan/yolo-update/lib/cmd/vite/plugins/vue2.js) | Compiles `.vue` files; replaces `@nymag/vueify` Browserify transform |
-| Browser compat | [`lib/cmd/vite/plugins/browser-compat.js`](https://github.com/clay/claycli/blob/jordan/yolo-update/lib/cmd/vite/plugins/browser-compat.js) | Stubs server-only Node.js modules (`fs`, `http`, `clay-log`, etc.) |
-| Service rewrite | [`lib/cmd/vite/plugins/service-rewrite.js`](https://github.com/clay/claycli/blob/jordan/yolo-update/lib/cmd/vite/plugins/service-rewrite.js) | Rewrites `services/server/` imports to `services/client/` |
-| Missing module | [`lib/cmd/vite/plugins/missing-module.js`](https://github.com/clay/claycli/blob/jordan/yolo-update/lib/cmd/vite/plugins/missing-module.js) | Stubs unresolvable relative imports (legacy compatibility) |
-| Manual chunks | [`lib/cmd/vite/plugins/manual-chunks.js`](https://github.com/clay/claycli/blob/jordan/yolo-update/lib/cmd/vite/plugins/manual-chunks.js) | `viteManualChunksPlugin` — inlines small private deps into owner chunk |
+| Vue 2 SFC | [`lib/cmd/vite/plugins/vue2.js`](./lib/cmd/vite/plugins/vue2.js) | Compiles `.vue` files; replaces `@nymag/vueify` Browserify transform |
+| Browser compat | [`lib/cmd/vite/plugins/browser-compat.js`](./lib/cmd/vite/plugins/browser-compat.js) | Stubs server-only Node.js modules (`fs`, `http`, `clay-log`, etc.) |
+| Service rewrite | [`lib/cmd/vite/plugins/service-rewrite.js`](./lib/cmd/vite/plugins/service-rewrite.js) | Rewrites `services/server/` imports to `services/client/` |
+| Missing module | [`lib/cmd/vite/plugins/missing-module.js`](./lib/cmd/vite/plugins/missing-module.js) | Stubs unresolvable relative imports (legacy compatibility) |
+| Manual chunks | [`lib/cmd/vite/plugins/manual-chunks.js`](./lib/cmd/vite/plugins/manual-chunks.js) | `viteManualChunksPlugin` — inlines small private deps into owner chunk |
 
 ### Generated files
 
@@ -745,12 +803,12 @@ merge).
 Running them in `Promise.all()` is free — both passes compile independently and write to
 different output locations. The wall-clock cost is the longer of the two, not their sum.
 
-#### `kilnSplit: false` — the ESM escape hatch
+#### `kilnSplit: true` — the ESM escape hatch
 
 Once all `model.js` and `kiln.js` files are native ESM, the synchronous-initialization
 constraint disappears. ESM `import` statements at the top of a file are resolved statically
 by the module linker before any code runs, so there is no async gap for Kiln to initialize
-into. Setting `kilnSplit: false` in `bundlerConfig` signals that the kiln pass can be
+into. Setting `kilnSplit: true` in `bundlerConfig` signals that the kiln pass can be
 treated as a splitting pass, collapsing the two-pass build into one. This is the planned
 final state after full ESM migration.
 
@@ -1242,7 +1300,7 @@ full dependency tree enters the browser bundle. This can add hundreds of KB of N
 transitive dependencies (Elasticsearch clients, `node-fetch`, `iconv-lite` encoding tables,
 etc.) that the browser never needs and can never actually use.
 
-See [`lib/cmd/vite/plugins/service-rewrite.js`](https://github.com/clay/claycli/blob/jordan/yolo-update/lib/cmd/vite/plugins/service-rewrite.js)
+See [`lib/cmd/vite/plugins/service-rewrite.js`](./lib/cmd/vite/plugins/service-rewrite.js)
 for the full implementation and bundle-size impact documentation.
 
 ### Known violations (already fixed)
