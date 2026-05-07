@@ -24,15 +24,43 @@ function builder(yargs) {
       description: 'Additional entry-point file paths (supplements the default component globs)',
       default: [],
     })
+    .option('only', {
+      type: 'array',
+      description: 'Build only selected steps: js, styles, fonts, templates, vendor, media',
+      default: [],
+      coerce: values => {
+        // Normalize both "--only a,b" and repeated "--only a --only b"
+        // into the same array shape for the downstream build orchestrator.
+        const list = Array.isArray(values) ? values : [values];
+
+        return list
+          .flatMap(v => String(v).split(','))
+          .map(v => v.trim())
+          .filter(Boolean);
+      },
+    })
     .example('$0', 'Build all component scripts and assets with Vite')
     .example('$0 --watch', 'Rebuild on every file change')
-    .example('$0 --minify', 'Build and minify for production');
+    .example('$0 --minify', 'Build and minify for production')
+    .example('$0 --only styles,templates', 'Build only selected asset pipelines');
 }
 
 async function handler(argv) {
+  // Keep CLI validation close to parsing so bad values fail fast before we
+  // do any build preparation work.
+  const validOnly = new Set(['all', 'js', 'styles', 'fonts', 'templates', 'vendor', 'media']);
+  const only = (argv.only || []).filter(Boolean);
+  const invalid = only.filter(item => !validOnly.has(item));
+
+  if (invalid.length) {
+    log('error', `Invalid --only value(s): ${invalid.join(', ')}`);
+    process.exit(1);
+  }
+
   const options = {
     minify:       argv.minify,
     extraEntries: argv.entry || [],
+    only,
   };
 
   if (argv.watch) {
