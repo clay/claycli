@@ -259,7 +259,7 @@ flowchart LR
 | **JS tool** | Browserify + Babel (megabundles) | Vite (Rollup 4 + manualChunks) | 🔄 Replaced |
 | **CSS tool** | Gulp + PostCSS 7 | PostCSS 8 programmatic API | 🔄 Replaced; same plugin ecosystem |
 | **Module graph** | `_registry.json` + `_ids.json` | `_manifest.json` (human-readable) | ⚠️ Different format; same purpose |
-| **Component loader** | `_client-init.js` — mounts every `.client` module loaded | `vite-bootstrap.js` — mounts only when DOM element present | ✅ Better; avoids dead code execution |
+| **Component loader** | `_client-init.js` — calls `window.require()` on every `.client` module (executing its body and dependency graph), then DOM-checks before invoking the exported controller | `vite-bootstrap.js` — scans the DOM first; only `import()`s a `.client` module if its element exists | ✅ Better; module body never executes for components absent from the page |
 | **JS output** | Per-component files + alpha-bucket dep files | Dynamic import splits + `chunks/` shared deps | ✅ Better; shared deps cached once |
 
 ### 4b. JS module system architecture
@@ -339,7 +339,7 @@ flowchart TB
 | Concern | `clay compile` | `clay vite` | Why it matters |
 |---|---|---|---|
 | **Module registry** | Runtime: `window.modules` built as scripts evaluate | Build-time: `_manifest.json` written once | Old: any code could `window.require()` at any time. New: all wiring is static. |
-| **Component mounting** | `_client-init.js` mounts every loaded `.client` module, DOM or not | `vite-bootstrap.js` scans DOM; only imports a component if its element exists | New: no dead component code execution |
+| **Component mounting** | `_client-init.js` calls `window.require()` on every `.client` (running its body and dep graph) before DOM-gating the controller invocation | `vite-bootstrap.js` scans the DOM first; only imports a component if its element exists | New: no module body or transitive imports run for components absent from the page |
 | **Edit-mode aggregator** | `window.modules` registry | `_kiln-edit-init.js` pre-registers all model/kiln files on `window.kiln.componentModels` | New: explicit pre-wiring, backward compatible |
 | **Shared deps** | Alpha-bucketed dep files (`_deps-a.js`…) — static filenames | Named content-hashed chunks in `public/js/chunks/` | New: unchanged chunks stay cached across deploys |
 | **Global scripts** | Individual `<script>` tags per file | One `_globals-init.js` — 1 request instead of 70–100 | New: fewer network round-trips |
@@ -397,7 +397,7 @@ absent on the next deploy → old path activates. No code changes needed in the 
 | **Output filenames** | Static: `article.client.js` | Content-hashed: `chunks/client-A1B2C3.js` |
 | **Module runtime** | `_prelude.js` + `_postlude.js` (custom `window.require`) | Native ESM — no runtime overhead |
 | **Module graph** | `_registry.json` (numeric IDs) + `_ids.json` | `_manifest.json` (human-readable keys) |
-| **Component loader** | `_client-init.js` mounts every `.client` module in `window.modules` | `vite-bootstrap.js` mounts only when DOM element exists |
+| **Component loader** | `_client-init.js` calls `window.require()` on every `.client` in `window.modules` (always executing the module body), then only invokes the controller for matching DOM elements | `vite-bootstrap.js` only imports a `.client` when its DOM element exists, so the module body never runs otherwise |
 | **Chunk size control** | None — all or nothing per alpha-bucket | `manualChunksMinSize` — private deps inlined below threshold |
 | **CJS circular deps** | Implicit (flat scope) | Explicit via `@rollup/plugin-commonjs strictRequires:'auto'` |
 | **Tree shaking** | None | ESM packages: export-level; CJS: `process.env` dead-code elimination |

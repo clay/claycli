@@ -45,7 +45,9 @@ Browserify + Babel (30–60 s)
     ▼
 _prelude.js / _postlude.js  ← shipped to every page
 _registry.json + _ids.json  ← opaque numeric dep graph
-_client-init.js             ← mounts every .client module loaded, DOM or not
+_client-init.js             ← calls window.require() on every .client module
+                              (runs body + deps even if no DOM element exists);
+                              controller invocation itself is DOM-gated
 ```
 
 ### Problems
