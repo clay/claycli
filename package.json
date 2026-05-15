@@ -46,7 +46,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/nymag/clay-cli.git"
+    "url": "git+https://github.com/clay/claycli.git"
   },
   "keywords": [
     "clay",
@@ -55,9 +55,9 @@
   "author": "New York Media",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/nymag/clay-cli/issues"
+    "url": "https://github.com/clay/claycli/issues"
   },
-  "homepage": "https://github.com/nymag/clay-cli#readme",
+  "homepage": "https://github.com/clay/claycli#readme",
   "devDependencies": {
     "@babel/eslint-parser": "^7.14.7",
     "@babel/plugin-syntax-dynamic-import": "^7.8.3",
