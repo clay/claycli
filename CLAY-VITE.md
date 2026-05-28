@@ -1292,6 +1292,59 @@ into megabundles and never complained about Node-only packages. Under Vite, unre
 Node built-ins produce explicit build errors or runtime crashes. `serviceRewritePlugin`
 automatically redirects `services/server/*` to `services/client/*` in browser builds.
 
+### Debugging component preload/load/mount failures
+
+`vite-bootstrap.js` now logs structured error diagnostics for each component failure phase:
+
+- `preload` — module prefetch failed while scanning Clay comment markers.
+- `load` — dynamic `import()` failed for a component `client.js`.
+- `mount` — module loaded, but the exported controller threw while running.
+- `ds-mount` — Dollar Slice fallback `window.DS.get()` threw.
+
+Each failure includes component identity + URI context (`phase`, `component`, `moduleKey`,
+`uri`) and a normalized error object (`name`, `message`, `stack`, optional `code`, optional
+recursive `cause`).
+
+Example browser console output:
+
+```text
+[clay vite] mount errors (2)
+┌─────────┬──────────┬────────────────┬─────────────────────────────────────┬──────────────────────────────────────────────────────────────┬─────────────────────────────────────────────────────────────┐
+│ (index) │  phase   │   component    │              moduleKey              │                             uri                              │                           message                           │
+├─────────┼──────────┼────────────────┼─────────────────────────────────────┼──────────────────────────────────────────────────────────────┼─────────────────────────────────────────────────────────────┤
+│    0    │ 'load'   │ 'comments-link'│ 'components/comments-link/client.js'│ '/_components/comments-link/instances/cmp123'                │ 'Init must be called with `name` property'                  │
+│    1    │ 'mount'  │ 'auth-modal'   │ 'components/auth-modal/client.js'   │ '/_components/auth-modal/instances/cmp456'                   │ \"Cannot read properties of null (reading 'textContent')\"   │
+└─────────┴──────────┴────────────────┴─────────────────────────────────────┴──────────────────────────────────────────────────────────────┴─────────────────────────────────────────────────────────────┘
+
+[clay vite] mount error details [
+  {
+    phase: 'load',
+    component: 'comments-link',
+    moduleKey: 'components/comments-link/client.js',
+    uri: '/_components/comments-link/instances/cmp123',
+    error: {
+      name: 'Error',
+      message: 'Init must be called with `name` property',
+      stack: 'Error: Init must be called with `name` property\\n    at ...'
+    }
+  },
+  {
+    phase: 'mount',
+    component: 'auth-modal',
+    moduleKey: 'components/auth-modal/client.js',
+    uri: '/_components/auth-modal/instances/cmp456',
+    error: {
+      name: 'TypeError',
+      message: \"Cannot read properties of null (reading 'textContent')\",
+      stack: \"TypeError: Cannot read properties of null (reading 'textContent')\\n    at ...\"
+    }
+  }
+]
+```
+
+For implementation details, see
+[`lib/cmd/vite/generate-bootstrap.js`](./lib/cmd/vite/generate-bootstrap.js).
+
 ### Why this matters for bundle size
 
 If `serviceRewritePlugin` is not respected (e.g. a `client.js` file imports
