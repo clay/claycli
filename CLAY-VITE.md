@@ -384,6 +384,32 @@ flowchart TD
 `_manifest.json` is written → new path activates. Remove the flag → `_manifest.json` is
 absent on the next deploy → old path activates. No code changes needed in the site.
 
+### 4d. Module preloading & the on-demand component waterfall
+
+View-mode pages inject **one** `<script type="module">` — the bootstrap — at the end of
+`<body>`. The bootstrap then scans the DOM and `import()`s each present component's
+`client.js` on demand. That on-demand model keeps the initial parse tiny, but naively it
+creates a **load waterfall**: the browser cannot discover a component's chunk (nav, header,
+…) or its dependencies (auth, gtm, shared chunks) until the deferred bootstrap has
+downloaded, executed, and called `import()`. For JS-gated UI — e.g. the global nav revealing
+its account / sign-in links — that delay is visible, especially on cold cache or high latency.
+
+Two layers of `<link rel="modulepreload">` hints flatten the waterfall. They are opt-in on
+the amphora-html side (`configure({ modulepreload: true })`) and emitted into `<head>` so the
+browser starts fetching during HTML parse instead of after the bootstrap runs:
+
+| Layer | Source | What it preloads |
+|---|---|---|
+| Startup graph | `getViteModulePreloads()` (via `resolveModuleScripts`) | the bootstrap **plus its static imports** — `_globals-init`, `_env-init`, and the shared chunks the bootstrap pulls in synchronously |
+| On-page components | `getComponentPreloads(componentNames, assetPath)` | each rendered component's `client.js` chunk **plus its static import chunks**, de-duped |
+
+`getComponentPreloads` depends on the manifest keying **dynamic** entries: `buildManifest`
+records every component/layout `client.js` chunk under `components/<name>/client` (and
+`layouts/<name>/client`), not just the bootstrap and kiln entries. The **server** (amphora
+`resolve-media.js`) owns the policy: it passes the page's component list
+(`locals._components`) to `getComponentPreloads` and merges the result into
+`media.modulePreloads`, de-duping against the startup-graph preloads.
+
 ## 5. Feature-by-Feature Comparison
 
 ### JavaScript Bundling
@@ -444,6 +470,7 @@ absent on the next deploy → old path activates. No code changes needed in the 
 | **How scripts are resolved** | `getDependencies()` reads `_registry.json` | `resolveModuleScripts()` reads `_manifest.json` |
 | **Edit mode scripts** | All `_deps-*.js` + `_models-*.js` + `_kiln-*.js` + templates | Single `_kiln-edit-init` bundle + templates |
 | **View mode scripts** | Numeric IDs → individual dep files | `vite-bootstrap` + `_globals-init` + shared chunks (typically 3–5 files) |
+| **Preload hints** | None | `<link rel="modulepreload">` for the bootstrap startup graph (`getViteModulePreloads`) + on-page component chunks (`getComponentPreloads`) — see §4d |
 | **Global scripts** | Individual files per registry entry (70–100 requests) | All `global/js/*.js` in one `_globals-init.js` (1 request) |
 
 ## 6. Configuration
@@ -660,8 +687,8 @@ RUN if [ "$CLAYCLI_VITE_ENABLED" = "true" ]; then \
 | Font processing | [`lib/cmd/vite/fonts.js`](./lib/cmd/vite/fonts.js) | Font copy + CSS generation; `buildFonts`, `FONTS_SRC_GLOB` |
 | Media copy | [`lib/cmd/vite/media.js`](./lib/cmd/vite/media.js) | Copies media files to `public/media/`; `copyMedia` |
 | Vendor copy | [`lib/cmd/vite/vendor.js`](./lib/cmd/vite/vendor.js) | Copies `clay-kiln` dist files to `public/js/`; `copyVendor` |
-| Manifest writer | [`lib/cmd/vite/scripts.js`](./lib/cmd/vite/scripts.js) | `buildManifest`, `writeManifest` — writes `_manifest.json` |
-| Script dependency resolver | [`lib/cmd/vite/index.js`](./lib/cmd/vite/index.js) | `resolveModuleScripts`, `hasManifest` — runtime helpers for `resolve-media.js` |
+| Manifest writer | [`lib/cmd/vite/scripts.js`](./lib/cmd/vite/scripts.js) | `buildManifest` (keys static **and** dynamic component entries), `writeManifest` — writes `_manifest.json` |
+| Script / preload resolver | [`lib/cmd/vite/index.js`](./lib/cmd/vite/index.js) | `resolveModuleScripts`, `getComponentPreloads`, `hasManifest` — runtime helpers for `resolve-media.js` (see §4d) |
 
 ### Vite plugins
 
