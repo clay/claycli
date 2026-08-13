@@ -469,11 +469,10 @@ executes every on-page component's `client.js`. That fires analytics, ad calls (
 `<iframe>` per slot), comment embeds and other third-party scripts inside the editing surface,
 where they mutate the DOM Kiln is trying to decorate.
 
-To opt back into mounting in edit mode, pass `mountInEditMode`:
-
-```js
-clayBuild.resolveModuleScripts(media, assetPath, { edit: true, mountInEditMode: true });
-```
+There is no option to opt back in. Mounting components in edit mode has no legitimate use — it
+was never possible under `clay compile`, and a component that needs its `client.js` output visible
+while editing should provide it through `kiln.js` rather than by running every ad and analytics
+script on the page inside the editor.
 
 If `public/js` was built by a claycli that predates the no-mount entry, `resolveModuleScripts()`
 falls back to the mounting bootstrap — serving no initializers at all would break Kiln outright,
