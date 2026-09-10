@@ -960,6 +960,177 @@ pattern is to expose a **promise** that consumers `.then()` instead of listening
 A resolved promise is always "replayable" — calling `.then()` on an already-resolved promise
 runs the callback in the next microtask, with no shim required.
 
+---
+
+### Beyond sticky events: value-shaped state for cross-cutting client facts
+
+#### The general shape: a signal nobody was listening for yet
+
+`stickyEvents` fixes one instance of a wider problem the Vite bootstrap introduced. Under
+Browserify, every consuming site got an implicit **total execution order** for free: every
+component's top-level code ran synchronously during HTML parse, before any deferred
+third-party script and before any other component's code that mattered. The deferred
+`<script type="module">` bootstrap plus per-component dynamic `import()` removes that order
+entirely — component code now runs later, and its timing is unordered relative to both
+third-party scripts and other components.
+
+The general failure shape: a **one-shot signal** — a custom event, or a value handed to a
+vendor-owned callback slot — fires before the code that needs to react to it has had a chance
+to subscribe or install itself. Once that happens, the signal is gone for that pageview; there
+is nothing left to observe or replay. `stickyEvents` addresses one shape of this. The same race
+also shows up as:
+
+- A **third-party vendor SDK** invoking a global callback it expects the page to have already
+  defined (a consent-management callback, an ads SDK ready-hook, `window.dataLayer.push`, etc.)
+  before claycli's own bootstrap-authored code has installed the real handler.
+- A one-shot `MutationObserver` set up to watch for a DOM node a vendor script writes — if the
+  vendor script already ran and wrote the node before the observer attaches, the observer never
+  fires.
+- A site-authored one-shot custom event that `stickyEvents` doesn't happen to cover.
+
+#### Worked example: a consent callback answered by the wrong function
+
+This shipped as a real production bug. A Clay site's `gtm/client.js` assigned
+`window.OptanonWrapper = function () { /* real consent handling */ }` at module top level —
+this is the callback name a consent-management vendor SDK calls once the reader has made (or,
+on a return visit, already made) a consent decision. The site's page template also declared an
+inline no-op `function OptanonWrapper() {}` immediately next to the vendor SDK's own `<script>`
+tag, as a just-in-case guard against the global being undefined when the SDK first looks for it.
+
+Under Browserify this was harmless: the real handler installed synchronously, ~300ms in,
+always well before the vendor SDK could call it, and simply overwrote the inline no-op. Under
+Vite, the real handler installs via the deferred bootstrap + dynamic `import()`, often 1000ms
+or more later — long after the vendor SDK has already called *something* named
+`OptanonWrapper`. That something was, more often than not, the still-installed no-op, and the
+real logic never ran for that pageview. In practice this shipped as blank video embeds and,
+more subtly, as consent-tracking analytics that silently stopped firing, because the code meant
+to run on the reader's consent decision never got the chance.
+
+The site's own fix (already shipped on their side, not claycli's) was to read the vendor
+global's already-resolved state defensively on mount — `if (window.OnetrustActiveGroups) { …
+run the catch-up logic manually … }` — i.e. "read current state first, subscribe as the
+fallback." That works, but it's per-file developer discipline: every future component that
+needs to react to a vendor callback, another component's signal, or any one-shot cross-cutting
+fact has to reinvent it by hand, correctly, including whatever idempotence guard it needs (the
+real fix needed one, to avoid double-processing the same consent decision if the vendor fires
+its callback more than once).
+
+#### Why `stickyEvents` doesn't reach this
+
+It's tempting to read the incident above and reach for `stickyEvents` — don't. `stickyEvents`
+replays past **event** firings to late `addEventListener` subscribers, once, for named events
+that claycli's own bootstrap can patch by wrapping `window.addEventListener`. It has no
+visibility into a third-party vendor global callback slot like `window.OptanonWrapper` —
+nothing in claycli's bootstrap is anywhere near that call path; the vendor SDK just invokes
+whatever function happens to be assigned to that name at the moment it calls it.
+
+And even for events `stickyEvents` *does* cover, "replay the one past firing" is still
+**edge-shaped**, not **value-shaped**. It doesn't help when the underlying fact can change
+*again* after the replay — a reader can update their consent preferences mid-session, long
+after the first `auth:init`-style event fired — and it doesn't remove the need for consuming
+code to guard against processing the same underlying decision twice if the vendor calls its
+callback more than once.
+
+#### The value-shaped pattern: a store, not an event
+
+Many of the "facts" that trigger this race — a vendor's consent decision, auth-ready state,
+third-party API readiness, subscription/entitlement status — aren't really one-shot events at
+all. They're **values** that settle at some point and may change again later. Modeling a value
+as an event (fire once, subscribe-or-miss-it) is what creates the race in the first place.
+Modeling it as a readable, subscribable **current value** removes it: a late subscriber just
+reads or receives the current value, instead of having missed a past edge.
+
+This is a pattern for how a consuming site structures its own client-side service code —
+claycli does not provide or enforce it. A minimal version needs only `get()`, `set()`, and
+`subscribe()`:
+
+```js
+// pattern for site code (e.g. services/client/consent.js) — not a claycli API
+function createValueStore(initialValue) {
+  let value = initialValue;
+  const subscribers = [];
+
+  return {
+    get: () => value,
+    set(next) {
+      if (next === value) return; // already this value — nothing changed, nothing to notify
+      value = next;
+      subscribers.forEach((fn) => fn(value));
+    },
+    subscribe(fn) {
+      fn(value); // called immediately with the CURRENT value — a late subscriber is never behind
+      subscribers.push(fn);
+    }
+  };
+}
+```
+
+The `subscribe` call is the whole fix: it invokes `fn` immediately with whatever value is
+current, so a subscriber that shows up late still gets it, and it invokes `fn` again only when
+the value actually changes, so consumers don't need their own duplicate-decision guards.
+
+#### Owning the boundary: why this has to be a synchronous inline script
+
+A store only helps if something reliably feeds it. That something is a companion pattern: a
+single, small, **synchronous** script — placed as early in the document as the vendor SDK's own
+`<script>` tag, typically right next to it — that owns the vendor global callback slot and
+translates each vendor invocation into a `set()` call on the corresponding store:
+
+```html
+<!-- inline, synchronous — placed immediately before the vendor SDK's own <script> tag -->
+<script>
+  window.consentStore = createValueStore(window.OnetrustActiveGroups || null);
+
+  // owns the vendor's callback slot; nothing else may assign to this name
+  window.OptanonWrapper = function () {
+    window.consentStore.set(window.OnetrustActiveGroups);
+  };
+</script>
+<script src="https://vendor-cdn.example.com/onetrust-sdk.js"></script>
+```
+
+Bundled component code — Browserify's or Vite's — always arrives over the network at some point
+in time, no matter how fast the bundler pipeline gets. Only inline, synchronous document script
+is guaranteed to run before an async vendor SDK's first callback. A component's `client.js` can
+then subscribe whenever it happens to load, with no race, because it's reading a value, not
+racing an edge:
+
+```js
+// client.js — arrives later, async; never races the vendor callback
+window.consentStore.subscribe((activeGroups) => {
+  // runs immediately with whatever the current decision already is,
+  // and again whenever the reader changes it later in the session
+});
+```
+
+No bundler configuration and no claycli feature can substitute for owning that one synchronous
+boundary point. It's inherent to how a page loads, not a limitation of any particular pipeline.
+
+#### The tempting non-fix: making component imports eager
+
+It's worth ruling out an obvious-looking alternative: have claycli load some or all `client.js`
+files eagerly (static imports baked into the bootstrap) instead of via lazy, per-component
+dynamic `import()`, so component code runs closer to Browserify's old timing. Don't reach for
+this. It only narrows the timing window — it doesn't remove the race, since a static import is
+still asynchronous relative to inline document script and still resolves at whatever speed the
+network happens to allow that pageview. Offering it as an easy knob would also encourage teams
+to reach for a timing tweak instead of the actual fix, quietly leaving the underlying race in
+place for the next vendor integration or the next slow network.
+
+#### claycli's role here
+
+This pattern lives in the consuming site's code, not in claycli. claycli's role is this section
+plus build-time diagnostics: a build-time diagnostic exists to help surface component code that
+assigns to a bare `window.<Identifier>`, which is often a sign that code may need this pattern.
+
+**Future direction:** once a site has migrated its cross-cutting one-shot custom events (like
+`auth:init`) onto this value-shaped pattern, `stickyEvents` becomes unnecessary for those events
+and could eventually be removed from `claycli.config.js`. This doesn't make `stickyEvents`
+deprecated — it may still be the right tool for events that haven't been migrated yet — but it's
+a bridge, not a destination, in exactly the same sense that "promises over events" above is: a
+store subsumes a promise, since a promise settles once and a store can also model a value that
+goes on changing.
+
 ### Watch mode (`clay vite --watch`)
 
 The watch implementation uses **Rollup watch mode** for JS incremental rebuilds and
@@ -1226,6 +1397,8 @@ Run against the feature branch URL after enabling `CLAYCLI_VITE_ENABLED=true`.
 - [ ] Dollar-Slice controller components mount correctly
 - [ ] Vue components render correctly (subscriptions, listings-search, leaderboard, account)
 - [ ] `auth:init` sticky event is received by late subscribers
+- [ ] No component's `client.js` depends on winning a race against a third-party vendor
+      callback or another component's one-shot signal
 - [ ] Ads load on article pages
 
 #### Edit mode (Kiln)
