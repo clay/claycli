@@ -823,6 +823,117 @@ build pipeline with its own post-processing step over `public/css` (asset hashin
 must run after the *last* claycli invocation that includes `js`, or its own changes to this
 specific file are silently overwritten on the next one.
 
+### Node globals in browser bundles
+
+#### Why this needs its own explanation
+
+The legacy Browserify pipeline polyfilled Node globals for free. Browserify's bundler runs every
+module through `insert-module-globals`, which detects a bare reference to `Buffer`, `process`, or
+`global` and rewrites it into an explicit `require('buffer').Buffer`-style import, pulling in the
+[feross/buffer](https://www.npmjs.com/package/buffer) polyfill automatically. A component's
+`Buffer.from(...)` — written with no accompanying `require('buffer')` at all — just worked, silently.
+
+`clay vite` has no equivalent. Vite/Rollup never rewrites a bare identifier into an import; a
+module that references `Buffer` without importing it compiles cleanly and then throws
+`ReferenceError: Buffer is not defined` the first time that code path actually runs in the browser
+— with zero build-time signal. `browser-compat.js`'s stubs (see the Vite plugins table above)
+don't help here either: they only intercept an *explicit* `require('buffer')`/`import 'buffer'`.
+They have nothing to intercept when there is no import at all.
+
+#### The policy: no blanket polyfilling
+
+The obvious "fix" — reintroduce something like `insert-module-globals` — is deliberately not on the
+table. Universal, automatic Node-global injection is exactly what made Browserify bundles carry
+megabytes of dead weight for code paths that only ever ran on the server; a bundle that pulls in a
+full `Buffer` polyfill because one file references it as a bare identifier reintroduces the same
+bloat this migration exists to remove. The fix here is visibility plus a narrow, explicit opt-in —
+never an automatic one.
+
+#### The diagnostic
+
+Every Vite build runs a `transform` hook (`lib/cmd/vite/scripts.js`, `scanBareNodeGlobals` /
+`viteBareNodeGlobalsPlugin`) that scans first-party source (skipping `node_modules` and virtual
+module ids) for `Buffer` used as a free identifier — a whole-word match that isn't a property-access
+target (`foo.Buffer`) and isn't already covered by an explicit `require('buffer')`/`import` in the
+same file. Every hit is collected and printed once, at the end of the build, as a single summary:
+
+```
+[clay vite] 1 Node global(s) referenced as bare identifiers in browser-reachable code
+(no polyfill is provided — see CLAY-VITE.md § Node globals in browser bundles):
+  Buffer:
+    - components/podcast-transcripts/model.js
+```
+
+This is deliberately scoped to `Buffer` only, not `process`/`global`. Both of those are already
+substituted at build time by `buildDefines()` for their common legitimate forms —
+`process.env.*`, `process.browser`, `process.version(s)`, and `global → globalThis` — so scanning
+for them as bare identifiers would flag mostly correct, already-handled code. And it's a regex, not
+an AST walk: it can't distinguish a free identifier from a property name (`{ Buffer: 1 }`), an
+accepted trade-off against adding a parser dependency for a report-only diagnostic.
+
+#### The fix: `nodeGlobals` in `bundlerConfig()`
+
+Once a bare reference is named, `bundlerConfig().nodeGlobals` is the narrow, explicit, opt-in fix —
+set in `claycli.config.js`, alongside `alias`/`define`/`browserStubs`:
+
+```js
+// claycli.config.js
+module.exports = {
+  bundlerConfig(config) {
+    config.nodeGlobals = { Buffer: true };
+    return config;
+  },
+};
+```
+
+| Value | Effect |
+|---|---|
+| unset / `false` (default) | No plugin added. Zero bytes, zero behavior change. |
+| `true` | Adds `@rollup/plugin-inject`, which auto-imports `Buffer` from `'buffer'` — but only into modules that actually reference the free identifier. Resolves through the existing `browser-compat.js` stub, which already prefers a real `globalThis.Buffer` when the page provides one. |
+| `'polyfill'` | Same auto-import, but also aliases the `'buffer'` specifier to the real npm `buffer` package instead of the minimal stub, for byte-capable operations (e.g. `createHmac`) the stub can't support. Pulls in real bytes — use only where the minimal stub genuinely isn't enough. |
+
+This mirrors `lenientBrowserExternalize`'s shape elsewhere in this pipeline: a bounded, documented,
+default-off bridge with a stated exit, not a new permanent behavior. The exit path here is the same
+one that applies to any Node-only code reachable from the browser: replace the Node-specific call
+with a browser-native equivalent. The single most common case — base64-encoding a string, which is
+what motivated this section — has a two-line browser-native replacement that needs neither the stub
+nor `nodeGlobals`:
+
+```js
+// Node-only, throws in the browser without nodeGlobals:
+const encoded = Buffer.from(str, 'utf8').toString('base64');
+
+// Browser-native, works everywhere, no config needed:
+const encoded = btoa(str);
+// or, for non-Latin1 strings: btoa(String.fromCharCode(...new TextEncoder().encode(str)))
+```
+
+#### `serverOnlyPackages`: the related, more general leak
+
+A bare `Buffer` reference is one *symptom* of a broader shape: server-only code reachable from a
+browser-facing bundle. Sometimes the leak isn't a bare Node global at all, but an entire
+third-party package — an Amphora internal, an Amphora plugin — that a component's `client.js`
+transitively pulls in. `service-rewrite.js`'s existing `services/server` → `services/client`
+rewrite only covers Clay's own isomorphic service convention; it has no opinion on a third-party
+package like this. `bundlerConfig().serverOnlyPackages` is the same shape of fix, generalized:
+
+```js
+// claycli.config.js
+module.exports = {
+  bundlerConfig(config) {
+    config.serverOnlyPackages = ['amphora/lib'];
+    return config;
+  },
+};
+```
+
+An array of package-path prefixes (default `[]`, a complete no-op) that **warn** — never
+block — when a matching import resolves inside a browser-reachable module, naming the module and
+its importer. This is a stopgap allowlist, not a hard guarantee like the `services/server` rewrite
+(which errors, because a missing client counterpart is unambiguously broken): a match just means
+"this looks suspicious," and the fix is the same package `browser` field remap or browser-safe
+reimplementation as any other leaked server dependency.
+
 ### Why `_globals-init.js` exists as a separate file
 
 Clay's `global/js/*.js` files are **side-effect modules** — they set up `window.DS`,
