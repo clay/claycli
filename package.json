@@ -119,6 +119,7 @@
     "gulp-postcss": "^9.0.0",
     "gulp-rename": "^2.0.0",
     "gulp-replace": "^1.0.0",
+    "hash-sum": "^1.0.2",
     "highland": "^2.13.0",
     "home-config": "^0.1.0",
     "imports-loader": "^2.0.0",
