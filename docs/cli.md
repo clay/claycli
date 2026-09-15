@@ -43,6 +43,7 @@ For smaller `Clay` installations (or, ironically, for very large teams where dev
 * [`import`](#import)
 * [`export`](#export)
 * [`compile`](#compile)
+* [`vite`](#vite)
 
 ## Common Arguments
 
@@ -881,4 +882,48 @@ Calculate script dependencies. _Note:_ when calling this from `resolveMedia`, th
 
 ```js
 compile.scripts.getDependencies(scripts, assetPath, { edit, minify });
+```
+
+## Vite
+
+```bash
+clay vite [--watch] [--minify] [--only <comma-separated step names>] [--entry <path>]
+```
+
+`clay vite` is a newer asset pipeline, built on Vite + Rollup, that can run alongside or in place
+of `clay compile`. It builds the same output shape (`public/js`, `public/css`, `public/media`) so a
+site can adopt it incrementally, one target environment at a time, without changing anything else
+about how assets are served. It compiles the same asset types `clay compile` does — scripts,
+styles, templates, fonts, media, plus a Kiln edit-mode bundle — using native ES modules instead of a
+single Browserify megabundle.
+
+This is a substantial enough shift from `clay compile` (module system, PostCSS major, Node-global
+handling, config surface) that it has its own dedicated reference document rather than living here
+in full: [`CLAY-VITE.md`](https://github.com/clay/claycli/blob/master/CLAY-VITE.md) in the repo root
+covers the architecture, a full command reference, `claycli.config.js`'s `bundlerConfig()` hook
+(aliases, defines, Node-global handling via `nodeGlobals`, third-party server-only package detection
+via `serverOnlyPackages`, and more), running both pipelines side-by-side during a migration, and a
+migration guide.
+
+#### Arguments
+
+* `-w, --watch` enables watching of source files after compilation
+* `-m, --minify` enables minification and bundling of source files
+* `-o, --only` restricts the build to specific steps (`js`, `styles`, `fonts`, `templates`, `vendor`, `media`, or `all`) — see `CLAY-VITE.md` for step interactions and `--only` behavior
+* `-e, --entry` overrides the default bootstrap entry path
+
+#### Examples
+
+```bash
+# build all assets once
+clay vite
+
+# build and watch all assets
+clay vite --watch
+
+# build all assets once, minified, for production
+clay vite --minify
+
+# build only the JS and templates steps
+clay vite --only js,templates
 ```
