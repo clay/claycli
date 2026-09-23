@@ -1705,6 +1705,44 @@ into megabundles and never complained about Node-only packages. Under Vite, unre
 Node built-ins produce explicit build errors or runtime crashes. `serviceRewritePlugin`
 automatically redirects `services/server/*` to `services/client/*` in browser builds.
 
+### Chunk URLs under an asset host or path prefix
+
+Where `public/js/` is served from is decided per request, not at build time. amphora-html emits
+the bootstrap tag from `_manifest.json`, rebased onto the site's `assetHost || assetPath`, and
+that differs by environment and site: a CDN host in production (`https://assets.example.com/js/`),
+the page origin plus a site path prefix on staging or a feature branch (`/section/js/`), or the
+bare origin for a site with no prefix (`/js/`). One build is served from all of them.
+
+Chunk imports are emitted relative, so they always follow the bootstrap. Vite's dynamic-import
+preload helper is the one piece that reads Vite's `base`, so claycli builds with Vite's relative
+base, `base: './'` (Vite's documented value for "embedded deployment"; see `resolveViteBase()` in
+`lib/cmd/vite/scripts.js`). The helper then resolves each dep with
+`new URL(dep, import.meta.url)`, which lands on the same URL the real import uses. With the old
+absolute `base: '/js/'`, the helper injected `<link rel="modulepreload" href="/js/chunks/…">`
+against the page origin, which never matched the imports under a CDN host or path prefix, so
+every shared chunk downloaded twice. If DevTools shows the same chunk fetched from two different
+URLs, check that the relative base is still in effect.
+
+A build-time absolute base (for example from `CLAYCLI_COMPILE_ASSET_HOST`) is not a substitute:
+that variable only matches the served location in production. Feature-branch builds, for
+example, point it at staging, so their chunks would be requested from the wrong deployment.
+
+The base only affects the preload helper. claycli emits nothing but JS into `public/js/`, nothing
+reads `import.meta.env.BASE_URL`, and `_manifest.json` builds its `/js/…` paths independently.
+`clay compile` (Browserify) never uses this config.
+
+Overrides, for a site that needs something else:
+
+- `bundlerConfig().publicBase` (e.g. `'/js'` or `'https://cdn.example.com/js'`) restores an
+  absolute base, for JS that is only ever served from that one location.
+- A site plugin can set `base` or `experimental.renderBuiltUrl` from a Vite `config()` hook.
+  Vite merges plugin config over claycli's, so this keeps working on top of the default.
+
+A `ds-mount` error of `Could not dynamically require "<name>"` usually means the component's
+`client.js` exports nothing and has no `DS.controller`. The runtime falls back to
+`window.DS.get()`, which finds no controller to run. Export a mount function
+(`module.exports = (el) => { ... }`) instead of running side effects at the top level.
+
 ### Debugging component preload/load/mount failures
 
 `vite-bootstrap.js` now logs structured error diagnostics for each component failure phase:
