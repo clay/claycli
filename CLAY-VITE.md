@@ -1705,6 +1705,23 @@ into megabundles and never complained about Node-only packages. Under Vite, unre
 Node built-ins produce explicit build errors or runtime crashes. `serviceRewritePlugin`
 automatically redirects `services/server/*` to `services/client/*` in browser builds.
 
+### Chunk URLs under an asset host or path prefix
+
+The build uses `base: '/js/'`, but amphora-html serves `public/js/` from `<assetPath>/js/`,
+which may be a CDN host (`https://assets.example.com/js/`) or a site path prefix
+(`/section/js/`). Chunk imports are emitted relative, so they always resolve from wherever the
+bootstrap loaded. Vite's dynamic-import preload helper is configured the same way:
+`baseViteConfig()` sets `experimental.renderBuiltUrl` (see `renderBuiltUrl()` in
+`lib/cmd/vite/scripts.js`) so preload deps are importer-relative too. Without it the helper
+prepended `/js/`, injecting `<link rel="modulepreload">` tags against the page origin that
+never matched the real imports, so every shared chunk downloaded twice. If DevTools shows the
+same chunk fetched from two different URLs, check that this hook is still in place.
+
+A `ds-mount` error of `Could not dynamically require "<name>"` usually means the component's
+`client.js` exports nothing and has no `DS.controller`. The runtime falls back to
+`window.DS.get()`, which finds no controller to run. Export a mount function
+(`module.exports = (el) => { ... }`) instead of running side effects at the top level.
+
 ### Debugging component preload/load/mount failures
 
 `vite-bootstrap.js` now logs structured error diagnostics for each component failure phase:
