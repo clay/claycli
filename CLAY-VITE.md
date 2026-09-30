@@ -453,6 +453,11 @@ records every component/layout `client.js` chunk under `components/<name>/client
 | **Future path** | Locked to PostCSS | Lightning CSS: `css: { transformer: 'lightningcss' }` in `baseViteConfig` |
 
 > **Same result:** Output CSS files are byte-for-byte identical between pipelines.
+>
+> This table describes **styleguide/component CSS** (`styleguides/**/{components,layouts}/*.css`).
+> **Kiln plugin CSS** (`<style>` blocks inside a Kiln plugin's `.vue` file) is compiled by a
+> separate, shared PostCSS chain — see Section 8 (Kiln plugin PostCSS chain) below for why it
+> needs its own explanation.
 
 ### Template Compilation
 
@@ -468,10 +473,42 @@ records every component/layout `client.js` chunk under `components/<name>/client
 | Aspect | `clay compile` | `clay vite` |
 |---|---|---|
 | **How scripts are resolved** | `getDependencies()` reads `_registry.json` | `resolveModuleScripts()` reads `_manifest.json` |
-| **Edit mode scripts** | All `_deps-*.js` + `_models-*.js` + `_kiln-*.js` + templates | Single `_kiln-edit-init` bundle + templates |
+| **Edit mode scripts** | All `_deps-*.js` + `_models-*.js` + `_kiln-*.js` + templates | `vite-bootstrap-no-mount` + `_kiln-edit-init` bundle + templates |
 | **View mode scripts** | Numeric IDs → individual dep files | `vite-bootstrap` + `_globals-init` + shared chunks (typically 3–5 files) |
 | **Preload hints** | None | `<link rel="modulepreload">` for the bootstrap startup graph (`getViteModulePreloads`) + on-page component chunks (`getComponentPreloads`) — see §4d |
+| **Component `client.js` in edit mode** | Never runs — the `edit` branch of `getDependencies()` ships no client bundle and no `_client-init.js` | Never runs — edit mode loads the no-mount bootstrap (see below) |
 | **Global scripts** | Individual files per registry entry (70–100 requests) | All `global/js/*.js` in one `_globals-init.js` (1 request) |
+
+#### Component `client.js` does not run in edit mode
+
+Under `clay compile`, component controllers only ran on rendered pages: the `edit` branch of
+`getDependencies()` resolves `model.js`, `kiln.js` and kiln plugins, but neither the client
+dependency graph nor `_client-init.js` — the runtime that mounts controllers. Editors therefore
+never executed component `client.js` inside Kiln.
+
+`clay vite` preserves that. Two bootstrap entries are generated from the same initializer prelude:
+
+| Entry | Loaded in | Contents |
+|---|---|---|
+| `.clay/vite-bootstrap.js` | view mode | prelude + `_clayClientModules` map + `mountComponentModules()` |
+| `.clay/vite-bootstrap-no-mount.js` | edit mode | prelude only |
+
+The prelude (the `window.modules` stub, `_env-init.js`, `_globals-init.js` and the sticky-events
+shim) is required in both modes — Kiln's preloader reads `window.modules`, and every `model.js`
+and kiln plugin reads env through the object `_env-init.js` hydrates. Only the mount runtime is
+view-mode-specific, and it runs at module scope, so serving the view bootstrap in edit mode
+executes every on-page component's `client.js`. That fires analytics, ad calls (GPT injects an
+`<iframe>` per slot), comment embeds and other third-party scripts inside the editing surface,
+where they mutate the DOM Kiln is trying to decorate.
+
+There is no option to opt back in. Mounting components in edit mode has no legitimate use — it
+was never possible under `clay compile`, and a component that needs its `client.js` output visible
+while editing should provide it through `kiln.js` rather than by running every ad and analytics
+script on the page inside the editor.
+
+If `public/js` was built by a claycli that predates the no-mount entry, `resolveModuleScripts()`
+falls back to the mounting bootstrap — serving no initializers at all would break Kiln outright,
+so a stale manifest degrades rather than fails. Re-run `clay vite` to pick up the fix.
 
 ## 6. Configuration
 
@@ -679,7 +716,7 @@ RUN if [ "$CLAYCLI_VITE_ENABLED" = "true" ]; then \
 | Module | File | Purpose |
 |---|---|---|
 | Orchestrator | [`lib/cmd/vite/scripts.js`](./lib/cmd/vite/scripts.js) | Main build + watch orchestration; `getViteConfig`, `baseViteConfig`, `buildAll`, `watch` |
-| Bootstrap generator | [`lib/cmd/vite/generate-bootstrap.js`](./lib/cmd/vite/generate-bootstrap.js) | Generates `.clay/vite-bootstrap.js` with component mount runtime |
+| Bootstrap generator | [`lib/cmd/vite/generate-bootstrap.js`](./lib/cmd/vite/generate-bootstrap.js) | Generates `.clay/vite-bootstrap.js` (with component mount runtime) and `.clay/vite-bootstrap-no-mount.js` (edit mode, prelude only) |
 | Globals init generator | [`lib/cmd/vite/generate-globals-init.js`](./lib/cmd/vite/generate-globals-init.js) | Generates `.clay/_globals-init.js` |
 | Kiln edit generator | [`lib/cmd/vite/generate-kiln-edit.js`](./lib/cmd/vite/generate-kiln-edit.js) | Generates `.clay/_kiln-edit-init.js` |
 | CSS compilation | [`lib/cmd/vite/styles.js`](./lib/cmd/vite/styles.js) | PostCSS pipeline; `buildStyles`, `SRC_GLOBS` |
@@ -700,12 +737,20 @@ RUN if [ "$CLAYCLI_VITE_ENABLED" = "true" ]; then \
 | Missing module | [`lib/cmd/vite/plugins/missing-module.js`](./lib/cmd/vite/plugins/missing-module.js) | Stubs unresolvable relative imports (legacy compatibility) |
 | Manual chunks | [`lib/cmd/vite/plugins/manual-chunks.js`](./lib/cmd/vite/plugins/manual-chunks.js) | `viteManualChunksPlugin` — inlines small private deps into owner chunk |
 
+The Vue 2 SFC plugin's PostCSS handling is not self-contained — it delegates to a module shared
+with `clay compile`, so the two pipelines can't silently diverge on Kiln plugin CSS:
+
+| Module | File | Purpose |
+|---|---|---|
+| Kiln PostCSS chain | [`lib/postcss-chain.js`](./lib/postcss-chain.js) | Resolves + validates the Kiln-plugin PostCSS chain from the host project's `node_modules`, shared by `vue2.js` (`clay vite`) and `lib/cmd/compile/scripts.js`'s `buildVuePostcssChain` (`clay compile`) — see Section 8 (Kiln plugin PostCSS chain) |
+
 ### Generated files
 
 | File | Generated by | Purpose |
 |---|---|---|
 | `public/js/_manifest.json` | `lib/cmd/vite/scripts.js` (`buildManifest`/`writeManifest`) | Entry → file + chunks map. Replaces `_registry.json` + `_ids.json`. |
-| `.clay/vite-bootstrap.js` | `generate-bootstrap.js` | Imports every `client.js`; mounts via dynamic `import()` on DOM presence |
+| `.clay/vite-bootstrap.js` | `generate-bootstrap.js` | View mode. Imports every `client.js`; mounts via dynamic `import()` on DOM presence |
+| `.clay/vite-bootstrap-no-mount.js` | `generate-bootstrap.js` | Edit mode. Same initializers, no mount runtime — component `client.js` never runs in Kiln |
 | `.clay/_kiln-edit-init.js` | `generate-kiln-edit.js` | Imports every `model.js` + `kiln.js`; registers on `window.kiln.componentModels` |
 | `.clay/_globals-init.js` | `generate-globals-init.js` | Imports all `global/js/*.js` into one non-splitting entry |
 | `client-env.json` | `createClientEnvCollector` (Rollup plugin) | JSON array of `process.env.VAR_NAME` identifiers for `amphora-html` |
@@ -720,6 +765,201 @@ RUN if [ "$CLAYCLI_VITE_ENABLED" = "true" ]; then \
 > `import`/`require` at build time. The `.clay/` generated files are the static entry points
 > that pull in every component's model, kiln, and global scripts. They are build artifacts,
 > not source code — `.clay/` belongs in `.gitignore`.
+
+### Kiln plugin PostCSS chain
+
+Kiln plugins are the modals, pickers, and panels a site adds to Kiln's editing UI, authored as
+Vue 2 SFCs under `services/kiln/`. Their `<style>` blocks are compiled by a PostCSS chain that is
+**not** the same one `clay vite`'s component-CSS step ([`lib/cmd/vite/styles.js`](./lib/cmd/vite/styles.js))
+uses, and — unlike everything else covered in Section 5 — it is **not** identical between
+pipelines by default, because of a hard constraint on the legacy side that makes "identical"
+mean something different than it does for component CSS.
+
+#### Why this chain can't just reuse claycli's own PostCSS plugins
+
+`clay compile`'s Vue-style compilation goes through `@nymag/vueify`, which hard-pins
+`postcss@^7` and runs whatever plugin array it is handed through **its own internal `postcss`
+instance** — not the one the plugins themselves were resolved alongside. Handing it claycli's
+bundled PostCSS 8 plugins does not degrade gracefully; it throws
+`PostCSS plugin X requires PostCSS 8` the first time a Kiln plugin style compiles. This isn't
+theoretical — an earlier version of this chain's resolution logic did exactly that as a fallback
+for hosts with no `postcss` of their own, and it was a live, if rarely-triggered, crash.
+
+So the host project's `node_modules` is the **only** valid source for this chain — claycli cannot
+supply a working substitute the way it can for, say, a missing site-specific `postcss.config.js`
+value. [`lib/postcss-chain.js`](./lib/postcss-chain.js)'s `resolveKilnPostcssChain()` is the single
+resolver both pipelines call (`vue2.js` for `clay vite`, `buildVuePostcssChain()` in
+`lib/cmd/compile/scripts.js` for `clay compile`), and its contract is **peer-dependency
+validation, not substitution**:
+
+- Resolve `postcss` and all five chain plugins (`postcss-import`, `autoprefixer`,
+  `postcss-mixins`, `postcss-nested`, `postcss-simple-vars`) from **one** tree — the host's — never
+  mixing plugins resolved from different trees. Each plugin's `Symbol.for('postcss')` identity is
+  anchored to whichever `postcss` copy it was installed beside; picking plugins across trees
+  reproduces the same "requires PostCSS 8" crash even when each individual plugin, in isolation,
+  would have worked.
+- Validate each resolved plugin's major version against the resolved `postcss` major, using a
+  compatibility table built from each plugin's own published `peerDependencies.postcss` (verified
+  empirically across every plugin's major-version history — the postcss7-era majors declare no
+  `postcss` peer at all; the first postcss8-only major declares `^8.x`).
+- **Report, never silently drop.** A missing or incompatible plugin logs the resolved `postcss`
+  version, the plugin, and the exact install command for a compatible version — then is excluded
+  from the chain (the existing style block still compiles with whatever resolved cleanly, matching
+  the legacy best-effort behaviour, but now the gap is visible instead of silent).
+
+A host with an incomplete or version-mismatched chain — the `postcss-mixins` package legitimately
+absent from a project that has never used `@mixin`, say — is not a broken build. It's a build that
+now tells you exactly what's missing and how to fix it, instead of one that quietly ships CSS with
+a nesting rule or a `$variable` that never got resolved.
+
+#### `autoprefixerOptions`: this chain intentionally does NOT use `stylesConfig`
+
+`clay vite`'s component-CSS step ([`lib/cmd/vite/styles.js`](./lib/cmd/vite/styles.js)) reads its
+`autoprefixerOptions` from the `stylesConfig` hook in `claycli.config.js` — the new-pipeline
+convention. The Kiln-plugin chain instead reads `autoprefixerOptions` via
+`getConfigFileOrBrowsersList('autoprefixerOptions')`
+([`lib/compilation-helpers.js`](./lib/compilation-helpers.js)) — the **legacy top-level key**,
+the same helper `clay compile`'s Vue chain has always used. This is deliberate, not an oversight:
+this chain's whole purpose is to produce Kiln plugin CSS that looks identical to what
+`clay compile scripts` produces (mirroring `@nymag/vueify`'s chain), not to match this pipeline's
+own component CSS, which is intentionally on a separate, newer configuration path. A site whose
+`claycli.config.js` sets `stylesConfig`'s `autoprefixerOptions` but not the legacy top-level key
+will see its component CSS and its Kiln plugin CSS target different browser lists — that is the
+two config mechanisms working as designed, not a bug in this chain.
+
+#### Delivery: the linked file only, never runtime injection
+
+Kiln plugin CSS has exactly one delivery mechanism: `public/css/_kiln-plugins.css`, written on
+`closeBundle` and linked by the consuming site (e.g. `services/resolve-media.js` in `nymag/sites`
+prepends it to the edit-mode stylesheet list). This matches `@nymag/vueify` + `extract-css` under
+the legacy pipeline, which strips CSS out of the JS bundle entirely and writes only to that file —
+there is no secondary delivery path on either pipeline. A build that also injected a runtime
+`<style>` element for the same rules would apply Kiln plugin CSS twice, and because the linked
+file sits at the front of `<head>` (weakest cascade position) while a runtime-appended `<style>`
+lands last (strongest), which of two conflicting declarations won would depend on page-load
+timing rather than source order.
+
+#### `--only` and this file's ownership
+
+This plugin only participates in Rollup's JS build pass — `buildPlugins()` is assembled once, for
+the `js` step, and the `styles`/`fonts`/`templates`/`vendor`/`media` steps are plain async
+functions with no Vite/Rollup involvement at all. `public/css/_kiln-plugins.css` is therefore owned
+**entirely by the `js` step**: any invocation of `clay vite --only ...` that includes `js`
+rewrites this one file wholesale, and any invocation that excludes it leaves the file untouched. A
+build pipeline with its own post-processing step over `public/css` (asset hashing, for example)
+must run after the *last* claycli invocation that includes `js`, or its own changes to this
+specific file are silently overwritten on the next one.
+
+### Node globals in browser bundles
+
+#### Why this needs its own explanation
+
+The legacy Browserify pipeline polyfilled Node globals for free. Browserify's bundler runs every
+module through `insert-module-globals`, which detects a bare reference to `Buffer`, `process`, or
+`global` and rewrites it into an explicit `require('buffer').Buffer`-style import, pulling in the
+[feross/buffer](https://www.npmjs.com/package/buffer) polyfill automatically. A component's
+`Buffer.from(...)` — written with no accompanying `require('buffer')` at all — just worked, silently.
+
+`clay vite` has no equivalent. Vite/Rollup never rewrites a bare identifier into an import; a
+module that references `Buffer` without importing it compiles cleanly and then throws
+`ReferenceError: Buffer is not defined` the first time that code path actually runs in the browser
+— with zero build-time signal. `browser-compat.js`'s stubs (see the Vite plugins table above)
+don't help here either: they only intercept an *explicit* `require('buffer')`/`import 'buffer'`.
+They have nothing to intercept when there is no import at all.
+
+#### The policy: no blanket polyfilling
+
+The obvious "fix" — reintroduce something like `insert-module-globals` — is deliberately not on the
+table. Universal, automatic Node-global injection is exactly what made Browserify bundles carry
+megabytes of dead weight for code paths that only ever ran on the server; a bundle that pulls in a
+full `Buffer` polyfill because one file references it as a bare identifier reintroduces the same
+bloat this migration exists to remove. The fix here is visibility plus a narrow, explicit opt-in —
+never an automatic one.
+
+#### The diagnostic
+
+Every Vite build runs a `transform` hook (`lib/cmd/vite/scripts.js`, `scanBareNodeGlobals` /
+`viteBareNodeGlobalsPlugin`) that scans first-party source (skipping `node_modules` and virtual
+module ids) for `Buffer` used as a free identifier — a whole-word match that isn't a property-access
+target (`foo.Buffer`) and isn't already covered by an explicit `require('buffer')`/`import` in the
+same file. Every hit is collected and printed once, at the end of the build, as a single summary:
+
+```
+[clay vite] 1 Node global(s) referenced as bare identifiers in browser-reachable code
+(no polyfill is provided — see CLAY-VITE.md § Node globals in browser bundles):
+  Buffer:
+    - components/podcast-transcripts/model.js
+```
+
+This is deliberately scoped to `Buffer` only, not `process`/`global`. Both of those are already
+substituted at build time by `buildDefines()` for their common legitimate forms —
+`process.env.*`, `process.browser`, `process.version(s)`, and `global → globalThis` — so scanning
+for them as bare identifiers would flag mostly correct, already-handled code. And it's a regex, not
+an AST walk: it can't distinguish a free identifier from a property name (`{ Buffer: 1 }`), an
+accepted trade-off against adding a parser dependency for a report-only diagnostic.
+
+#### The fix: `nodeGlobals` in `bundlerConfig()`
+
+Once a bare reference is named, `bundlerConfig().nodeGlobals` is the narrow, explicit, opt-in fix —
+set in `claycli.config.js`, alongside `alias`/`define`/`browserStubs`:
+
+```js
+// claycli.config.js
+module.exports = {
+  bundlerConfig(config) {
+    config.nodeGlobals = { Buffer: true };
+    return config;
+  },
+};
+```
+
+| Value | Effect |
+|---|---|
+| unset / `false` (default) | No plugin added. Zero bytes, zero behavior change. |
+| `true` | Adds `@rollup/plugin-inject`, which auto-imports `Buffer` from `'buffer'` — but only into modules that actually reference the free identifier. Resolves through the existing `browser-compat.js` stub, which already prefers a real `globalThis.Buffer` when the page provides one. |
+| `'polyfill'` | Same auto-import, but also aliases the `'buffer'` specifier to the real npm `buffer` package instead of the minimal stub, for byte-capable operations (e.g. `createHmac`) the stub can't support. Pulls in real bytes — use only where the minimal stub genuinely isn't enough. |
+
+This mirrors `lenientBrowserExternalize`'s shape elsewhere in this pipeline: a bounded, documented,
+default-off bridge with a stated exit, not a new permanent behavior. The exit path here is the same
+one that applies to any Node-only code reachable from the browser: replace the Node-specific call
+with a browser-native equivalent. The single most common case — base64-encoding a string, which is
+what motivated this section — has a two-line browser-native replacement that needs neither the stub
+nor `nodeGlobals`:
+
+```js
+// Node-only, throws in the browser without nodeGlobals:
+const encoded = Buffer.from(str, 'utf8').toString('base64');
+
+// Browser-native, works everywhere, no config needed:
+const encoded = btoa(str);
+// or, for non-Latin1 strings: btoa(String.fromCharCode(...new TextEncoder().encode(str)))
+```
+
+#### `serverOnlyPackages`: the related, more general leak
+
+A bare `Buffer` reference is one *symptom* of a broader shape: server-only code reachable from a
+browser-facing bundle. Sometimes the leak isn't a bare Node global at all, but an entire
+third-party package — an Amphora internal, an Amphora plugin — that a component's `client.js`
+transitively pulls in. `service-rewrite.js`'s existing `services/server` → `services/client`
+rewrite only covers Clay's own isomorphic service convention; it has no opinion on a third-party
+package like this. `bundlerConfig().serverOnlyPackages` is the same shape of fix, generalized:
+
+```js
+// claycli.config.js
+module.exports = {
+  bundlerConfig(config) {
+    config.serverOnlyPackages = ['amphora/lib'];
+    return config;
+  },
+};
+```
+
+An array of package-path prefixes (default `[]`, a complete no-op) that **warn** — never
+block — when a matching import resolves inside a browser-reachable module, naming the module and
+its importer. This is a stopgap allowlist, not a hard guarantee like the `services/server` rewrite
+(which errors, because a missing client counterpart is unambiguously broken): a match just means
+"this looks suspicious," and the fix is the same package `browser` field remap or browser-safe
+reimplementation as any other leaked server dependency.
 
 ### Why `_globals-init.js` exists as a separate file
 
@@ -953,6 +1193,177 @@ pattern is to expose a **promise** that consumers `.then()` instead of listening
 
 A resolved promise is always "replayable" — calling `.then()` on an already-resolved promise
 runs the callback in the next microtask, with no shim required.
+
+---
+
+### Beyond sticky events: value-shaped state for cross-cutting client facts
+
+#### The general shape: a signal nobody was listening for yet
+
+`stickyEvents` fixes one instance of a wider problem the Vite bootstrap introduced. Under
+Browserify, every consuming site got an implicit **total execution order** for free: every
+component's top-level code ran synchronously during HTML parse, before any deferred
+third-party script and before any other component's code that mattered. The deferred
+`<script type="module">` bootstrap plus per-component dynamic `import()` removes that order
+entirely — component code now runs later, and its timing is unordered relative to both
+third-party scripts and other components.
+
+The general failure shape: a **one-shot signal** — a custom event, or a value handed to a
+vendor-owned callback slot — fires before the code that needs to react to it has had a chance
+to subscribe or install itself. Once that happens, the signal is gone for that pageview; there
+is nothing left to observe or replay. `stickyEvents` addresses one shape of this. The same race
+also shows up as:
+
+- A **third-party vendor SDK** invoking a global callback it expects the page to have already
+  defined (a consent-management callback, an ads SDK ready-hook, `window.dataLayer.push`, etc.)
+  before claycli's own bootstrap-authored code has installed the real handler.
+- A one-shot `MutationObserver` set up to watch for a DOM node a vendor script writes — if the
+  vendor script already ran and wrote the node before the observer attaches, the observer never
+  fires.
+- A site-authored one-shot custom event that `stickyEvents` doesn't happen to cover.
+
+#### Worked example: a consent callback answered by the wrong function
+
+This shipped as a real production bug. A Clay site's `gtm/client.js` assigned
+`window.OptanonWrapper = function () { /* real consent handling */ }` at module top level —
+this is the callback name a consent-management vendor SDK calls once the reader has made (or,
+on a return visit, already made) a consent decision. The site's page template also declared an
+inline no-op `function OptanonWrapper() {}` immediately next to the vendor SDK's own `<script>`
+tag, as a just-in-case guard against the global being undefined when the SDK first looks for it.
+
+Under Browserify this was harmless: the real handler installed synchronously, ~300ms in,
+always well before the vendor SDK could call it, and simply overwrote the inline no-op. Under
+Vite, the real handler installs via the deferred bootstrap + dynamic `import()`, often 1000ms
+or more later — long after the vendor SDK has already called *something* named
+`OptanonWrapper`. That something was, more often than not, the still-installed no-op, and the
+real logic never ran for that pageview. In practice this shipped as blank video embeds and,
+more subtly, as consent-tracking analytics that silently stopped firing, because the code meant
+to run on the reader's consent decision never got the chance.
+
+The site's own fix (already shipped on their side, not claycli's) was to read the vendor
+global's already-resolved state defensively on mount — `if (window.OnetrustActiveGroups) { …
+run the catch-up logic manually … }` — i.e. "read current state first, subscribe as the
+fallback." That works, but it's per-file developer discipline: every future component that
+needs to react to a vendor callback, another component's signal, or any one-shot cross-cutting
+fact has to reinvent it by hand, correctly, including whatever idempotence guard it needs (the
+real fix needed one, to avoid double-processing the same consent decision if the vendor fires
+its callback more than once).
+
+#### Why `stickyEvents` doesn't reach this
+
+It's tempting to read the incident above and reach for `stickyEvents` — don't. `stickyEvents`
+replays past **event** firings to late `addEventListener` subscribers, once, for named events
+that claycli's own bootstrap can patch by wrapping `window.addEventListener`. It has no
+visibility into a third-party vendor global callback slot like `window.OptanonWrapper` —
+nothing in claycli's bootstrap is anywhere near that call path; the vendor SDK just invokes
+whatever function happens to be assigned to that name at the moment it calls it.
+
+And even for events `stickyEvents` *does* cover, "replay the one past firing" is still
+**edge-shaped**, not **value-shaped**. It doesn't help when the underlying fact can change
+*again* after the replay — a reader can update their consent preferences mid-session, long
+after the first `auth:init`-style event fired — and it doesn't remove the need for consuming
+code to guard against processing the same underlying decision twice if the vendor calls its
+callback more than once.
+
+#### The value-shaped pattern: a store, not an event
+
+Many of the "facts" that trigger this race — a vendor's consent decision, auth-ready state,
+third-party API readiness, subscription/entitlement status — aren't really one-shot events at
+all. They're **values** that settle at some point and may change again later. Modeling a value
+as an event (fire once, subscribe-or-miss-it) is what creates the race in the first place.
+Modeling it as a readable, subscribable **current value** removes it: a late subscriber just
+reads or receives the current value, instead of having missed a past edge.
+
+This is a pattern for how a consuming site structures its own client-side service code —
+claycli does not provide or enforce it. A minimal version needs only `get()`, `set()`, and
+`subscribe()`:
+
+```js
+// pattern for site code (e.g. services/client/consent.js) — not a claycli API
+function createValueStore(initialValue) {
+  let value = initialValue;
+  const subscribers = [];
+
+  return {
+    get: () => value,
+    set(next) {
+      if (next === value) return; // already this value — nothing changed, nothing to notify
+      value = next;
+      subscribers.forEach((fn) => fn(value));
+    },
+    subscribe(fn) {
+      fn(value); // called immediately with the CURRENT value — a late subscriber is never behind
+      subscribers.push(fn);
+    }
+  };
+}
+```
+
+The `subscribe` call is the whole fix: it invokes `fn` immediately with whatever value is
+current, so a subscriber that shows up late still gets it, and it invokes `fn` again only when
+the value actually changes, so consumers don't need their own duplicate-decision guards.
+
+#### Owning the boundary: why this has to be a synchronous inline script
+
+A store only helps if something reliably feeds it. That something is a companion pattern: a
+single, small, **synchronous** script — placed as early in the document as the vendor SDK's own
+`<script>` tag, typically right next to it — that owns the vendor global callback slot and
+translates each vendor invocation into a `set()` call on the corresponding store:
+
+```html
+<!-- inline, synchronous — placed immediately before the vendor SDK's own <script> tag -->
+<script>
+  window.consentStore = createValueStore(window.OnetrustActiveGroups || null);
+
+  // owns the vendor's callback slot; nothing else may assign to this name
+  window.OptanonWrapper = function () {
+    window.consentStore.set(window.OnetrustActiveGroups);
+  };
+</script>
+<script src="https://vendor-cdn.example.com/onetrust-sdk.js"></script>
+```
+
+Bundled component code — Browserify's or Vite's — always arrives over the network at some point
+in time, no matter how fast the bundler pipeline gets. Only inline, synchronous document script
+is guaranteed to run before an async vendor SDK's first callback. A component's `client.js` can
+then subscribe whenever it happens to load, with no race, because it's reading a value, not
+racing an edge:
+
+```js
+// client.js — arrives later, async; never races the vendor callback
+window.consentStore.subscribe((activeGroups) => {
+  // runs immediately with whatever the current decision already is,
+  // and again whenever the reader changes it later in the session
+});
+```
+
+No bundler configuration and no claycli feature can substitute for owning that one synchronous
+boundary point. It's inherent to how a page loads, not a limitation of any particular pipeline.
+
+#### The tempting non-fix: making component imports eager
+
+It's worth ruling out an obvious-looking alternative: have claycli load some or all `client.js`
+files eagerly (static imports baked into the bootstrap) instead of via lazy, per-component
+dynamic `import()`, so component code runs closer to Browserify's old timing. Don't reach for
+this. It only narrows the timing window — it doesn't remove the race, since a static import is
+still asynchronous relative to inline document script and still resolves at whatever speed the
+network happens to allow that pageview. Offering it as an easy knob would also encourage teams
+to reach for a timing tweak instead of the actual fix, quietly leaving the underlying race in
+place for the next vendor integration or the next slow network.
+
+#### claycli's role here
+
+This pattern lives in the consuming site's code, not in claycli. claycli's role is this section
+plus build-time diagnostics: a build-time diagnostic exists to help surface component code that
+assigns to a bare `window.<Identifier>`, which is often a sign that code may need this pattern.
+
+**Future direction:** once a site has migrated its cross-cutting one-shot custom events (like
+`auth:init`) onto this value-shaped pattern, `stickyEvents` becomes unnecessary for those events
+and could eventually be removed from `claycli.config.js`. This doesn't make `stickyEvents`
+deprecated — it may still be the right tool for events that haven't been migrated yet — but it's
+a bridge, not a destination, in exactly the same sense that "promises over events" above is: a
+store subsumes a promise, since a promise settles once and a store can also model a value that
+goes on changing.
 
 ### Watch mode (`clay vite --watch`)
 
@@ -1220,6 +1631,8 @@ Run against the feature branch URL after enabling `CLAYCLI_VITE_ENABLED=true`.
 - [ ] Dollar-Slice controller components mount correctly
 - [ ] Vue components render correctly (subscriptions, listings-search, leaderboard, account)
 - [ ] `auth:init` sticky event is received by late subscribers
+- [ ] No component's `client.js` depends on winning a race against a third-party vendor
+      callback or another component's one-shot signal
 - [ ] Ads load on article pages
 
 #### Edit mode (Kiln)
@@ -1318,6 +1731,44 @@ Under the old Browserify pipeline, violations were invisible: Browserify bundled
 into megabundles and never complained about Node-only packages. Under Vite, unresolvable
 Node built-ins produce explicit build errors or runtime crashes. `serviceRewritePlugin`
 automatically redirects `services/server/*` to `services/client/*` in browser builds.
+
+### Chunk URLs under an asset host or path prefix
+
+Where `public/js/` is served from is decided per request, not at build time. amphora-html emits
+the bootstrap tag from `_manifest.json`, rebased onto the site's `assetHost || assetPath`, and
+that differs by environment and site: a CDN host in production (`https://assets.example.com/js/`),
+the page origin plus a site path prefix on staging or a feature branch (`/section/js/`), or the
+bare origin for a site with no prefix (`/js/`). One build is served from all of them.
+
+Chunk imports are emitted relative, so they always follow the bootstrap. Vite's dynamic-import
+preload helper is the one piece that reads Vite's `base`, so claycli builds with Vite's relative
+base, `base: './'` (Vite's documented value for "embedded deployment"; see `resolveViteBase()` in
+`lib/cmd/vite/scripts.js`). The helper then resolves each dep with
+`new URL(dep, import.meta.url)`, which lands on the same URL the real import uses. With the old
+absolute `base: '/js/'`, the helper injected `<link rel="modulepreload" href="/js/chunks/…">`
+against the page origin, which never matched the imports under a CDN host or path prefix, so
+every shared chunk downloaded twice. If DevTools shows the same chunk fetched from two different
+URLs, check that the relative base is still in effect.
+
+A build-time absolute base (for example from `CLAYCLI_COMPILE_ASSET_HOST`) is not a substitute:
+that variable only matches the served location in production. Feature-branch builds, for
+example, point it at staging, so their chunks would be requested from the wrong deployment.
+
+The base only affects the preload helper. claycli emits nothing but JS into `public/js/`, nothing
+reads `import.meta.env.BASE_URL`, and `_manifest.json` builds its `/js/…` paths independently.
+`clay compile` (Browserify) never uses this config.
+
+Overrides, for a site that needs something else:
+
+- `bundlerConfig().publicBase` (e.g. `'/js'` or `'https://cdn.example.com/js'`) restores an
+  absolute base, for JS that is only ever served from that one location.
+- A site plugin can set `base` or `experimental.renderBuiltUrl` from a Vite `config()` hook.
+  Vite merges plugin config over claycli's, so this keeps working on top of the default.
+
+A `ds-mount` error of `Could not dynamically require "<name>"` usually means the component's
+`client.js` exports nothing and has no `DS.controller`. The runtime falls back to
+`window.DS.get()`, which finds no controller to run. Export a mount function
+(`module.exports = (el) => { ... }`) instead of running side effects at the top level.
 
 ### Debugging component preload/load/mount failures
 
