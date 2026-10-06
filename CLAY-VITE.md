@@ -961,6 +961,89 @@ its importer. This is a stopgap allowlist, not a hard guarantee like the `servic
 "this looks suspicious," and the fix is the same package `browser` field remap or browser-safe
 reimplementation as any other leaked server dependency.
 
+### Stub member gaps
+
+#### Why this needs its own explanation
+
+The diagnostic above (bare Node globals) catches one specific shape of bug: code that assumes an
+implicit global with no import at all. It deliberately does *not* catch the opposite, more common
+shape: code that explicitly `require()`s/`import`s a Node built-in — so browser-compat.js's stub
+resolves cleanly, no build warning fires — but then calls a property the stub genuinely doesn't
+implement. `querystring.stringify(...)` against the empty `querystring` stub. `url.format(...)`
+against the `url` stub, which only ever added WHATWG `URL`/`URLSearchParams` (see
+[PR #254](https://github.com/clay/claycli/pull/254)'s own description — legacy `parse`/`format`
+were never implemented, by either the old empty stub or the new richer one). None of this is a build
+error: the import resolves, the property access is valid JS that just evaluates to `undefined`, and
+Rollup has no reason to warn. The `TypeError` only fires the moment a browser actually executes that
+line — a real Kiln save, a real page render — which `clay vite build` never does itself.
+
+Three real, independently-confirmed incidents motivated this check: `querystring.stringify` in
+`subscription-button/client.js` (a public-page component) and in `ooyala-recirc`/`ooyala-recirc-lede`
+(Kiln-edit-reachable model.js render paths). All three throw synchronously inside code Kiln's save
+flow (or a page's own hydration) actually executes, and all three shipped with zero build-time signal
+under the diagnostic above.
+
+#### Scope — what this can and cannot catch
+
+This only sees **first-party source** (`node_modules` is skipped, same as the bare-globals scan
+above) — nothing here is actionable by editing a file inside `node_modules`. That means it
+**cannot** catch a stub gap that only manifests deep inside a third-party package's own internals —
+e.g. `crypto-browserify`'s `sha.js` calling `.readInt32BE()` on a `Buffer.alloc(...)` result several
+layers into `node_modules`, or `@google/maps`'s `make-api-call.js` calling `url.format()` internally
+— never touching a site's own source at all in either case. Those need either a real end-to-end
+Rollup build against the specific dependency chain, or a runtime smoke test; a static first-party
+scan structurally cannot see them. Treat a clean report from this check as "first-party code doesn't
+misuse a stub directly," not as "nothing anywhere in the bundle will throw."
+
+#### The diagnostic
+
+Every Vite build runs a second `transform` hook (`lib/cmd/vite/scripts.js`, `scanStubMemberGaps` /
+`viteStubGapPlugin`) that parses each first-party module with `acorn` (not a regex — reliably
+tracking which local variable a `require('mod')`/`import mod from 'mod'` binds to, then finding
+every later read of that binding's properties, is what an AST is for) and flags:
+
+- `const x = require('querystring'); x.stringify(...)` — a binding, checked at every later `.member` read
+- `const { stringify } = require('querystring')` / `import { stringify } from 'querystring'` — a
+  destructured/named form, checked immediately
+- `require('url').format(...)` — an inline call with no intermediate variable
+
+against the stub's *actual* exported shape — extracted by parsing the real stub source
+(`browser-compat.js`'s `extractStubMemberNames`), including a site's own `bundlerConfig().browserStubs`
+overrides, never a hand-maintained, driftable list. Every hit is collected and printed once, at the
+end of the build:
+
+```
+[clay vite] ✗ 1 stub member gap(s) — code calls a method a Vite stub doesn't implement
+(this WILL throw at runtime in the browser — see CLAY-VITE.md § Stub member gaps):
+  querystring.stringify():
+    - components/ooyala-recirc/model.js
+    - components/subscription-button/client.js
+```
+
+#### The fix: fails the build
+
+Unlike the bare-globals scan (report-only), **this one fails the build.** Every occurrence is a
+statically-provable fact — this stub's source genuinely has no such member, not a heuristic guess —
+so false positives are structurally unlikely, and letting one ship is a real Kiln-save or
+page-render crash waiting for the first real editor or reader to hit that code path.
+
+There is no config flag to downgrade this to a warning. The fix is one of:
+
+1. Rewrite the call to avoid the missing stub method. The two incidents that motivated this check
+   both had a small, browser-native replacement with no config needed:
+   ```js
+   // Node-only, throws in the browser — querystring stub is empty:
+   const qs = querystring.stringify({ count: 5, site: 'grubstreet' });
+
+   // Browser-native, works everywhere:
+   const qs = Object.keys(params)
+     .map(k => `${encodeURIComponent(k)}=${encodeURIComponent(params[k])}`)
+     .join('&');
+   ```
+2. Provide a `bundlerConfig().browserStubs` override (see § Site-specific stubs in
+   `lib/cmd/vite/plugins/browser-compat.js`'s own doc block) with a real implementation of the
+   missing member, when the call site can't reasonably be rewritten.
+
 ### Why `_globals-init.js` exists as a separate file
 
 Clay's `global/js/*.js` files are **side-effect modules** — they set up `window.DS`,
