@@ -401,6 +401,7 @@ Copy component, layout, styleguide, and site-specific media files from their sou
 * `layouts/<name>/media/` are referenced by layout templates and get copied to `public/media/layouts/<name>/`
 * `styleguides/<name>/media/` are referenced by that styleguide's CSS and get copied to `public/media/stylesguides/<name>/`
 * `sites/<name>/media/` are favicons and other site-specific icons that are referenced by particular components in the `<head>` of pages. They get copied to `public/media/sites/<name>/`
+* `sites/<name>/subsites/<subsite>/media/` get copied to `public/media/sites/<name>/<subsite>/`, which is where a subsite's slug (`<name>/<subsite>`) points. A subsite inherits all of its parent site's media (`sites/<name>/media/`) and can override any of it with a file of the same name in its own `media/` folder. `clay vite` writes the same `public/media/sites/<name>/<subsite>/` files, and its overrides always win
 
 #### Arguments
 
