@@ -7,6 +7,13 @@
   "bin": {
     "clay": "cli/index.js"
   },
+  "files": [
+    "index.js",
+    "cli/",
+    "lib/",
+    "CLAY-VITE.md",
+    "BUNDLER-COMPARISON.md"
+  ],
   "scripts": {
     "lint": "eslint lib cli index.js",
     "test": "npm run lint && jest",
