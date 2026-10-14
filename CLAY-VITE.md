@@ -18,6 +18,7 @@
 6. [Configuration](#6-configuration)
 7. [Running Both Side-by-Side](#7-running-both-side-by-side)
 8. [Code References](#8-code-references)
+   - [CommonJS conversion in browser bundles](#commonjs-conversion-in-browser-bundles)
    - [Why `_globals-init.js` exists as a separate file](#why-_globals-initjs-exists-as-a-separate-file)
    - [Why the build runs in two passes](#why-the-build-runs-in-two-passes)
    - [How client-env.json is generated](#how-client-envjson-is-generated)
@@ -738,6 +739,7 @@ RUN if [ "$CLAYCLI_VITE_ENABLED" = "true" ]; then \
 | Service rewrite | [`lib/cmd/vite/plugins/service-rewrite.js`](./lib/cmd/vite/plugins/service-rewrite.js) | Rewrites `services/server/` imports to `services/client/` |
 | Missing module | [`lib/cmd/vite/plugins/missing-module.js`](./lib/cmd/vite/plugins/missing-module.js) | Stubs unresolvable relative imports (legacy compatibility) |
 | Manual chunks | [`lib/cmd/vite/plugins/manual-chunks.js`](./lib/cmd/vite/plugins/manual-chunks.js) | `viteManualChunksPlugin` — inlines small private deps into owner chunk |
+| Free CommonJS references | [`lib/cmd/vite/plugins/free-cjs-refs.js`](./lib/cmd/vite/plugins/free-cjs-refs.js) | Fails the build when a chunk still references `exports`/`module`/`require` without defining them — see Section 8 (CommonJS conversion in browser bundles) |
 
 The Vue 2 SFC plugin's PostCSS handling is not self-contained — it delegates to a module shared
 with `clay compile`, so the two pipelines can't silently diverge on Kiln plugin CSS:
@@ -962,6 +964,82 @@ its importer. This is a stopgap allowlist, not a hard guarantee like the `servic
 (which errors, because a missing client counterpart is unambiguously broken): a match just means
 "this looks suspicious," and the fix is the same package `browser` field remap or browser-safe
 reimplementation as any other leaked server dependency.
+
+### CommonJS conversion in browser bundles
+
+Most component, service and `node_modules` code is still CommonJS. `@rollup/plugin-commonjs`
+converts it to ESM so Rollup can bundle it: every `require()`, `module.exports` and `exports.x`
+is rewritten to module-local bindings. Browsers have no `exports`, `module` or `require` globals,
+so any reference the plugin leaves behind throws `ReferenceError: exports is not defined` when it
+runs.
+
+#### claycli runs its own `@rollup/plugin-commonjs`, not Vite's
+
+Vite 5 bundles `@rollup/plugin-commonjs` 26.x. That copy skips any `if` branch whose test it
+thinks is always false, and it gets `<unknown> || false` wrong: it treats it as always false.
+claycli's `process.browser` define produces exactly that test in
+`randomfill/browser.js` (a crypto-browserify dependency):
+
+```js
+if ((crypto && crypto.getRandomValues) || !process.browser) {   // → `… || false`
+  exports.randomFill = randomFill;          // never rewritten by 26.x
+  exports.randomFillSync = randomFillSync;
+} else { … }
+```
+
+The leftover `exports` crashed Kiln edit mode as soon as an `import()` reached the kiln bundle,
+and no site Kiln plugin registered. Before that, esbuild's minifier hid it: a chunk with no ESM
+syntax gets wrapped in esbuild's own CommonJS helper, where the stray `exports` writes to a
+throwaway object. `randomFill` was silently undefined in edit mode instead.
+
+The fix landed upstream in `@rollup/plugin-commonjs` 29.0.2 (rollup/plugins#1952). claycli turns
+Vite's copy off (`build.commonjsOptions.include: []`) and adds its own 29.x instance to every
+pass's `build.rollupOptions.plugins` (`buildCommonjsPlugin()` in `lib/cmd/vite/scripts.js`). That
+slot runs after Vite's `define` step, as the bundled copy did, so dead-branch skipping still works
+for patterns like `vue.common.js`'s `process.env.NODE_ENV` switch.
+
+Two output differences come with 29.x:
+
+- **Top-level `this` in a CommonJS module is `module.exports`,** as in Node and Browserify
+  (Browserify calls each module with `this` set to `module.exports`). 26.x rewrote it to
+  `globalThis`. UMD wrappers and TypeScript helpers (`this && this.__importDefault`) behave the
+  same either way. A module that relied on top-level `this` being `window` to set a global
+  (dollar-slice's `attach.DS = DS`) no longer sets it, which is what Browserify always did.
+- **The view pass emits a small `chunks/_commonjsHelpers-<hash>.js`** (about 260 bytes). It holds
+  the interop helpers (`getDefaultExportFromCjs`, …) that component chunks import. With 26.x, the
+  helpers rode along in the shared chunk both bootstraps import, because dollar-slice's top-level
+  `this` made the global prelude use `commonjsGlobal`. Now only dynamically imported chunks use
+  them, so Rollup gives them their own chunk. Its hash only changes when the plugin version does,
+  so it stays cached across deploys. It can't be moved into `vite-bootstrap` with
+  `manualChunks`: assigning the bootstrap entry to a manual chunk pulls the whole shared prelude
+  in with it, and then `vite-bootstrap-no-mount` imports `vite-bootstrap` and mounts components in
+  edit mode.
+
+#### The build check
+
+Every chunk is scanned in `renderChunk`, before Vite's minifier can wrap it, by
+`lib/cmd/vite/plugins/free-cjs-refs.js`. A reference to `exports`, `module` or `require` that no
+enclosing scope declares fails the build and names the source module:
+
+```
+.clay/vite-kiln-edit-init-[hash].js references CommonJS exports without defining it (2 place(s)).
+Browsers have no such global, so this chunk throws "ReferenceError: … is not defined" when that code runs.
+  - `exports` at 101594:2 in node_modules/randomfill/browser.js
+      exports.randomFill = randomFill;
+  - `exports` at 101595:2 in node_modules/randomfill/browser.js
+      exports.randomFillSync = randomFillSync;
+```
+
+`typeof module` and references guarded by a `typeof` check of the same name
+(`typeof module === 'object' && module.exports`) are allowed, since they cannot throw.
+
+If the check fires:
+
+- **The module is in `commonjsExclude`:** excluded modules are not converted at all, so any
+  `exports`/`require` in them stays. Keep the module out of browser code instead (`browserStubs`,
+  `alias`, or the `services/server` → `services/client` rewrite).
+- **Otherwise:** `@rollup/plugin-commonjs` mis-converted the module. Check for a newer plugin
+  release, or alias the package to a browser/ESM build.
 
 ### Why `_globals-init.js` exists as a separate file
 
