@@ -175,7 +175,9 @@ clay vite
 │   └── styleguides/**/*.css → public/css/{component}.{styleguide}.css
 │
 ├── templates.js← Handlebars precompile (parallel, p-limit 20, progress-tracked)
-│   └── components/**/template.hbs → public/js/*.template.js
+│   ├── components/**/template.hbs → public/js/*.template.js
+│   ├── node_modules/clay-*/template.hbs (npm components, e.g. clay-kiln)
+│   └── layouts/**/template.hbs
 │
 ├── fonts.js    ← fs-extra copy + CSS concat
 │   └── styleguides/*/fonts/* → public/fonts/ + public/css/_linked-fonts.*.css
@@ -467,6 +469,7 @@ records every component/layout `client.js` chunk under `components/<name>/client
 | Aspect | `clay compile` (Gulp + clayhandlebars) | `clay vite` (Node + clayhandlebars) |
 |---|---|---|
 | **API** | Gulp stream | Direct `fs.readFile` / `hbs.precompile` |
+| **Sources** | `components/*`, npm components (`clay-*` dependencies, via `amphora-fs`), `layouts/**` | Same, with `components/**` globbed recursively |
 | **Concurrency** | Sequential per-file | Parallel with `p-limit(20)` |
 | **Output** | `public/js/{name}.template.js` | **Identical** |
 | **Error handling** | `process.exit(1)` on first error | Per-template error logged; build continues |
@@ -1719,6 +1722,8 @@ Run against the feature branch URL after enabling `CLAYCLI_VITE_ENABLED=true`.
 - [ ] Kiln toolbar appears and initialises without errors
 - [ ] `Object.keys(window.kiln.componentModels).length` > 200 in console
 - [ ] Component data saves successfully (PUT request returns 200)
+- [ ] `window.kiln.componentTemplates['clay-kiln']` is defined in console (npm component templates are compiled)
+- [ ] Saving a layout list in layout mode shows no "Error saving Layout"
 - [ ] Page publishes successfully
 - [ ] No `window.modules` or `window.require` errors in edit mode
 
