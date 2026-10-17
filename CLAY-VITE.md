@@ -1267,6 +1267,48 @@ client-side code.
 
 ---
 
+### The component `client.js` contract
+
+A component's `client.js` takes one of two forms:
+
+1. **A function export** (preferred): `module.exports = el => { ... }` or `export default el => { ... }`.
+   The bootstrap calls it once per element on the page, as soon as that component's module has loaded.
+2. **A Dollar-Slice controller** (legacy): the file exports nothing and calls
+   `DS.controller('name', ...)`. The bootstrap calls `window.DS.get('name', el)` for each element.
+
+What claycli guarantees:
+
+- Every element is mounted on its own. One failing element never stops the others; the failure is
+  reported with its phase (`preload`, `load`, `mount`, `ds-mount`).
+- A function export mounts as soon as its own module has loaded.
+- A legacy controller that looks up **another component's controller** with a literal name,
+  `DS.get('ad', el)` or `$module.get('ad', el)`, is mounted only after the `ad` module has loaded,
+  provided there is an `ad` element on the page. It waits at most **3 seconds**. If `ad` never
+  loads, the controller mounts anyway and its lookup fails the way it would have before, as a
+  `ds-mount` error. Everything else mounts without waiting.
+
+What claycli does not guarantee:
+
+- Any order between function exports.
+- The order in which modules' top-level code runs, so one component must not rely on a global that
+  another component's top-level code sets.
+- Lookups whose name is not a string literal, such as `DS.get(name, el)`. The build cannot tell
+  which component they need. It prints a warning naming the files; use a literal name, or import the
+  module directly.
+
+Why this exists: under `clay compile` every `client.js` was evaluated before anything mounted, so
+a controller could always find the one it looked up. `clay vite` loads each component's module on
+its own and mounts it as soon as it arrives, so without the rule above, whether `ad` had registered
+when `sticky-list` mounted depended on which file the network delivered first.
+
+How it works: while generating the bootstrap, claycli reads each `components/*/client.js` and
+records the literal lookups (including the lookups of the components looked up). The result is
+`_clayClientDeps` in `vite-bootstrap.js`. It is read from source, so there is nothing to
+configure and no list to keep up to date.
+
+Do not put a function export and a `DS.controller` in the same file. `clay vite` calls only the
+function; `clay compile` runs both.
+
 ### Sticky events and the `stickyEvents` config key
 
 #### The problem — ESM dynamic-import race condition
@@ -1892,10 +1934,17 @@ Overrides, for a site that needs something else:
 - A site plugin can set `base` or `experimental.renderBuiltUrl` from a Vite `config()` hook.
   Vite merges plugin config over claycli's, so this keeps working on top of the default.
 
-A `ds-mount` error of `Could not dynamically require "<name>"` usually means the component's
-`client.js` exports nothing and has no `DS.controller`. The runtime falls back to
-`window.DS.get()`, which finds no controller to run. Export a mount function
-(`module.exports = (el) => { ... }`) instead of running side effects at the top level.
+A `ds-mount` error of `Could not dynamically require "<name>"` has two common causes:
+
+- The component's `client.js` exports nothing and has no `DS.controller`. The runtime falls back to
+  `window.DS.get()`, which finds no controller to run. Export a mount function
+  (`module.exports = (el) => { ... }`) instead of running side effects at the top level.
+- A legacy controller looked up another component's controller, `DS.get('<name>', ...)`, before
+  that component's module had loaded. claycli normally makes the controller wait (see
+  [The component `client.js` contract](#the-component-clientjs-contract)). If you still see this,
+  check the build output for the warning about lookups that are not string literals, and check
+  that the component named in the error has an element on the page, since the wait only applies
+  when it does.
 
 ### Debugging component preload/load/mount failures
 
