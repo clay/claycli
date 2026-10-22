@@ -244,7 +244,7 @@ flowchart LR
 
     N0["🖼 Media<br/>fs-extra · ~0.7 s"]:::fast
     N1["📦 JS + Vue<br/>Vite/Rollup · ~30 s"]:::med
-    N2["🎨 CSS<br/>Lightning CSS · ~1 s"]:::fast
+    N2["🎨 CSS<br/>Lightning CSS · ~1.5 s"]:::fast
     N3["📄 Templates<br/>Handlebars · ~16 s"]:::med
     N4["🔤 Fonts + 📚 Vendor<br/>fs-extra · ~1 s"]:::fast
 
@@ -460,7 +460,7 @@ records every component/layout `client.js` chunk under `components/<name>/client
 | **Error handling** | Stream error halts entire pipeline | Every file compiles and every error is logged, then the step fails |
 | **Invalid CSS** | Passed through (cssnano sometimes rewrites it) | Fails the build, naming the source file and line |
 | **Output format** | `public/css/{component}.{styleguide}.css` | Same names; not byte-identical to `clay compile` |
-| **Speed (nymag/sites, 2,872 files)** | ~17 s with cssnano | ~2.6 s with the PostCSS syntax (5.5 s on the main thread); about 5 s on the main thread for standard CSS, under 1 s with workers |
+| **Speed (nymag/sites, 2,872 files)** | ~17 s with cssnano | ~2.6 s with the PostCSS syntax (5.5 s on the main thread); about 5 s on the main thread for standard CSS, about 1.5 s with workers |
 
 > **Equivalent, not identical:** Lightning CSS spells some values differently than cssnano
 > (`translate(-50%)` for `translateX(-50%)`, `0 0` for `0% 0%`, merged shorthands). On
