@@ -52,15 +52,16 @@ the 2014–2018 JavaScript ecosystem. Over time these became pain points:
 | `browserify-cache.json` stale cache risk | Corrupted cache silently served old module code |
 | 20+ npm dependencies just for bundling | Large attack surface, slow installs, difficult version management |
 
-The new `clay vite` pipeline replaces Browserify/Gulp with **Vite 7 + PostCSS 8 + Lightning CSS**:
+The new `clay vite` pipeline replaces Browserify/Gulp with **Vite 7 + Lightning CSS**:
 
 - **Vite** uses Rollup 4 internally for production builds and a well-maintained plugin
   ecosystem. We use Vite exclusively for its **production build** — the Vite dev server and
   HMR are not used. Clay runs a full server-rendered architecture (Amphora) where the browser
   never speaks directly to a Vite dev server; watch mode uses Rollup's incremental rebuild
   instead. (`optimizeDeps` is intentionally disabled in this flow.)
-- PostCSS 8 (imports, mixins, variables, nesting) followed by Lightning CSS (vendor prefixes,
-  minification), compiled across worker threads, replaces Gulp's stream-based CSS pipeline
+- Lightning CSS builds standard CSS (imports, nesting, design tokens, vendor prefixes,
+  minification) across worker threads, replacing Gulp's stream-based CSS pipeline. The PostCSS
+  syntax (`$variables`, mixins) still builds through PostCSS 8 first, but is deprecated
 - All build steps (JS, CSS, fonts, templates, vendor, media) run **in parallel**
 - A human-readable `_manifest.json` replaces the numeric `_registry.json` / `_ids.json` pair
 - Watch mode uses Rollup's incremental rebuild — only changed modules are reprocessed
@@ -450,16 +451,16 @@ records every component/layout `client.js` chunk under `components/<name>/client
 
 ### CSS Compilation
 
-| Aspect | `clay compile` (Gulp + PostCSS 7) | `clay vite` (PostCSS 8 + Lightning CSS) |
+| Aspect | `clay compile` (Gulp + PostCSS 7) | `clay vite` (Lightning CSS) |
 |---|---|---|
-| **Source plugins** | postcss-import, postcss-mixins, postcss-simple-vars, postcss-nested | Same plugins, then any `stylesConfig` `plugins` |
+| **Source syntax** | postcss-import, postcss-mixins, postcss-simple-vars, postcss-nested | Standard CSS: `@import`, nesting, design tokens (`var(--color-black)`). The PostCSS syntax builds with `pipeline: 'postcss'` (deprecated) |
 | **Vendor prefixes** | autoprefixer | Lightning CSS, for the oldest browsers in the project's browserslist (see [Configuration](#stylesconfig-css)) |
 | **Minification** | cssnano (when `CLAYCLI_COMPILE_MINIFIED` set) | Lightning CSS (same flag) |
 | **Concurrency** | Sequential per-file | Worker threads (one per available CPU minus one, up to 8; main thread for small builds, 2 CPUs or fewer, and watch rebuilds) |
 | **Error handling** | Stream error halts entire pipeline | Every file compiles and every error is logged, then the step fails |
 | **Invalid CSS** | Passed through (cssnano sometimes rewrites it) | Fails the build, naming the source file and line |
 | **Output format** | `public/css/{component}.{styleguide}.css` | Same names; not byte-identical to `clay compile` |
-| **Speed (nymag/sites, 2,872 files)** | ~17 s with cssnano | ~2.6 s (5.5 s on the main thread) |
+| **Speed (nymag/sites, 2,872 files)** | ~17 s with cssnano | ~2.6 s with the PostCSS syntax (5.5 s on the main thread); about 5 s on the main thread for standard CSS, under 1 s with workers |
 
 > **Equivalent, not identical:** Lightning CSS spells some values differently than cssnano
 > (`translate(-50%)` for `translateX(-50%)`, `0 0` for `0% 0%`, merged shorthands). On
@@ -468,9 +469,10 @@ records every component/layout `client.js` chunk under `components/<name>/client
 > changed what the source meant (see [Lightning CSS](#lightning-css-in-the-styles-step)).
 >
 > This table describes **styleguide/component CSS** (`styleguides/**/{components,layouts}/*.css`).
-> **Kiln plugin CSS** (`<style>` blocks inside a Kiln plugin's `.vue` file) is compiled by a
-> separate, shared PostCSS chain — see Section 8 (Kiln plugin PostCSS chain) below for why it
-> needs its own explanation.
+> **Kiln plugin CSS** (`<style>` blocks inside a Kiln plugin's `.vue` file) goes through the same
+> Lightning CSS compiler (nesting, design tokens, targets, minification), then Vue's scoping. Under
+> the deprecated `pipeline: 'postcss'` it still runs the host's own PostCSS chain — see Section 8
+> (Kiln plugin PostCSS chain) below.
 
 ### Template Compilation
 
@@ -615,18 +617,39 @@ module.exports.bundlerConfig = function(config) {
 
 ### `stylesConfig` (CSS)
 
-`clay vite` compiles each `styleguides/**/{components,layouts}/*.css` file with PostCSS
-(postcss-import, postcss-mixins, postcss-simple-vars, postcss-nested, then your `plugins`)
-and passes the result to [Lightning CSS](https://lightningcss.dev/) for vendor prefixes and,
-when minifying, minification. The `stylesConfig` hook mutates this object:
+`clay vite` compiles each `styleguides/**/{components,layouts}/*.css` file with
+[Lightning CSS](https://lightningcss.dev/). The files are standard CSS:
+
+- **`@import`** at the top of a file, found next to the file and then in `importPaths`
+  (`.css` optional). A file is included once per output file, where it's first imported.
+- **Nesting** (`.a { &:hover {} .b {} @media … {} }`). It's written out flat at build time, the
+  way postcss-nested did, so the minifier can still merge the rules it produces. `&` stands
+  for the parent selector, as in the CSS spec; where the spec's meaning (`:is(<parent>)`)
+  differs (a parent list whose selectors differ in specificity, a parent with a
+  pseudo-element, `&` after a combinator under a complex parent) write the rule out instead.
+  `&-suffix` concatenation isn't CSS.
+- **Design tokens**: `var(--color-black)` is replaced by the token's value at build time, from
+  [DTCG](https://www.designtokens.org/) JSON files (`tokens`; by default
+  `styleguides/_default/tokens.json`): `{ "color": { "black": { "$value": "#000" } } }` is
+  `--color-black`. A `var()` that isn't a token (or has a fallback) is left for the browser.
+- **`$asset-host`** (and `$asset-path`) at the start of a `url()` are filled in from
+  `CLAYCLI_COMPILE_ASSET_HOST` / `CLAYCLI_COMPILE_ASSET_PATH`.
+
+The `stylesConfig` hook mutates this object:
 
 | Property | Default | Purpose |
 |---|---|---|
-| `importPaths` | `postcssImportPaths` or `['./styleguides']` | postcss-import search paths, relative to the project root |
-| `plugins` | `[]` | Extra PostCSS plugins. They run **after** the four source plugins and **before** Lightning CSS, so they see expanded CSS without vendor prefixes |
+| `pipeline` | `'lightningcss'` | `'postcss'` builds the PostCSS syntax (`$variables`, mixins, `&-suffix`) with postcss-import, postcss-mixins, postcss-simple-vars and postcss-nested before Lightning CSS. **Deprecated**; the build warns |
+| `importPaths` | `postcssImportPaths` or `['./styleguides']` | Where `@import` looks after the importing file's folder, relative to the project root |
+| `tokens` | `styleguides/_default/tokens.json` if it exists | Design token files (DTCG JSON), relative to the project root; later files win |
+| `plugins` | `[]` | `pipeline: 'postcss'` only: extra PostCSS plugins, run **after** the four source plugins and **before** Lightning CSS |
 | `browserslist` | project browserslist | Browsers Lightning CSS targets, in place of the project's own list (`.browserslistrc`, `package.json`, or browserslist's defaults) |
 | `lightningcssOptions` | `{}` | Extra options for Lightning CSS [`transform()`](https://lightningcss.dev/transforms.html) (`drafts`, `include`/`exclude`, `visitor`, …). `targets` and `minify` set here win over the computed ones |
 | `minify` | `--minify` or `CLAYCLI_COMPILE_MINIFIED` | Minify. Unminified output is pretty-printed (comments are not kept) |
+
+A file with PostCSS syntax fails to build in the default pipeline, naming the file and what it
+found. nymag/sites moved its styleguides to standard CSS with a codemod; see "Moving to
+standard CSS" under [Lightning CSS in the styles step](#lightning-css-in-the-styles-step).
 
 `autoprefixerOptions` is ignored (with a warning): autoprefixer does not run.
 
@@ -784,7 +807,9 @@ RUN if [ "$CLAYCLI_VITE_ENABLED" = "true" ]; then \
 | Globals init generator | [`lib/cmd/vite/generate-globals-init.js`](./lib/cmd/vite/generate-globals-init.js) | Generates `.clay/_globals-init.js` |
 | Kiln edit generator | [`lib/cmd/vite/generate-kiln-edit.js`](./lib/cmd/vite/generate-kiln-edit.js) | Generates `.clay/_kiln-edit-init.js` |
 | CSS compilation | [`lib/cmd/vite/styles.js`](./lib/cmd/vite/styles.js) | `buildStyles`, `SRC_GLOBS`; file selection, worker pool, warning report |
-| CSS compiler | [`lib/cmd/vite/styles-compiler.js`](./lib/cmd/vite/styles-compiler.js) | `stylesConfig` resolution, Lightning CSS targets, PostCSS → Lightning CSS for one file |
+| CSS compiler | [`lib/cmd/vite/styles-compiler.js`](./lib/cmd/vite/styles-compiler.js) | `stylesConfig` resolution, Lightning CSS targets, the compiler for one file (Lightning CSS, or PostCSS → Lightning CSS) |
+| CSS sources | [`lib/cmd/vite/styles-source.js`](./lib/cmd/vite/styles-source.js) | `@import` inlining, design tokens, finding a declaration in the text |
+| CSS nesting | [`lib/cmd/vite/styles-nesting.js`](./lib/cmd/vite/styles-nesting.js) | Flattens nesting in Lightning CSS's AST before it minifies |
 | CSS worker | [`lib/cmd/vite/styles-worker.js`](./lib/cmd/vite/styles-worker.js) | Worker thread entry; re-runs the `stylesConfig` hook and compiles posted files |
 | Template compilation | [`lib/cmd/vite/templates.js`](./lib/cmd/vite/templates.js) | Handlebars precompile; `buildTemplates`, `TEMPLATE_GLOB_PATTERN` |
 | Font processing | [`lib/cmd/vite/fonts.js`](./lib/cmd/vite/fonts.js) | Font copy + CSS generation; `buildFonts`, `FONTS_SRC_GLOB` |
@@ -930,6 +955,21 @@ every nymag/sites styleguide file against the old PostCSS + cssnano output):
 | `font: …` with `font-stretch: condensed` | prints `font: 75% …` when minifying (invalid) | longhands instead of `font` |
 | unitless lengths (`margin: 25 0 12px`) | reads them as `px` (browsers ignore them) | a unit, or delete |
 | selector lists mixing vendor prefixes (`::-ms-input-placeholder, ::placeholder`, `_:future` Safari hacks) | splits them into one rule per selector, so each applies on its own | one rule per selector, `@supports` for hacks |
+
+The standard CSS pipeline runs Lightning CSS the same way; its diagnostics are errors at the
+source file and line too. Flattening nesting in a visitor runs into three more Lightning CSS
+behaviors, handled in [`styles-nesting.js`](./lib/cmd/vite/styles-nesting.js): a rule a visitor
+returns forgets that its selectors hold pseudo-elements (so it no longer merges with an
+identical parsed rule, and a list mixing vendor-prefixed pseudo-elements is rewritten into
+`:is()`), unset fields come back as `null` it can't read, and whole numbers past 16 bits arrive
+as integers it refuses for a float. Only rules that hold nested rules are rebuilt, and the rest
+is worked around there. Tokens are replaced in the text rather than with Lightning CSS's
+`Variable` visitor, which loses the whitespace after a replaced `var()` (`var(--a) 0` prints as
+`#0000`).
+
+**Moving to standard CSS.** nymag/sites' styleguides were migrated with a codemod
+(`scripts/css-migration/` in that repo), checked by building every file with both pipelines and
+comparing the output byte for byte, then per selector where the bytes differ.
 
 ### Node globals in browser bundles
 
