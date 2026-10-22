@@ -19,7 +19,6 @@
 7. [Running Both Side-by-Side](#7-running-both-side-by-side)
 8. [Code References](#8-code-references)
    - [CommonJS conversion in browser bundles](#commonjs-conversion-in-browser-bundles)
-   - [Deterministic builds](#deterministic-builds)
    - [Why `_globals-init.js` exists as a separate file](#why-_globals-initjs-exists-as-a-separate-file)
    - [Why the build runs in two passes](#why-the-build-runs-in-two-passes)
    - [How client-env.json is generated](#how-client-envjson-is-generated)
@@ -744,7 +743,6 @@ RUN if [ "$CLAYCLI_VITE_ENABLED" = "true" ]; then \
 | Missing module | [`lib/cmd/vite/plugins/missing-module.js`](./lib/cmd/vite/plugins/missing-module.js) | Stubs unresolvable relative imports (legacy compatibility) |
 | Manual chunks | [`lib/cmd/vite/plugins/manual-chunks.js`](./lib/cmd/vite/plugins/manual-chunks.js) | `viteManualChunksPlugin` — inlines small private deps into owner chunk |
 | Free CommonJS references | [`lib/cmd/vite/plugins/free-cjs-refs.js`](./lib/cmd/vite/plugins/free-cjs-refs.js) | Fails the build when a chunk still references `exports`/`module`/`require` without defining them — see Section 8 (CommonJS conversion in browser bundles) |
-| Strict requires check | [`lib/cmd/vite/plugins/strict-requires.js`](./lib/cmd/vite/plugins/strict-requires.js) | Checks commonjs's load-order-dependent wrapping against the complete require graph and has the pass rebuilt when they differ — see Section 8 (Deterministic builds) |
 
 The Vue 2 SFC plugin's PostCSS handling is not self-contained — it delegates to a module shared
 with `clay compile`, so the two pipelines can't silently diverge on Kiln plugin CSS:
@@ -1046,74 +1044,6 @@ If the check fires:
 - **Otherwise:** `@rollup/plugin-commonjs` mis-converted the module. Check for a newer plugin
   release, or alias the package to a browser/ESM build.
 
-### Deterministic builds
-
-`clay vite` emits byte-identical files for identical source. That is what keeps the browser
-cache working across deploys: every chunk's file name carries a hash of its content, and each
-importer embeds its dependencies' names, so one leaf that changes from build to build renames
-every chunk above it. On nymag/sites a single unstable leaf renamed about 265 chunks per deploy,
-and every reader re-downloaded them.
-
-These used to vary between builds of the same source:
-
-| What varied | Effect | Now |
-|---|---|---|
-| `@rollup/plugin-commonjs`'s `strictRequires: 'auto'` decides from **load order** whether a module required both conditionally (inside a function or branch) and unconditionally gets a lazy `requireX()` wrapper or is hoisted | The kiln bundle and the `ads`/`client` chunks changed on about every other build (on nymag/sites: `pyxis-frontend`, `js-cookie`, `readable-stream/…/destroy.js`, `video-feed-slot.js`, and some component `client.js` files) | Checked against the complete require graph; a pass that raced is rebuilt (below) |
-| `_kiln-plugins.css` was written in the order the `.vue` transforms finished, and both passes' writes could overlap | Rule order changed | One entry per `.vue` file, written in path order; writes queued |
-| A build timestamp in the generated `.clay/*.js` entries | Every source map that embeds them (`sourcesContent`) changed | Removed |
-| glob 10 returns files in directory-read order (reverse alphabetical on macOS APFS, hash order on Linux ext4) | The import order of `global/js/*.js`, `model.js`, `kiln.js` and `client.js` files, and the order of the template and font bundles, depended on the build machine | Sorted by path |
-
-`global/js/*.js` therefore always runs in path order (`aaa-module-mounting.js` first), on
-every machine. Before, it ran in whatever order the filesystem listed the directory: last
-on macOS.
-
-#### How the wrapping check works
-
-`'auto'` wraps a CommonJS module when it is part of a `require()` cycle, or when it is only
-required conditionally. It decides the second case when the module's own transform starts,
-from the requires it has seen by then. Rollup loads modules concurrently, so the answer
-depends on which parent's `resolve()` finished first.
-
-`lib/cmd/vite/plugins/strict-requires.js` applies the same rules to the complete graph once
-it is built:
-
-- a module is wrapped when every `require()` of it is conditional or comes from a module
-  wrapped for that same reason;
-- an ESM `import`/`import()` of it counts as unconditional (it loads the module as soon as its
-  importer is parsed);
-- a module in a `require()` cycle is wrapped, but that does not make its own requires
-  conditional (commonjs only finds the cycle after the module has registered them).
-
-Each production pass (view and kiln) still runs with `'auto'`. At `buildEnd` the check compares
-`'auto'`'s decisions with the graph's. If they match, the pass continues as usual. If they
-differ, the pass is aborted before any chunk is rendered or written, and runs again with the
-graph's answer as an explicit `strictRequires` list, which commonjs applies without any
-order-dependent analysis. The output is the same bytes either way, so it depends on the source
-only. The rebuild prints one line:
-
-```
-[clay vite] kiln pass: commonjs's load-order-dependent 'auto' wrapping differed from the complete require graph; wrapped only by 'auto': node_modules/js-cookie/src/js.cookie.js, node_modules/pyxis-frontend/dist/main.js. Rebuilding the pass with an explicit list so the output is deterministic.
-```
-
-The graph's answer is what `'auto'` documents ("only required in a conditional way"). On
-nymag/sites it matched `'auto'` for every module that doesn't race (107 in the view pass,
-221 in the kiln pass). For the racy ones, production had already shipped both variants.
-
-The cost is one more run of the pass, only when `'auto'` raced. On nymag/sites some module
-races in both passes on nearly every build, so a full `clay vite` went from about 48 s to about
-61 s. Watch mode keeps plain `'auto'` with no check: its output is never deployed.
-
-#### Checking it
-
-`lib/cmd/vite/determinism.test.js` builds a small site twice, with a site plugin that delays
-loading one side of each race, and fails on any difference in `public/`. To check a real
-site, build twice from clean and compare:
-
-```bash
-rm -rf public .clay && npx clay vite && mv public /tmp/build-1
-rm -rf public .clay && npx clay vite && diff -r /tmp/build-1 public && echo identical
-```
-
 ### Why `_globals-init.js` exists as a separate file
 
 Clay's `global/js/*.js` files are **side-effect modules** — they set up `window.DS`,
@@ -1124,7 +1054,6 @@ In the old Browserify pipeline this ordering was implicit: all global scripts we
 synchronously into the bundle before any component code, so order was guaranteed by the
 file-system sort order (hence `aaa-module-mounting.js` — the `aaa` prefix forces it first
 lexicographically). There was nothing to configure; the bundler handled it by construction.
-`_globals-init.js` imports them in the same path order (see [Deterministic builds](#deterministic-builds)).
 
 In Vite's ESM model, all component `client.js` files are loaded via **dynamic `import()`**
 inside the bootstrap. Dynamic imports are async — they return a Promise and do not block
@@ -1708,13 +1637,11 @@ Tests for the Vite pipeline live in the same location as other claycli tests:
 ```
 lib/cmd/vite/
 ├── scripts.test.js        ← unit tests for config helpers, buildAll, watch, signal writes
-├── determinism.test.js    ← real build, twice, with each load order forced; output must match
 ├── plugins/
 │   ├── browser-compat.test.js
 │   ├── service-rewrite.test.js
 │   ├── missing-module.test.js
-│   ├── manual-chunks.test.js
-│   └── strict-requires.test.js
+│   └── manual-chunks.test.js
 ```
 
 Run with: `npm test`
