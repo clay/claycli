@@ -18,6 +18,7 @@
 6. [Configuration](#6-configuration)
 7. [Running Both Side-by-Side](#7-running-both-side-by-side)
 8. [Code References](#8-code-references)
+   - [Lightning CSS in the styles step](#lightning-css-in-the-styles-step)
    - [CommonJS conversion in browser bundles](#commonjs-conversion-in-browser-bundles)
    - [Build output stability](#build-output-stability)
    - [Why `_globals-init.js` exists as a separate file](#why-_globals-initjs-exists-as-a-separate-file)
@@ -51,14 +52,15 @@ the 2014–2018 JavaScript ecosystem. Over time these became pain points:
 | `browserify-cache.json` stale cache risk | Corrupted cache silently served old module code |
 | 20+ npm dependencies just for bundling | Large attack surface, slow installs, difficult version management |
 
-The new `clay vite` pipeline replaces Browserify/Gulp with **Vite 5 + PostCSS 8**:
+The new `clay vite` pipeline replaces Browserify/Gulp with **Vite 5 + PostCSS 8 + Lightning CSS**:
 
 - **Vite** uses Rollup 4 internally for production builds and a well-maintained plugin
   ecosystem. We use Vite exclusively for its **production build** — the Vite dev server and
   HMR are not used. Clay runs a full server-rendered architecture (Amphora) where the browser
   never speaks directly to a Vite dev server; watch mode uses Rollup's incremental rebuild
   instead. (`optimizeDeps` is intentionally disabled in this flow.)
-- PostCSS 8's programmatic API replaces Gulp's stream-based CSS pipeline
+- PostCSS 8 (imports, mixins, variables, nesting) followed by Lightning CSS (vendor prefixes,
+  minification), compiled across worker threads, replaces Gulp's stream-based CSS pipeline
 - All build steps (JS, CSS, fonts, templates, vendor, media) run **in parallel**
 - A human-readable `_manifest.json` replaces the numeric `_registry.json` / `_ids.json` pair
 - Watch mode uses Rollup's incremental rebuild — only changed modules are reprocessed
@@ -172,7 +174,7 @@ clay vite
 │       ├── Entry: .clay/_kiln-edit-init.js ← generated, registers all model.js + kiln.js
 │       └── Single output file: .clay/_kiln-edit-init-[hash].js
 │
-├── styles.js   ← PostCSS 8 programmatic API (parallel, p-limit 50)
+├── styles.js   ← PostCSS 8 source plugins → Lightning CSS (prefixes, minify), worker threads
 │   └── styleguides/**/*.css → public/css/{component}.{styleguide}.css
 │
 ├── templates.js← Handlebars precompile (parallel, p-limit 20, progress-tracked)
@@ -241,7 +243,7 @@ flowchart LR
 
     N0["🖼 Media<br/>fs-extra · ~0.7 s"]:::fast
     N1["📦 JS + Vue<br/>Vite/Rollup · ~30 s"]:::med
-    N2["🎨 CSS<br/>PostCSS 8 · ~32 s"]:::slow
+    N2["🎨 CSS<br/>PostCSS 8 + Lightning CSS · ~3 s"]:::fast
     N3["📄 Templates<br/>Handlebars · ~16 s"]:::med
     N4["🔤 Fonts + 📚 Vendor<br/>fs-extra · ~1 s"]:::fast
 
@@ -263,7 +265,7 @@ flowchart LR
 | **Total time** | ~60–120s | ~60s | **~2× faster** |
 | **Execution** | Sequential — each step waits | Parallel — all steps run simultaneously after media | ⚠️ Different shape; same end result |
 | **JS tool** | Browserify + Babel (megabundles) | Vite (Rollup 4 + manualChunks) | 🔄 Replaced |
-| **CSS tool** | Gulp + PostCSS 7 | PostCSS 8 programmatic API | 🔄 Replaced; same plugin ecosystem |
+| **CSS tool** | Gulp + PostCSS 7 (autoprefixer, cssnano) | PostCSS 8 source plugins + Lightning CSS (prefixes, minify) in worker threads | 🔄 Replaced; same source syntax and `stylesConfig` hook |
 | **Module graph** | `_registry.json` + `_ids.json` | `_manifest.json` (human-readable) | ⚠️ Different format; same purpose |
 | **Component loader** | `_client-init.js` — calls `window.require()` on every `.client` module (executing its body and dependency graph), then DOM-checks before invoking the exported controller | `vite-bootstrap.js` — scans the DOM first; only `import()`s a `.client` module if its element exists | ✅ Better; module body never executes for components absent from the page |
 | **JS output** | Per-component files + alpha-bucket dep files | Dynamic import splits + `chunks/` shared deps | ✅ Better; shared deps cached once |
@@ -340,7 +342,7 @@ flowchart TB
     classDef output   fill:#14532d,color:#86efac,stroke:#166534
 ```
 
-**🔁 Same in both pipelines:** CSS (PostCSS plugins → `public/css/`) · Templates (Handlebars precompile → `public/js/*.template.js`) · Fonts (copy + concat → `public/fonts/`) · Media (copy → `public/media/`)
+**🔁 Same in both pipelines:** CSS source syntax and output names (`public/css/{component}.{styleguide}.css`) · Templates (Handlebars precompile → `public/js/*.template.js`) · Fonts (copy + concat → `public/fonts/`) · Media (copy → `public/media/`)
 
 | Concern | `clay compile` | `clay vite` | Why it matters |
 |---|---|---|---|
@@ -448,17 +450,22 @@ records every component/layout `client.js` chunk under `components/<name>/client
 
 ### CSS Compilation
 
-| Aspect | `clay compile` (Gulp + PostCSS 7) | `clay vite` (PostCSS 8) |
+| Aspect | `clay compile` (Gulp + PostCSS 7) | `clay vite` (PostCSS 8 + Lightning CSS) |
 |---|---|---|
-| **API** | Gulp stream pipeline | PostCSS programmatic API |
-| **Concurrency** | Sequential per-file | Parallel with `p-limit(50)` |
-| **PostCSS plugins** | autoprefixer, postcss-import, postcss-mixins, postcss-simple-vars, postcss-nested | Same plugins |
-| **Minification** | cssnano (when `CLAYCLI_COMPILE_MINIFIED` set) | cssnano (same flag) |
-| **Error handling** | Stream error halts entire pipeline | Per-file error logged; remaining files continue |
-| **Output format** | `public/css/{component}.{styleguide}.css` | **Identical** |
-| **Future path** | Locked to PostCSS | Lightning CSS: `css: { transformer: 'lightningcss' }` in `baseViteConfig` |
+| **Source plugins** | postcss-import, postcss-mixins, postcss-simple-vars, postcss-nested | Same plugins, then any `stylesConfig` `plugins` |
+| **Vendor prefixes** | autoprefixer | Lightning CSS, for the oldest browsers in the project's browserslist (see [Configuration](#stylesconfig-css)) |
+| **Minification** | cssnano (when `CLAYCLI_COMPILE_MINIFIED` set) | Lightning CSS (same flag) |
+| **Concurrency** | Sequential per-file | Worker threads (one per core minus one, up to 8; main thread for small builds and watch rebuilds) |
+| **Error handling** | Stream error halts entire pipeline | Every file compiles and every error is logged, then the step fails |
+| **Invalid CSS** | Passed through (cssnano sometimes rewrites it) | Fails the build, naming the source file and line |
+| **Output format** | `public/css/{component}.{styleguide}.css` | Same names; not byte-identical to `clay compile` |
+| **Speed (nymag/sites, 2,872 files)** | ~17 s with cssnano | ~2.6 s (5.5 s on the main thread) |
 
-> **Same result:** Output CSS files are byte-for-byte identical between pipelines.
+> **Equivalent, not identical:** Lightning CSS spells some values differently than cssnano
+> (`translate(-50%)` for `translateX(-50%)`, `0 0` for `0% 0%`, merged shorthands). On
+> nymag/sites every remaining difference, checked per file in Chrome's CSS parser and as
+> computed styles on real pages, is either an equivalent spelling or a place where cssnano had
+> changed what the source meant (see [Lightning CSS](#lightning-css-in-the-styles-step)).
 >
 > This table describes **styleguide/component CSS** (`styleguides/**/{components,layouts}/*.css`).
 > **Kiln plugin CSS** (`<style>` blocks inside a Kiln plugin's `.vue` file) is compiled by a
@@ -529,9 +536,10 @@ Both commands read the same `claycli.config.js` but use **separate config keys**
 // PostCSS import paths (used by both clay compile and clay vite)
 module.exports.postcssImportPaths = ['./styleguides'];
 
-// PostCSS plugin customization hook
+// CSS customization hook (see "stylesConfig (CSS)" below for clay vite)
 module.exports.stylesConfig = function(config) {
-  // config.importPaths, config.autoprefixerOptions, config.plugins, config.minify
+  // config.importPaths, config.autoprefixerOptions, config.plugins, config.minify,
+  // and for clay vite only: config.browserslist, config.lightningcssOptions
 };
 
 // ─── clay compile only (Browserify) ─────────────────────────────────────────
@@ -592,7 +600,7 @@ module.exports.bundlerConfig = function(config) {
 // claycli.config.js — minimal setup for clay vite
 'use strict';
 
-// PostCSS (optional — defaults work for most sites)
+// CSS (optional — defaults work for most sites)
 module.exports.stylesConfig = function(config) {
   config.importPaths = ['./styleguides'];
 };
@@ -604,6 +612,46 @@ module.exports.bundlerConfig = function(config) {
   return config;
 };
 ```
+
+### `stylesConfig` (CSS)
+
+`clay vite` compiles each `styleguides/**/{components,layouts}/*.css` file with PostCSS
+(postcss-import, postcss-mixins, postcss-simple-vars, postcss-nested, then your `plugins`)
+and passes the result to [Lightning CSS](https://lightningcss.dev/) for vendor prefixes and,
+when minifying, minification. The `stylesConfig` hook mutates this object:
+
+| Property | Default | Purpose |
+|---|---|---|
+| `importPaths` | `postcssImportPaths` or `['./styleguides']` | postcss-import search paths, relative to the project root |
+| `plugins` | `[]` | Extra PostCSS plugins. They run **after** the four source plugins and **before** Lightning CSS, so they see expanded CSS without vendor prefixes |
+| `browserslist` | project browserslist | Browsers Lightning CSS targets, in place of the project's own list (`.browserslistrc`, `package.json`, or browserslist's defaults) |
+| `lightningcssOptions` | `{}` | Extra options for Lightning CSS [`transform()`](https://lightningcss.dev/transforms.html) (`drafts`, `include`/`exclude`, `visitor`, …). `targets` and `minify` set here win over the computed ones |
+| `minify` | `--minify` or `CLAYCLI_COMPILE_MINIFIED` | Minify. Unminified output is pretty-printed (comments are not kept) |
+
+`autoprefixerOptions` is ignored (with a warning): autoprefixer does not run.
+
+**Browserslist is a floor, not a usage share.** Lightning CSS prints newer syntax and drops
+fallbacks once every target supports them, so the targets must be the oldest browsers you
+support. A share query like `> 2%` would make nymag/sites print 9,828 range media queries
+(`@media (width>=768px)`) that Safari < 16.4 and Chrome < 104 ignore. A pinned Baseline query
+such as `baseline widely available on 2025-05-01` (Chrome/Edge 107, Firefox 104, Safari/iOS 16;
+Vite 7's default build target) keeps legacy media queries and is stable across caniuse updates.
+
+The stylesConfig hook runs on the main thread and again in every worker thread, since PostCSS
+plugin instances and Lightning CSS visitors cannot be sent between threads. Keep it free of
+side effects.
+
+`CLAYCLI_VITE_CSS_WORKERS=<n>` sets the number of worker threads (`0` compiles on the main
+thread). By default a full build uses one per core minus one, up to 8, and builds under 200
+files and `--watch` rebuilds of a changed component compile on the main thread.
+
+CSS that Lightning CSS cannot parse (and browsers ignore) is an error, reported once per source
+location, for example
+`[styles] Invalid CSS in styleguides/nyxny/components/follow.css:43:3: Unexpected token … in \`background-image: …\``.
+Every file is still compiled and written, then the styles step fails, so `clay vite` exits
+non-zero and `--watch` keeps running.
+
+`clay compile` is unchanged: it still runs autoprefixer and cssnano.
 
 ### All `bundlerConfig` properties
 
@@ -645,6 +693,7 @@ These controls are intended for local/QA iteration while Browserify and Vite run
 |---|---|---|
 | `CLAYCLI_VITE_SITES=<csv>` | JS pipeline rollout (site integration) | Used by site-level wrappers (for example in `sites`) to enable Vite JS for selected sites during canary rollout |
 | `CLAYCLI_VITE_CSS_SITES=<csv>` | CSS full builds | Compiles only selected styleguides, always includes `_default`; use `all` (or unset) for normal behavior |
+| `CLAYCLI_VITE_CSS_WORKERS=<n>` | CSS full builds | Worker threads for the styles step; `0` compiles on the main thread (see [`stylesConfig` (CSS)](#stylesconfig-css)) |
 | `clay vite --only <steps>` | Build orchestration | Runs only selected steps: `js`, `styles`, `fonts`, `templates`, `vendor`, `media` |
 
 #### `CLAYCLI_VITE_CSS_SITES`
@@ -726,7 +775,9 @@ RUN if [ "$CLAYCLI_VITE_ENABLED" = "true" ]; then \
 | Bootstrap generator | [`lib/cmd/vite/generate-bootstrap.js`](./lib/cmd/vite/generate-bootstrap.js) | Generates `.clay/vite-bootstrap.js` (with component mount runtime) and `.clay/vite-bootstrap-no-mount.js` (edit mode, prelude only) |
 | Globals init generator | [`lib/cmd/vite/generate-globals-init.js`](./lib/cmd/vite/generate-globals-init.js) | Generates `.clay/_globals-init.js` |
 | Kiln edit generator | [`lib/cmd/vite/generate-kiln-edit.js`](./lib/cmd/vite/generate-kiln-edit.js) | Generates `.clay/_kiln-edit-init.js` |
-| CSS compilation | [`lib/cmd/vite/styles.js`](./lib/cmd/vite/styles.js) | PostCSS pipeline; `buildStyles`, `SRC_GLOBS` |
+| CSS compilation | [`lib/cmd/vite/styles.js`](./lib/cmd/vite/styles.js) | `buildStyles`, `SRC_GLOBS`; file selection, worker pool, warning report |
+| CSS compiler | [`lib/cmd/vite/styles-compiler.js`](./lib/cmd/vite/styles-compiler.js) | `stylesConfig` resolution, Lightning CSS targets, PostCSS → Lightning CSS for one file |
+| CSS worker | [`lib/cmd/vite/styles-worker.js`](./lib/cmd/vite/styles-worker.js) | Worker thread entry; re-runs the `stylesConfig` hook and compiles posted files |
 | Template compilation | [`lib/cmd/vite/templates.js`](./lib/cmd/vite/templates.js) | Handlebars precompile; `buildTemplates`, `TEMPLATE_GLOB_PATTERN` |
 | Font processing | [`lib/cmd/vite/fonts.js`](./lib/cmd/vite/fonts.js) | Font copy + CSS generation; `buildFonts`, `FONTS_SRC_GLOB` |
 | Media copy | [`lib/cmd/vite/media.js`](./lib/cmd/vite/media.js) | Copies media files to `public/media/`; `copyMedia` |
@@ -857,6 +908,20 @@ rewrites this one file wholesale, and any invocation that excludes it leaves the
 build pipeline with its own post-processing step over `public/css` (asset hashing, for example)
 must run after the *last* claycli invocation that includes `js`, or its own changes to this
 specific file are silently overwritten on the next one.
+
+### Lightning CSS in the styles step
+
+Lightning CSS 1.33 mishandles some valid CSS; write it this way instead (found by comparing
+every nymag/sites styleguide file against the old PostCSS + cssnano output):
+
+| Avoid | Because Lightning CSS | Write |
+|---|---|---|
+| `width: fit-content; width: -moz-fit-content` | keeps only the last value | prefixed value first, or no prefix |
+| `.a{x: y !important}` … `.a{x: z}` in one file | drops the `!important` when merging the rules | one declaration |
+| `font: …` then `font-variant-numeric` / `font-feature-settings` / `font-kerning` | prints `font` last, which resets them | longhands instead of `font` |
+| `font: …` with `font-stretch: condensed` | prints `font: 75% …` when minifying (invalid) | longhands instead of `font` |
+| unitless lengths (`margin: 25 0 12px`) | reads them as `px` (browsers ignore them) | a unit, or delete |
+| selector lists mixing vendor prefixes (`::-ms-input-placeholder, ::placeholder`, `_:future` Safari hacks) | splits them into one rule per selector, so each applies on its own | one rule per selector, `@supports` for hacks |
 
 ### Node globals in browser bundles
 
@@ -1521,7 +1586,7 @@ The app server (`scripts/local/start.js` + `amphora/renderers.js`) watches them:
 **Why CSS needs a full restart:** CSS output files have stable names (no content hash), so
 the browser caches the old version. A server restart changes the ETag, forcing a re-fetch.
 
-**TODO:** Once CSS migrates to Lightning CSS with content-hashed filenames, the
+**TODO:** Once CSS output gets content-hashed filenames, the
 `reload-signal` and the nodemon restart can be removed — the new URL naturally busts
 the cache, exactly as JS chunks do today.
 
@@ -1532,7 +1597,7 @@ the cache, exactly as JS chunks do today.
 | Step | `clay compile` | `clay vite` | Notes |
 |---|---|---|---|
 | **JS bundling** | ~30–60s | ~30s | Vite: Rollup 4 + esbuild pre-bundler |
-| **CSS** | ~15–30s (sequential) | ~31s (parallel, p-limit 50, 2845 files) | Same PostCSS plugins; bottleneck is bind-mount I/O |
+| **CSS** | ~15–30s (sequential) | ~2.6s (worker threads, 2,872 files; ~17s with cssnano) | Lightning CSS replaces autoprefixer + cssnano, which took ~2/3 of the old time |
 | **Templates** | ~40s (sequential) | ~16s (parallel, p-limit 20, async reads) | ~2.5× faster |
 | **Fonts/vendor/media** | ~2–5s | ~1s | Direct fs-extra copy vs Gulp stream overhead |
 | **Total (full build)** | **~60–120s** | **~60s** | **~2× faster overall** |
@@ -1584,7 +1649,7 @@ the cache, exactly as JS chunks do today.
 | `gulp`, `highland`, `through2` | `@rollup/plugin-commonjs` |
 | `browserify-cache-api` | `@rollup/plugin-node-resolve` |
 | `browserify-extract-registry`, `browserify-extract-ids` | `@vue/component-compiler-utils` |
-| `browserify-global-pack`, `bundle-collapser` | `p-limit`, `cssnano` |
+| `browserify-global-pack`, `bundle-collapser` | `p-limit`, `lightningcss` |
 | `uglifyify`, `gulp-changed`, `gulp-replace`, `gulp-babel` | |
 | `gulp-group-concat`, `gulp-cssmin`, `gulp-if`, `gulp-rename` | |
 | `detective-postcss` | |
@@ -1610,7 +1675,7 @@ smaller `node_modules`, reduced supply-chain attack surface.
 
 **What's the same:**
 - `claycli.config.js` is the single configuration entry point
-- CSS uses the same PostCSS plugins with the same API (`stylesConfig`)
+- CSS source syntax and the `stylesConfig` hook are the same (Lightning CSS replaces autoprefixer and cssnano)
 - Output file locations and naming conventions are the same
 - `resolveMedia.js` integration is the same pattern (call a function, get script paths)
 
