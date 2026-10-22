@@ -209,6 +209,10 @@ Imports data into Clay from `stdin`. Data may be in _dispatch_ or _bootstrap_ fo
 
 The `publish` argument will trigger a publish of the pages and / or components you're importing. Note that the generated url of an imported page might be different than its original url, depending on your Clay url generation / publishing logic.
 
+With `publish`, every item is written first, and the publishes run after the last item is in: components and layouts first, then pages. Publishing a page makes Clay read every component and layout the page uses, so a page is never published before those exist. An item whose own write failed is not published.
+
+`clay import` exits with code `1` if any item fails to import or publish. The failures are listed under the summary, so a script (or CI step) that imports pages can tell a partial import from a complete one.
+
 ### Arguments
 
 * `-k, --key` allows specifying an api key or alias
