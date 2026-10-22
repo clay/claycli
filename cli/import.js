@@ -69,6 +69,12 @@ function handler(argv) {
           return { success: false, message: 'Imported 0 uris (´°ω°`)' };
         }
       })(results);
+
+      // a failed item is reported as a result, not thrown, so without this an import that lost
+      // pages still exits 0 and scripts (CI included) carry on as if everything landed
+      if (_.some(results, { type: 'error' })) {
+        process.exitCode = 1;
+      }
     });
 }
 

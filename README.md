@@ -209,6 +209,10 @@ Imports data into Clay from `stdin`. Data may be in _dispatch_ or _bootstrap_ fo
 
 The `publish` argument will trigger a publish of the pages and / or components you're importing. Note that the generated url of an imported page might be different than its original url, depending on your Clay url generation / publishing logic.
 
+With `publish`, every item is written first, and the publishes run after the last item is in: components and layouts first, then pages. Publishing a page makes Clay read every component and layout the page uses, so a page is never published before those exist. An item whose own write failed is not published.
+
+`clay import` exits with code `1` if any item fails to import or publish. The failures are listed under the summary, so a script (or CI step) that imports pages can tell a partial import from a complete one.
+
 ### Arguments
 
 * `-k, --key` allows specifying an api key or alias
@@ -401,6 +405,7 @@ Copy component, layout, styleguide, and site-specific media files from their sou
 * `layouts/<name>/media/` are referenced by layout templates and get copied to `public/media/layouts/<name>/`
 * `styleguides/<name>/media/` are referenced by that styleguide's CSS and get copied to `public/media/stylesguides/<name>/`
 * `sites/<name>/media/` are favicons and other site-specific icons that are referenced by particular components in the `<head>` of pages. They get copied to `public/media/sites/<name>/`
+* `sites/<name>/subsites/<subsite>/media/` get copied to `public/media/sites/<name>/<subsite>/`, which is where a subsite's slug (`<name>/<subsite>`) points. A subsite inherits all of its parent site's media (`sites/<name>/media/`) and can override any of it with a file of the same name in its own `media/` folder. `clay vite` writes the same `public/media/sites/<name>/<subsite>/` files, and its overrides always win
 
 #### Arguments
 
