@@ -19,6 +19,7 @@
 7. [Running Both Side-by-Side](#7-running-both-side-by-side)
 8. [Code References](#8-code-references)
    - [CommonJS conversion in browser bundles](#commonjs-conversion-in-browser-bundles)
+   - [Build output stability](#build-output-stability)
    - [Why `_globals-init.js` exists as a separate file](#why-_globals-initjs-exists-as-a-separate-file)
    - [Why the build runs in two passes](#why-the-build-runs-in-two-passes)
    - [How client-env.json is generated](#how-client-envjson-is-generated)
@@ -1044,6 +1045,45 @@ If the check fires:
 - **Otherwise:** `@rollup/plugin-commonjs` mis-converted the module. Check for a newer plugin
   release, or alias the package to a browser/ESM build.
 
+### Build output stability
+
+Every chunk's file name carries a hash of its content, and each importer embeds its dependencies'
+names. A file whose bytes change between two builds of the same source therefore renames every
+chunk above it, and readers download those chunks again on the next deploy.
+
+These no longer vary between builds:
+
+| What used to vary | Now |
+|---|---|
+| `_kiln-plugins.css` was written in the order the `.vue` transforms finished, and both passes' writes could overlap | One entry per `.vue` file, written in path order; writes queued |
+| A build timestamp in the generated `.clay/*.js` entries, which source maps embed (`sourcesContent`) | Removed |
+| glob 10 returns files in directory-read order (reverse alphabetical on macOS APFS, hash order on Linux ext4), which set the import order of `global/js/*.js`, `model.js`, `kiln.js` and `client.js` files and the order of the template and font bundles | Sorted by path |
+
+So `global/js/*.js` runs in path order (`aaa-module-mounting.js` first) on every machine.
+
+**Known exception.** `@rollup/plugin-commonjs`'s `strictRequires: 'auto'` wraps a CommonJS module in
+a lazy `requireX()` when it is only required conditionally (inside a function, an `if` branch,
+`a && require(…)`, a `try`), and decides that when the module's own transform starts. A module
+required conditionally in one file and unconditionally in another is therefore wrapped or not
+depending on which file was processed first. On nymag/sites this changes the edit-mode Kiln
+bundle (`pyxis-frontend`, required inside the `services/kiln/index.js` init function and at the top
+of an Agora `.vue` file, is one example) on about every other build. View chunks were identical in
+all 12 clean builds measured. The Kiln bundle is a single file that nothing imports, so its churn
+renames only itself. To remove a specific case, require the module the same way everywhere, for
+example at the top of the file that requires it inside a function.
+
+claycli does not force this. `strictRequires: true` would make it deterministic but changes when
+every CommonJS module runs. Checking the decision against the complete require graph and
+rebuilding when it raced was measured at about 13 s more per nymag/sites build. Both go away as
+the code moves to ESM.
+
+To check a site, build twice from clean and compare:
+
+```bash
+rm -rf public .clay && npx clay vite && mv public /tmp/build-1
+rm -rf public .clay && npx clay vite && diff -r /tmp/build-1 public && echo identical
+```
+
 ### Why `_globals-init.js` exists as a separate file
 
 Clay's `global/js/*.js` files are **side-effect modules** — they set up `window.DS`,
@@ -1054,6 +1094,7 @@ In the old Browserify pipeline this ordering was implicit: all global scripts we
 synchronously into the bundle before any component code, so order was guaranteed by the
 file-system sort order (hence `aaa-module-mounting.js` — the `aaa` prefix forces it first
 lexicographically). There was nothing to configure; the bundler handled it by construction.
+`_globals-init.js` imports them in the same path order (see [Build output stability](#build-output-stability)).
 
 In Vite's ESM model, all component `client.js` files are loaded via **dynamic `import()`**
 inside the bootstrap. Dynamic imports are async — they return a Promise and do not block
@@ -1637,6 +1678,7 @@ Tests for the Vite pipeline live in the same location as other claycli tests:
 ```
 lib/cmd/vite/
 ├── scripts.test.js        ← unit tests for config helpers, buildAll, watch, signal writes
+├── determinism.test.js    ← real build, twice, with transforms finishing in opposite orders; output must match
 ├── plugins/
 │   ├── browser-compat.test.js
 │   ├── service-rewrite.test.js
