@@ -90,7 +90,7 @@ clay compile
 clay compile --watch
 ```
 
-### New pipeline (Vite + PostCSS 8)
+### New pipeline (Vite + Lightning CSS)
 
 ```bash
 # One-shot build
@@ -159,7 +159,7 @@ clay compile
 the components on the page. `_client-init.js` then calls `window.require(key)` for every
 `.client` module in `window.modules` — even if that component's DOM element is absent.
 
-### New: `clay vite` (Vite + PostCSS 8)
+### New: `clay vite` (Vite + Lightning CSS)
 
 ```
 clay vite
@@ -175,7 +175,7 @@ clay vite
 │       ├── Entry: .clay/_kiln-edit-init.js ← generated, registers all model.js + kiln.js
 │       └── Single output file: .clay/_kiln-edit-init-[hash].js
 │
-├── styles.js   ← PostCSS 8 source plugins → Lightning CSS (prefixes, minify), worker threads
+├── styles.js   ← Lightning CSS (imports, nesting, tokens, prefixes, minify), worker threads
 │   └── styleguides/**/*.css → public/css/{component}.{styleguide}.css
 │
 ├── templates.js← Handlebars precompile (parallel, p-limit 20, progress-tracked)
@@ -235,7 +235,7 @@ flowchart LR
     classDef fast  fill:#14532d,color:#86efac,stroke:#166534
 ```
 
-**⚡ New — `clay vite` (Vite + PostCSS 8, ~60s)**
+**⚡ New — `clay vite` (Vite + Lightning CSS, ~60s)**
 
 ```mermaid
 %%{init: {'flowchart': {'nodeSpacing': 60, 'rankSpacing': 70, 'padding': 20}}}%%
@@ -244,7 +244,7 @@ flowchart LR
 
     N0["🖼 Media<br/>fs-extra · ~0.7 s"]:::fast
     N1["📦 JS + Vue<br/>Vite/Rollup · ~30 s"]:::med
-    N2["🎨 CSS<br/>PostCSS 8 + Lightning CSS · ~3 s"]:::fast
+    N2["🎨 CSS<br/>Lightning CSS · ~1 s"]:::fast
     N3["📄 Templates<br/>Handlebars · ~16 s"]:::med
     N4["🔤 Fonts + 📚 Vendor<br/>fs-extra · ~1 s"]:::fast
 
@@ -266,7 +266,7 @@ flowchart LR
 | **Total time** | ~60–120s | ~60s | **~2× faster** |
 | **Execution** | Sequential — each step waits | Parallel — all steps run simultaneously after media | ⚠️ Different shape; same end result |
 | **JS tool** | Browserify + Babel (megabundles) | Vite (Rollup 4 + manualChunks) | 🔄 Replaced |
-| **CSS tool** | Gulp + PostCSS 7 (autoprefixer, cssnano) | PostCSS 8 source plugins + Lightning CSS (prefixes, minify) in worker threads | 🔄 Replaced; same source syntax and `stylesConfig` hook |
+| **CSS tool** | Gulp + PostCSS 7 (autoprefixer, cssnano) | Lightning CSS (imports, nesting, design tokens, prefixes, minify) in worker threads | 🔄 Replaced; standard CSS (the PostCSS syntax with `pipeline: 'postcss'`, deprecated), same `stylesConfig` hook |
 | **Module graph** | `_registry.json` + `_ids.json` | `_manifest.json` (human-readable) | ⚠️ Different format; same purpose |
 | **Component loader** | `_client-init.js` — calls `window.require()` on every `.client` module (executing its body and dependency graph), then DOM-checks before invoking the exported controller | `vite-bootstrap.js` — scans the DOM first; only `import()`s a `.client` module if its element exists | ✅ Better; module body never executes for components absent from the page |
 | **JS output** | Per-component files + alpha-bucket dep files | Dynamic import splits + `chunks/` shared deps | ✅ Better; shared deps cached once |
@@ -621,7 +621,9 @@ module.exports.bundlerConfig = function(config) {
 [Lightning CSS](https://lightningcss.dev/). The files are standard CSS:
 
 - **`@import`** at the top of a file, found next to the file and then in `importPaths`
-  (`.css` optional). A file is included once per output file, where it's first imported.
+  (`.css` optional). A file is included once per output file, where it's first imported. An
+  `@import` of another site (`https://…`, `//…`) stays an `@import`. A file with an unclosed
+  block, comment or string fails, since files are joined before parsing.
 - **Nesting** (`.a { &:hover {} .b {} @media … {} }`). It's written out flat at build time, the
   way postcss-nested did, so the minifier can still merge the rules it produces. `&` stands
   for the parent selector, as in the CSS spec; where the spec's meaning (`:is(<parent>)`)
@@ -631,9 +633,13 @@ module.exports.bundlerConfig = function(config) {
 - **Design tokens**: `var(--color-black)` is replaced by the token's value at build time, from
   [DTCG](https://www.designtokens.org/) JSON files (`tokens`; by default
   `styleguides/_default/tokens.json`): `{ "color": { "black": { "$value": "#000" } } }` is
-  `--color-black`. A `var()` that isn't a token (or has a fallback) is left for the browser.
-- **`$asset-host`** (and `$asset-path`) at the start of a `url()` are filled in from
-  `CLAYCLI_COMPILE_ASSET_HOST` / `CLAYCLI_COMPILE_ASSET_PATH`.
+  `--color-black`. A `var()` that isn't a token (or has a fallback) is left for the browser; one
+  a couple of letters off a token, and not set anywhere in the file, is an error (`Unknown
+  design token --color-blakc (did you mean --color-black?)`). `--watch` rebuilds every file
+  when a token file changes.
+- **`$asset-host`** (and `$asset-path`, also written `$(asset-host)`) are filled in from
+  `CLAYCLI_COMPILE_ASSET_HOST` / `CLAYCLI_COMPILE_ASSET_PATH`: in `url()`s and `image-set()`
+  strings, anywhere but comments.
 
 The `stylesConfig` hook mutates this object:
 
@@ -647,11 +653,14 @@ The `stylesConfig` hook mutates this object:
 | `lightningcssOptions` | `{}` | Extra options for Lightning CSS [`transform()`](https://lightningcss.dev/transforms.html) (`drafts`, `include`/`exclude`, `visitor`, …). `targets` and `minify` set here win over the computed ones |
 | `minify` | `--minify` or `CLAYCLI_COMPILE_MINIFIED` | Minify. Unminified output is pretty-printed (comments are not kept) |
 
-A file with PostCSS syntax fails to build in the default pipeline, naming the file and what it
-found. nymag/sites moved its styleguides to standard CSS with a codemod; see "Moving to
-standard CSS" under [Lightning CSS in the styles step](#lightning-css-in-the-styles-step).
+A file with PostCSS syntax fails to build in the default pipeline: `$variable:` definitions,
+`@mixin`, `@define-mixin` and `@at-root` name the file and what was found; a `$variable` used in
+a value, or `&-suffix`, is invalid CSS and fails like any other. nymag/sites moved its
+styleguides to standard CSS with a codemod; see "Moving to standard CSS" under
+[Lightning CSS in the styles step](#lightning-css-in-the-styles-step).
 
-`autoprefixerOptions` is ignored (with a warning): autoprefixer does not run.
+`autoprefixerOptions` is ignored (with a warning): autoprefixer does not run. So are `plugins`
+outside `pipeline: 'postcss'` (with a warning), and any other `pipeline` value is an error.
 
 **Browserslist is a floor, not a usage share.** Lightning CSS prints newer syntax and drops
 fallbacks once every target supports them, so the targets must be the oldest browsers you
@@ -860,6 +869,11 @@ with `clay compile`, so the two pipelines can't silently diverge on Kiln plugin 
 
 ### Kiln plugin PostCSS chain
 
+> With the default `pipeline: 'lightningcss'`, Kiln plugin `<style>` blocks go through the styles
+> step's Lightning CSS compiler (nesting, design tokens, targets, minification; invalid CSS fails
+> the build, at the `.vue` file's line), then Vue's scoping. Everything below applies to the
+> deprecated `pipeline: 'postcss'` (and to `clay compile`).
+
 Kiln plugins are the modals, pickers, and panels a site adds to Kiln's editing UI, authored as
 Vue 2 SFCs under `services/kiln/`. Their `<style>` blocks are compiled by a PostCSS chain that is
 **not** the same one `clay vite`'s component-CSS step ([`lib/cmd/vite/styles.js`](./lib/cmd/vite/styles.js))
@@ -968,8 +982,11 @@ is worked around there. Tokens are replaced in the text rather than with Lightni
 `#0000`).
 
 **Moving to standard CSS.** nymag/sites' styleguides were migrated with a codemod
-(`scripts/css-migration/` in that repo), checked by building every file with both pipelines and
-comparing the output byte for byte, then per selector where the bytes differ.
+(`scripts/css-migration/` in that repo), checked by building every file with both pipelines:
+2,788 of 2,872 output files are byte-identical; for the other 84 every selector ends up with the
+same declarations at 18 screen widths from 320 to 1920 px (83 restate values that
+postcss-simple-vars used to leak from a file into the nested rules of a file it imported, 1
+differs in whitespace that Lightning CSS keeps as written).
 
 ### Node globals in browser bundles
 
