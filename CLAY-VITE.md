@@ -1292,7 +1292,7 @@ What claycli does not guarantee:
 - Any order between function exports.
 - The order in which modules' top-level code runs, so one component must not rely on a global that
   another component's top-level code sets.
-- Lookups whose name is not a string literal, such as `DS.get(name, el)`. The build cannot tell
+- Lookups whose name is not a plain string literal, such as `DS.get(name, el)` or `DS.get('ad-' + kind, el)`. The build cannot tell
   which component they need. It prints a warning naming the files; use a literal name, or import the
   module directly.
 
