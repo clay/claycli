@@ -3,7 +3,7 @@ name: CI
 on:
   push:
     branches:
-      - '**'
+      - master
     tags:
       - '**'
   pull_request:
@@ -18,33 +18,30 @@ permissions:
 
 jobs:
   test:
-    name: Test (Node ${{ matrix.node-version }})
+    name: Lint and test (Node 26)
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        node-version: [18, 20, 22]
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          node-version: ${{ matrix.node-version }}
+          persist-credentials: false
+
+      # .nvmrc is the one place the Node version is set (26.12.1: the first 26.x
+      # with the October 2026 security fixes), shared with local development
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
           cache: npm
-          cache-dependency-path: package-lock.json
 
-      - name: Install dependencies
-        run: npm ci --legacy-peer-deps
+      # --legacy-peer-deps: the Browserify and webpack plugins still pin old peer ranges
+      - run: npm ci --legacy-peer-deps
 
-      - name: Run tests
-        run: npm test
+      - run: npm test
 
       - name: Upload coverage to Coveralls
-        if: success() && matrix.node-version == 20
-        uses: coverallsapp/github-action@v2
+        if: success()
+        uses: coverallsapp/github-action@8d6379e14d29928660c4ba802d8e85393440b329 # v2.3.8
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path-to-lcov: coverage/lcov.info
         continue-on-error: true
-
