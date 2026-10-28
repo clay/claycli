@@ -455,7 +455,7 @@ records every component/layout `client.js` chunk under `components/<name>/client
 | **Source plugins** | postcss-import, postcss-mixins, postcss-simple-vars, postcss-nested | Same plugins, then any `stylesConfig` `plugins` |
 | **Vendor prefixes** | autoprefixer | Lightning CSS, for the oldest browsers in the project's browserslist (see [Configuration](#stylesconfig-css)) |
 | **Minification** | cssnano (when `CLAYCLI_COMPILE_MINIFIED` set) | Lightning CSS (same flag) |
-| **Concurrency** | Sequential per-file | Worker threads (one per core minus one, up to 8; main thread for small builds and watch rebuilds) |
+| **Concurrency** | Sequential per-file | Worker threads (one per available CPU minus one, up to 8; main thread for small builds, 2 CPUs or fewer, and watch rebuilds) |
 | **Error handling** | Stream error halts entire pipeline | Every file compiles and every error is logged, then the step fails |
 | **Invalid CSS** | Passed through (cssnano sometimes rewrites it) | Fails the build, naming the source file and line |
 | **Output format** | `public/css/{component}.{styleguide}.css` | Same names; not byte-identical to `clay compile` |
@@ -641,9 +641,16 @@ The stylesConfig hook runs on the main thread and again in every worker thread, 
 plugin instances and Lightning CSS visitors cannot be sent between threads. Keep it free of
 side effects.
 
-`CLAYCLI_VITE_CSS_WORKERS=<n>` sets the number of worker threads (`0` compiles on the main
-thread). By default a full build uses one per core minus one, up to 8, and builds under 200
-files and `--watch` rebuilds of a changed component compile on the main thread.
+By default a full build uses one worker per available CPU minus one, up to 8. Builds under 200
+files, builds with 2 CPUs or fewer (one worker only moves the work to another thread), and
+`--watch` rebuilds of a changed component compile on the main thread. A container's CPU quota
+(Docker `--cpus`, a Kubernetes CPU limit) counts as its CPUs. Measured on a 2-CPU quota, 8 workers
+made the full build ~9% slower than compiling on the main thread (the workers took CPU from the js
+step); with 4 or more CPUs, anything from 3 to 13 workers finished within a couple of seconds of
+each other.
+
+`CLAYCLI_VITE_CSS_WORKERS=<n>` overrides the default with an exact number of worker threads
+(`0` compiles on the main thread).
 
 CSS that Lightning CSS cannot parse (and browsers ignore) is an error, reported once per source
 location, for example
