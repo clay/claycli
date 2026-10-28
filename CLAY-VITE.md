@@ -52,7 +52,7 @@ the 2014–2018 JavaScript ecosystem. Over time these became pain points:
 | `browserify-cache.json` stale cache risk | Corrupted cache silently served old module code |
 | 20+ npm dependencies just for bundling | Large attack surface, slow installs, difficult version management |
 
-The new `clay vite` pipeline replaces Browserify/Gulp with **Vite 5 + PostCSS 8 + Lightning CSS**:
+The new `clay vite` pipeline replaces Browserify/Gulp with **Vite 7 + PostCSS 8 + Lightning CSS**:
 
 - **Vite** uses Rollup 4 internally for production builds and a well-maintained plugin
   ecosystem. We use Vite exclusively for its **production build** — the Vite dev server and
@@ -424,7 +424,7 @@ records every component/layout `client.js` chunk under `components/<name>/client
 
 | Aspect | `clay compile` (Browserify) | `clay vite` (Vite + Rollup) |
 |---|---|---|
-| **Bundler** | Browserify 17 + babelify | Vite 5 (Rollup 4 production, esbuild pre-bundler) |
+| **Bundler** | Browserify 17 + babelify | Vite 7 (Rollup 4 production, esbuild pre-bundler) |
 | **Transpilation** | Babel (preset-env) | esbuild native (ES2017 target) |
 | **Vue SFCs** | `@nymag/vueify` Browserify transform | `viteVue2Plugin` (same `vue-template-compiler`) |
 | **Bundle strategy** | Per-component + alpha-bucket dep bundles | Dynamic import splits + `manualChunks` shared deps |
@@ -1052,9 +1052,9 @@ runs.
 
 #### claycli runs its own `@rollup/plugin-commonjs`, not Vite's
 
-Vite 5 bundles `@rollup/plugin-commonjs` 26.x. That copy skips any `if` branch whose test it
-thinks is always false, and it gets `<unknown> || false` wrong: it treats it as always false.
-claycli's `process.browser` define produces exactly that test in
+Vite bundles its own `@rollup/plugin-commonjs` (26.x in Vite 5, 29.0.x in Vite 7). That copy
+skips any `if` branch whose test it thinks is always false, and it gets `<unknown> || false`
+wrong: it treats it as always false. claycli's `process.browser` define produces exactly that test in
 `randomfill/browser.js` (a crypto-browserify dependency):
 
 ```js
