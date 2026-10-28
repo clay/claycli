@@ -670,6 +670,7 @@ non-zero and `--watch` keeps running.
 | `clientFilesESM` | `false` | Switch to native Rollup `experimentalMinChunkSize` when client JS is fully ESM |
 | `kilnSplit` | `false` | Collapse two-pass build into one graph when model/kiln JS is fully ESM |
 | `define` | `{}` | Extra identifier replacements merged on top of built-ins |
+| `nodeEnv` | `process.env.NODE_ENV`, else `'development'` | The build-time `process.env.NODE_ENV` literal that library guards fold to, read once per build |
 | `alias` | `{}` | Module specifier redirects — equivalent to Vite's `resolve.alias` |
 | `sourcemap` | `true` | Emit `.js.map` files. Set to `false` in CI where source maps are not consumed |
 | `plugins` | `[]` | Extra Rollup/Vite plugins appended after built-ins |
