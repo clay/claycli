@@ -679,6 +679,33 @@ Notes:
 - Invalid values are rejected by the CLI with a clear error.
 - `--only all` is equivalent to a normal full build.
 
+#### `clay vite --only js --changed`
+
+```bash
+# One component script changed: rebuild only the view pass
+clay vite --only js --changed components/global-nav/client.js
+
+# A model and a Kiln plugin changed: rebuild only the Kiln pass, then delete leftover chunks
+clay vite --only js --changed components/article/model.js,services/kiln/plugins/x/index.vue --clean
+```
+
+The JS step is two independent Rollup passes. The **view** pass bundles the bootstrap and every
+component and layout `client.js` into chunks. The **Kiln** pass bundles every `model.js`,
+`kiln.js` and Kiln plugin into one file. Most edits feed only one of them. After every pass
+`clay vite` records which project modules the pass bundled, and which files it wrote, in
+`.clay/vite-deps.json`; `--changed` looks each file up there and runs only the pass(es) that
+bundled it. On a large site this is about 6.5 s and 1.4 GB for the view pass or 9.5 s and 1.7 GB for
+the Kiln pass, against about 15 s and 2.2 GB for both.
+
+Notes:
+
+- The other pass's entries in `_manifest.json` and its env names in `client-env.json` are kept as they were.
+- Both passes run when a file is in neither (a new file, or one only read through a glob), when no earlier build left `.clay/vite-deps.json`, or when there is no manifest. The shortcut only skips work that cannot change the output.
+- Entry files (`.clay/vite-bootstrap.js` and friends) are always regenerated, so adding or removing a component is picked up.
+- Paths may be absolute or project-relative. Dependency changes (anything in `node_modules`) are not tracked: reinstall and run a full build.
+- Rollup never deletes the previous build's hashed files, and production relies on that (see "assets are never pruned" below). `--clean` is opt-in: it deletes only files in `public/js/chunks` and `public/js/.clay` that neither pass's last build wrote, and does nothing unless both passes are recorded.
+- `kilnSplit: true` builds one pass, so `--changed` changes nothing there.
+
 ### How to switch pipelines in the Dockerfile
 
 ```dockerfile

@@ -891,7 +891,7 @@ compile.scripts.getDependencies(scripts, assetPath, { edit, minify });
 ## Vite
 
 ```bash
-clay vite [--watch] [--minify] [--only <comma-separated step names>] [--entry <path>]
+clay vite [--watch] [--minify] [--only <comma-separated step names>] [--changed <files>] [--clean] [--entry <path>]
 ```
 
 `clay vite` is a newer asset pipeline, built on Vite + Rollup, that can run alongside or in place
@@ -914,6 +914,8 @@ migration guide.
 * `-w, --watch` enables watching of source files after compilation
 * `-m, --minify` enables minification and bundling of source files
 * `-o, --only` restricts the build to specific steps (`js`, `styles`, `fonts`, `templates`, `vendor`, `media`, or `all`) — see `CLAY-VITE.md` for step interactions and `--only` behavior
+* `--changed` with the `js` step rebuilds only the Vite pass(es) that bundle these files (project-relative paths, comma-separated or repeated) — see `CLAY-VITE.md`
+* `--clean` after the `js` step deletes files in `public/js/chunks` and `public/js/.clay` that the last builds did not write
 * `-e, --entry` overrides the default bootstrap entry path
 
 #### Examples
@@ -930,4 +932,7 @@ clay vite --minify
 
 # build only the JS and templates steps
 clay vite --only js,templates
+
+# rebuild only the JS pass a changed file feeds (about half the time and memory of a full JS build)
+clay vite --only js --changed components/global-nav/client.js
 ```
