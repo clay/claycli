@@ -707,6 +707,8 @@ Notes:
 - `kilnSplit: true` builds one pass, so `--changed` changes nothing there; `--clean` still works.
 - `clay vite --watch` rewrites the outputs without keeping the index up to date, so it removes `.clay/vite-deps.json`; the first `--changed` build after a watch session runs both passes and records a new index.
 - A build writes the index last, after the manifest and `client-env.json`, and removes the old one just before it starts writing them. An index on disk therefore always describes a finished build: one that stops halfway leaves none.
+- `public/css/_kiln-plugins.css` holds the style blocks of the `.vue` files of both passes (Vue apps on public pages in the view pass, Kiln plugins in the Kiln pass), and the Vue plugin writes it from what its own process transformed. The index therefore keeps each pass's blocks, and a partial build puts the skipped pass's blocks back before the plugin writes the file, so it ends up the same as after a full build.
+- A partial build only skips a pass whose output is all still there: `_manifest.json` must parse and hold that pass's entry, and every file the index recorded for the pass must exist. Otherwise both passes run.
 
 ### How to switch pipelines in the Dockerfile
 
