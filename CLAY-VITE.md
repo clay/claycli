@@ -700,11 +700,13 @@ the Kiln pass, against about 15 s and 2.2 GB for both.
 Notes:
 
 - The other pass's entries in `_manifest.json` are kept as they were. `client-env.json` is rewritten from the names of both passes: the pass that ran replaces its own (a name nothing reads any more drops out) and the other pass keeps its names.
-- Both passes run when a file is in neither (a new file, or one only read through a glob), when no earlier build left `.clay/vite-deps.json` (or it has no env names, as one from an earlier claycli), when there is no manifest, or when the build config differs from the last build's. The index keeps a fingerprint of the resolved bundler config, `NODE_ENV` and the claycli version, so for example adding `--minify` rebuilds both passes. The shortcut only skips work that cannot change the output.
+- Both passes run when a file is in neither (a new file, or one only read through a glob), when no earlier build left `.clay/vite-deps.json` (or it has no env names, as one from an earlier claycli), when there is no manifest, or when the build config differs from the last build's. The index keeps a fingerprint of the resolved bundler config, `NODE_ENV`, `CLAYCLI_COMPILE_MINIFIED` (the Vue plugin compiles in production mode when it is set), the installed dependencies and the claycli version, so for example adding `--minify` or reinstalling packages rebuilds both passes. The shortcut only skips work that cannot change the output.
 - Entry files (`.clay/vite-bootstrap.js` and friends) are always regenerated, so adding or removing a component is picked up.
-- Paths may be absolute or project-relative. Dependency changes (anything in `node_modules`) are not tracked: reinstall and run a full build.
+- Paths may be absolute or project-relative. A reinstall is noticed through the record the package manager leaves in `node_modules` (npm's `.package-lock.json`, Yarn's `.yarn-integrity`, pnpm's `.modules.yaml`) and rebuilds both passes; where none of those exists, run a full build after changing dependencies.
 - Rollup never deletes the previous build's hashed files, and production relies on that (see "assets are never pruned" below). `--clean` is opt-in: it deletes only files in `public/js/chunks` and `public/js/.clay` that no pass's last build wrote, and does nothing unless every pass of the build is recorded in the index (both passes, or the one pass under `kilnSplit`).
 - `kilnSplit: true` builds one pass, so `--changed` changes nothing there; `--clean` still works.
+- `clay vite --watch` rewrites the outputs without keeping the index up to date, so it removes `.clay/vite-deps.json`; the first `--changed` build after a watch session runs both passes and records a new index.
+- A build writes the index last, after the manifest and `client-env.json`, and removes the old one just before it starts writing them. An index on disk therefore always describes a finished build: one that stops halfway leaves none.
 
 ### How to switch pipelines in the Dockerfile
 
