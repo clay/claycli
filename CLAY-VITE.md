@@ -692,15 +692,15 @@ clay vite --only js --changed components/article/model.js,services/kiln/plugins/
 The JS step is two independent Rollup passes. The **view** pass bundles the bootstrap and every
 component and layout `client.js` into chunks. The **Kiln** pass bundles every `model.js`,
 `kiln.js` and Kiln plugin into one file. Most edits feed only one of them. After every pass
-`clay vite` records which project modules the pass bundled, and which files it wrote, in
-`.clay/vite-deps.json`; `--changed` looks each file up there and runs only the pass(es) that
-bundled it. On a large site this is about 6.5 s and 1.4 GB for the view pass or 9.5 s and 1.7 GB for
+`clay vite` records which project modules the pass bundled, which files it wrote and which env
+names its code reads in `.clay/vite-deps.json`, together with a fingerprint of the build config;
+`--changed` looks each file up there and runs only the pass(es) that bundled it. On a large site this is about 6.5 s and 1.4 GB for the view pass or 9.5 s and 1.7 GB for
 the Kiln pass, against about 15 s and 2.2 GB for both.
 
 Notes:
 
-- The other pass's entries in `_manifest.json` and its env names in `client-env.json` are kept as they were.
-- Both passes run when a file is in neither (a new file, or one only read through a glob), when no earlier build left `.clay/vite-deps.json`, or when there is no manifest. The shortcut only skips work that cannot change the output.
+- The other pass's entries in `_manifest.json` are kept as they were. `client-env.json` is rewritten from the names of both passes: the pass that ran replaces its own (a name nothing reads any more drops out) and the other pass keeps its names.
+- Both passes run when a file is in neither (a new file, or one only read through a glob), when no earlier build left `.clay/vite-deps.json` (or it has no env names, as one from an earlier claycli), when there is no manifest, or when the build config differs from the last build's. The index keeps a fingerprint of the resolved bundler config, `NODE_ENV` and the claycli version, so for example adding `--minify` rebuilds both passes. The shortcut only skips work that cannot change the output.
 - Entry files (`.clay/vite-bootstrap.js` and friends) are always regenerated, so adding or removing a component is picked up.
 - Paths may be absolute or project-relative. Dependency changes (anything in `node_modules`) are not tracked: reinstall and run a full build.
 - Rollup never deletes the previous build's hashed files, and production relies on that (see "assets are never pruned" below). `--clean` is opt-in: it deletes only files in `public/js/chunks` and `public/js/.clay` that neither pass's last build wrote, and does nothing unless both passes are recorded.
@@ -1256,15 +1256,18 @@ Two problems:
 
 #### The new way — Rollup transform hook (effectively free)
 
-`createClientEnvCollector` in `lib/cmd/vite/plugins/client-env.js` returns a pair:
+`createClientEnvCollector` in `lib/cmd/vite/plugins/client-env.js` returns three functions:
 
 - **`plugin()`** — a Rollup plugin whose `transform` hook scans each module as Rollup
   already processes it.  No extra file I/O — the source is already in memory.
-- **`write()`** — flushes the accumulated Set to `client-env.json` after all passes complete.
+- **`names()`** — the sorted names collected so far, without writing anything.
+- **`write()`** — flushes the accumulated Set to `client-env.json`.
 
-Both the view pass and the kiln pass receive their own plugin instance from the same
-collector, so a single `write()` call covers `process.env` references from both
-`client.js` files and `model.js`/`kiln.js` files.
+In watch mode both passes receive their own plugin instance from the same collector, so a
+single `write()` call covers `process.env` references from both `client.js` files and
+`model.js`/`kiln.js` files.  The one-shot build gives each pass its own collector and writes
+the union of their `names()` (kept per pass in `.clay/vite-deps.json`), so a partial
+`--changed` build can replace one pass's names without touching the other's.
 
 The scope boundary is now the Rollup module graph: only files that are actually imported
 (directly or transitively) by `vite-bootstrap.js` or `_kiln-edit-init.js` contribute to

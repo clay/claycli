@@ -914,7 +914,7 @@ migration guide.
 * `-w, --watch` enables watching of source files after compilation
 * `-m, --minify` enables minification and bundling of source files
 * `-o, --only` restricts the build to specific steps (`js`, `styles`, `fonts`, `templates`, `vendor`, `media`, or `all`) — see `CLAY-VITE.md` for step interactions and `--only` behavior
-* `--changed` with the `js` step rebuilds only the Vite pass(es) that bundle these files (project-relative paths, comma-separated or repeated) — see `CLAY-VITE.md`
+* `--changed` with the `js` step rebuilds only the Vite pass(es) that bundle these files (project-relative paths, comma-separated or repeated), and both when the build config changed since the last build — see `CLAY-VITE.md`
 * `--clean` after the `js` step deletes files in `public/js/chunks` and `public/js/.clay` that the last builds did not write
 * `-e, --entry` overrides the default bootstrap entry path
 
