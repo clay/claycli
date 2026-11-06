@@ -703,8 +703,8 @@ Notes:
 - Both passes run when a file is in neither (a new file, or one only read through a glob), when no earlier build left `.clay/vite-deps.json` (or it has no env names, as one from an earlier claycli), when there is no manifest, or when the build config differs from the last build's. The index keeps a fingerprint of the resolved bundler config, `NODE_ENV` and the claycli version, so for example adding `--minify` rebuilds both passes. The shortcut only skips work that cannot change the output.
 - Entry files (`.clay/vite-bootstrap.js` and friends) are always regenerated, so adding or removing a component is picked up.
 - Paths may be absolute or project-relative. Dependency changes (anything in `node_modules`) are not tracked: reinstall and run a full build.
-- Rollup never deletes the previous build's hashed files, and production relies on that (see "assets are never pruned" below). `--clean` is opt-in: it deletes only files in `public/js/chunks` and `public/js/.clay` that neither pass's last build wrote, and does nothing unless both passes are recorded.
-- `kilnSplit: true` builds one pass, so `--changed` changes nothing there.
+- Rollup never deletes the previous build's hashed files, and production relies on that (see "assets are never pruned" below). `--clean` is opt-in: it deletes only files in `public/js/chunks` and `public/js/.clay` that no pass's last build wrote, and does nothing unless every pass of the build is recorded in the index (both passes, or the one pass under `kilnSplit`).
+- `kilnSplit: true` builds one pass, so `--changed` changes nothing there; `--clean` still works.
 
 ### How to switch pipelines in the Dockerfile
 
