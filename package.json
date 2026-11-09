@@ -115,7 +115,7 @@
     "exports-loader": "^3.0.0",
     "fs-extra": "^9.1.0",
     "get-stdin": "^8.0.0",
-    "glob": "^10.0.0",
+    "glob": "^14.0.2",
     "gulp": "^4.0.2",
     "gulp-babel": "^8.0.0",
     "gulp-changed": "^4.0.2",
