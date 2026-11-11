@@ -176,7 +176,7 @@ clay vite
 │   └── styleguides/**/*.css → public/css/{component}.{styleguide}.css
 │
 ├── templates.js← Handlebars precompile (parallel, p-limit 20, progress-tracked)
-│   ├── components/**/template.hbs → public/js/*.template.js
+│   ├── components/**/template.hbs → public/js/_templates-{a-d,…,u-z}.js (6 files)
 │   ├── node_modules/clay-*/template.hbs (npm components, e.g. clay-kiln)
 │   └── layouts/**/template.hbs
 │
@@ -340,7 +340,7 @@ flowchart TB
     classDef output   fill:#14532d,color:#86efac,stroke:#166534
 ```
 
-**🔁 Same in both pipelines:** CSS (PostCSS plugins → `public/css/`) · Templates (Handlebars precompile → `public/js/*.template.js`) · Fonts (copy + concat → `public/fonts/`) · Media (copy → `public/media/`)
+**🔁 Same in both pipelines:** CSS (PostCSS plugins → `public/css/`) · Templates (Handlebars precompile → `public/js/`) · Fonts (copy + concat → `public/fonts/`) · Media (copy → `public/media/`)
 
 | Concern | `clay compile` | `clay vite` | Why it matters |
 |---|---|---|---|
@@ -472,7 +472,7 @@ records every component/layout `client.js` chunk under `components/<name>/client
 | **API** | Gulp stream | Direct `fs.readFile` / `hbs.precompile` |
 | **Sources** | `components/*`, npm components (`clay-*` dependencies, via `amphora-fs`), `layouts/**` | Same, with `components/**` globbed recursively |
 | **Concurrency** | Sequential per-file | Parallel with `p-limit(20)` |
-| **Output** | `public/js/{name}.template.js` | **Identical** |
+| **Output** | `public/js/{name}.template.js`, or six `_templates-*.js` files when minified | Six `_templates-*.js` files in every build (minified or not); leftover `{name}.template.js` files are removed |
 | **Error handling** | `process.exit(1)` on first error | Per-template error logged; build continues |
 
 ### Module / Script Resolution
@@ -1586,7 +1586,7 @@ the cache, exactly as JS chunks do today.
 |---|---|---|
 | **View mode** | ~31 script requests (bucketed dep files + init) | **~3–5 script requests** (bootstrap + globals + shared chunks) |
 | **Edit mode module scripts** | ~31 (same as view) | **~4–6 module scripts** (view mode + kiln-edit-init) |
-| **Edit mode total (+ templates)** | ~650 | **~624** (620 template scripts needed by Kiln) |
+| **Edit mode total (+ templates)** | ~650 | **~10–12** (module scripts + 6 template files) |
 
 ### Measured browser performance (NYMag Clay instance)
 
