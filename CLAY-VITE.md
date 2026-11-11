@@ -1309,6 +1309,46 @@ configure and no list to keep up to date.
 Do not put a function export and a `DS.controller` in the same file. `clay vite` calls only the
 function; `clay compile` runs both.
 
+#### Mounting components added after page load: the `clay:mount` event
+
+The bootstrap mounts what is on the page when it runs. If a page adds component HTML later
+(infinite scroll, a lazy-loaded recirc, a modal fetched from the server), insert it and then
+dispatch a bubbling `clay:mount` event from the container:
+
+```js
+container.insertAdjacentHTML('beforeend', html);
+container.dispatchEvent(new CustomEvent('clay:mount', { bubbles: true }));
+```
+
+To wait until mounting has finished, pass an object as `detail`; the bootstrap puts a promise on it:
+
+```js
+const detail = {};
+
+container.dispatchEvent(new CustomEvent('clay:mount', { bubbles: true, detail }));
+await detail.mounted;
+```
+
+- **What mounts:** the element the event is dispatched from, if it is a component, and every
+  component under it. Dispatched from `document`, it mounts any new components on the page.
+- **`detail.mounted`** resolves once every element has mounted or failed. It never rejects;
+  failures are reported the same way as on page load.
+- **Safe to send again.** Each element is mounted at most once, so dispatching from the same root
+  twice, from a root inside one already mounted, or from a root that was on the page at load does
+  not mount anything twice.
+- The same rules as page load apply: a legacy controller still waits for the controllers it looks
+  up, even if those elements are elsewhere on the page and not under the root.
+- **No guard needed.** Only the view-mode bootstrap (`vite-bootstrap.js`) listens. In edit mode or
+  under `clay compile` nobody listens, so the event does nothing and `detail.mounted` stays
+  `undefined`.
+- **Don't send it before the bootstrap runs.** Nothing is listening yet, so the event is lost.
+  You don't need to: HTML already in the document when the bootstrap runs is mounted with the page.
+- Each mount after page load records its own performance measure, `clay-components-2`,
+  `clay-components-3`, and so on. The page-load run keeps the name `clay-components`.
+
+Why an event and not a global function: component code can send it without checking which build
+or mode it is running under, and the page needs no new `window` property.
+
 ### Sticky events and the `stickyEvents` config key
 
 #### The problem — ESM dynamic-import race condition
