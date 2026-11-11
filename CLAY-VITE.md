@@ -1309,6 +1309,39 @@ configure and no list to keep up to date.
 Do not put a function export and a `DS.controller` in the same file. `clay vite` calls only the
 function; `clay compile` runs both.
 
+#### Mounting components added after page load: the `clay:mount` event
+
+The bootstrap mounts what is on the page when it runs. If a page adds component HTML later
+(infinite scroll, a lazy-loaded recirc, a modal fetched from the server), insert it and then
+dispatch a `clay:mount` event from the container:
+
+```js
+container.insertAdjacentHTML('beforeend', html);
+container.dispatchEvent(new CustomEvent('clay:mount'));
+```
+
+To wait until mounting has finished, pass an object as `detail`; the bootstrap puts a promise on it:
+
+```js
+const detail = {};
+
+container.dispatchEvent(new CustomEvent('clay:mount', { detail }));
+await detail.mounted;
+```
+
+- **What mounts:** the element the event is dispatched from, if it is a component, and every
+  component under it. From `document` or `window`, any new component on the page.
+- **Insert first, then dispatch.** An event from a detached node is lost. Components
+  inside a shadow root are not supported.
+- **`detail.mounted`** resolves once every element it covers has mounted or failed, including ones
+  another event is still mounting. It never rejects; failures are reported as on page load.
+- **Safe to send again.** An element is mounted once. It is tried again only if its module failed
+  to load.
+- **No guard needed.** Only the view-mode bootstrap listens. In edit mode or under `clay compile`
+  the event does nothing and `detail.mounted` stays `undefined`.
+- **Don't send it before the bootstrap runs.** Nothing is listening yet, so the event is lost.
+  You don't need to: HTML already in the document when the bootstrap runs is mounted with the page.
+
 ### Sticky events and the `stickyEvents` config key
 
 #### The problem — ESM dynamic-import race condition
