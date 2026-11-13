@@ -624,7 +624,7 @@ when minifying, minification. The `stylesConfig` hook mutates this object:
 |---|---|---|
 | `importPaths` | `postcssImportPaths` or `['./styleguides']` | postcss-import search paths, relative to the project root |
 | `plugins` | `[]` | Extra PostCSS plugins. They run **after** the four source plugins and **before** Lightning CSS, so they see expanded CSS without vendor prefixes |
-| `browserslist` | project browserslist | Browsers Lightning CSS targets, in place of the project's own list (`.browserslistrc`, `package.json`, or browserslist's defaults) |
+| `browserslist` | project browserslist, else `baseline widely available on 2025-05-01` | Browsers Lightning CSS targets, in place of the project's own list (`.browserslistrc`, the `browserslist` key of `package.json`, or the `BROWSERSLIST` env var) |
 | `lightningcssOptions` | `{}` | Extra options for Lightning CSS [`transform()`](https://lightningcss.dev/transforms.html) (`drafts`, `include`/`exclude`, `visitor`, …). `targets` and `minify` set here win over the computed ones |
 | `minify` | `--minify` or `CLAYCLI_COMPILE_MINIFIED` | Minify. Unminified output is pretty-printed (comments are not kept) |
 
@@ -636,6 +636,9 @@ support. A share query like `> 2%` would make nymag/sites print 9,828 range medi
 (`@media (width>=768px)`) that Safari < 16.4 and Chrome < 104 ignore. A pinned Baseline query
 such as `baseline widely available on 2025-05-01` (Chrome/Edge 107, Firefox 104, Safari/iOS 16;
 Vite 7's default build target) keeps legacy media queries and is stable across caniuse updates.
+With no browserslist anywhere, claycli targets that same query rather than browserslist's
+defaults (`> 0.5%, last 2 versions, ...`), which follow usage data and would change the CSS
+whenever browserslist's data does. A later claycli release may move that date forward.
 
 The stylesConfig hook runs on the main thread and again in every worker thread, since PostCSS
 plugin instances and Lightning CSS visitors cannot be sent between threads. Keep it free of
