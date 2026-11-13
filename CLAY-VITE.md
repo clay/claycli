@@ -929,10 +929,17 @@ every nymag/sites styleguide file against the old PostCSS + cssnano output):
 |---|---|---|
 | `width: fit-content; width: -moz-fit-content` | keeps only the last value | prefixed value first, or no prefix |
 | `.a{x: y !important}` … `.a{x: z}` in one file | drops the `!important` when merging the rules | one declaration |
-| `font: …` then `font-variant-numeric` / `font-feature-settings` / `font-kerning` | prints `font` last, which resets them | longhands instead of `font` |
-| `font: …` with `font-stretch: condensed` | prints `font: 75% …` when minifying (invalid) | longhands instead of `font` |
 | unitless lengths (`margin: 25 0 12px`) | reads them as `px` (browsers ignore them) | a unit, or delete |
 | selector lists mixing vendor prefixes (`::-ms-input-placeholder, ::placeholder`, `_:future` Safari hacks) | splits them into one rule per selector, so each applies on its own | one rule per selector, `@supports` for hacks |
+
+**`font` and the properties it resets.** Lightning CSS prints a rule's `font` shorthand after every
+other declaration in the rule. `font` resets `font-variation-settings`, `font-feature-settings`,
+`font-kerning`, `font-optical-sizing`, `font-size-adjust`, `font-language-override` and
+`font-variant-*` (except caps), so one written after `font` would be reset, and `font-stretch` after
+`font` is printed inside it as `font: 75% …`, which is invalid. claycli keeps a `font` that has one
+of these after it where it is (it holds it as a custom property while Lightning CSS runs), so write
+the CSS in the order you mean. A `font` with nothing of that kind after it is still merged with
+the font longhands as usual.
 
 ### Node globals in browser bundles
 
