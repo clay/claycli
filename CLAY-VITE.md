@@ -199,7 +199,8 @@ clay vite
 ```
 
 **Key runtime behaviour:** The Vite bootstrap (`_view-init.js`) dynamically imports a
-component's `client.js` **only when that component's element exists in the DOM**.
+component's `client.js` **only when that component's element exists in the DOM**. Components
+added later mount through a `clay:mount` event, or on their own with `autoMount` (Section 8).
 `stickyEvents` in `claycli.config.js` configure a shim that replays one-shot events for
 late subscribers (solving the ESM dynamic-import race condition — see Section 8).
 
@@ -552,6 +553,12 @@ module.exports.babelPresetEnvOptions = {};
 // Events fired exactly once that may fire before a component's ESM module loads.
 // See Section 8 (Sticky events) for the full rationale.
 module.exports.stickyEvents = ['auth:init'];
+
+// ─── clay vite only — components added after page load ──────────────────────
+
+// Mount component elements added to the page after load without a clay:mount event.
+// Off by default; read Section 8 (Components added after page load) before turning it on.
+module.exports.autoMount = true;
 
 // ─── clay vite only (Vite + Rollup) ─────────────────────────────────────────
 
@@ -1391,6 +1398,63 @@ configure and no list to keep up to date.
 
 Do not put a function export and a `DS.controller` in the same file. `clay vite` calls only the
 function; `clay compile` runs both.
+
+### Components added after page load
+
+The bootstrap mounts the components that are on the page when it runs. A page that adds component
+HTML later (infinite scroll, a lazy-loaded recirc, a modal or the rest of a truncated article fetched
+from the server) has two ways to mount it.
+
+#### The `clay:mount` event
+
+Put the new HTML in an element of its own, insert it, and dispatch `clay:mount` from that element:
+
+```js
+const wrapper = document.createElement('div');
+
+wrapper.innerHTML = html;
+container.append(wrapper);
+wrapper.dispatchEvent(new CustomEvent('clay:mount'));
+```
+
+To wait for the mounts, pass an object as `detail`; the bootstrap puts a promise on it:
+
+```js
+const detail = {};
+
+wrapper.dispatchEvent(new CustomEvent('clay:mount', { detail }));
+await detail.mounted;
+```
+
+- **What mounts:** the element the event comes from, if it is a component, and every component
+  under it that is not mounted yet. An event from `document` or `window` is ignored, with a warning.
+- **Dispatch from the new content**, not from a container that already holds mounted components.
+  The bootstrap knows only what it mounted itself: a component element that page code copied and
+  mounted on its own (with `DS.get`, or by calling its `client.js`) looks new and would mount twice.
+- **An element mounts once.** It is tried again only if its module failed to load or `DS` was not
+  there yet. Changing its `data-uri` does not mount it again; insert a new element instead.
+- **`detail.mounted`** resolves once every component under the element has mounted or failed,
+  including any that an earlier event, or `autoMount`, is still mounting. It never rejects;
+  failures are reported as on page load.
+- **Insert first, then dispatch.** An event from a detached node, or one sent before the bootstrap
+  runs, is lost. HTML already in the document when the bootstrap runs mounts with the page.
+- **No guard needed.** Only the view-mode bootstrap listens. In edit mode and under `clay compile`
+  the event does nothing and `detail.mounted` stays `undefined`.
+
+#### `autoMount`: mount whatever is added
+
+With `autoMount: true` in `claycli.config.js`, the bootstrap watches the page with a
+`MutationObserver`, started as soon as the page-load components are found, and mounts every
+component element added after that, with no event needed. The rules above still apply: an element
+mounts once, so a moved element does not mount again, and `clay:mount` can still be sent to wait on
+`detail.mounted`.
+
+It is off by default because it changes what existing pages do. Before turning it on, find code
+that copies a component element (`cloneNode`) or inserts component HTML and then mounts it itself,
+and remove that mount call; otherwise the element mounts twice.
+
+Not covered yet: components are not told when their element is removed, so listeners a component
+put on `window` or `document`, its timers and its observers keep running after it leaves the page.
 
 ### Sticky events and the `stickyEvents` config key
 
