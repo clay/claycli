@@ -1,0 +1,50 @@
+name: Release
+
+# Pushing a version tag publishes it: `npm version prerelease` (or `npm run release <patch|...>`)
+# on master, then push the commit and the tag.
+#
+# Publishing uses npm trusted publishing: claycli's npm settings name this repository and this
+# file, so no token is stored in GitHub. 6.0.0-rc.14 goes to the "rc" dist-tag (the prerelease
+# id), a version without one to "latest".
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+*']
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    name: Publish to npm
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write # npm trusted publishing and provenance
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          registry-url: https://registry.npmjs.org
+      - name: Check that the tag is the package version
+        run: |
+          version="v$(node -p "require('./package.json').version")"
+          if [ "$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json ($version)"
+            exit 1
+          fi
+      - name: Publish
+        run: |
+          tag=latest
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then
+            pre="${GITHUB_REF_NAME#*-}"
+            tag="${pre%%.*}"
+          fi
+          npm publish --provenance --tag "$tag"

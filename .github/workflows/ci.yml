@@ -8,6 +8,7 @@ on:
       - '**'
   pull_request:
   workflow_dispatch:
+  workflow_call: # release.yml runs the tests before publishing
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
