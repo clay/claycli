@@ -5,7 +5,7 @@ name: Release
 #
 # Publishing uses npm trusted publishing: claycli's npm settings name this repository and this
 # file, so no token is stored in GitHub. 6.0.0-rc.14 goes to the "rc" dist-tag (the prerelease
-# id), a version without one to "latest".
+# id), 6.0.1-0 to "prerelease", a version without a prerelease part to "latest".
 on:
   push:
     tags: ['v[0-9]+.[0-9]+.[0-9]+*']
@@ -46,5 +46,7 @@ jobs:
           if [[ "$GITHUB_REF_NAME" == *-* ]]; then
             pre="${GITHUB_REF_NAME#*-}"
             tag="${pre%%.*}"
+            # npm rejects a tag that is a semver range, such as the 0 of 6.0.1-0 (`npm version prepatch`)
+            [[ "$tag" =~ ^[A-Za-z-]+$ ]] || tag=prerelease
           fi
           npm publish --provenance --tag "$tag"
