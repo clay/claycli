@@ -1433,6 +1433,9 @@ await detail.mounted;
   mounted on its own (with `DS.get`, or by calling its `client.js`) looks new and would mount twice.
 - **An element mounts once.** It is tried again only if its module failed to load or `DS` was not
   there yet. Changing its `data-uri` does not mount it again; insert a new element instead.
+- **Only elements on the page mount.** One removed before its module (or a legacy controller's
+  dependencies) is ready is skipped, page load included. Put it back and dispatch `clay:mount`
+  again to mount it; `autoMount` does that on its own.
 - **`detail.mounted`** resolves once every component under the element has mounted or failed,
   including any that an earlier event, or `autoMount`, is still mounting. It never rejects;
   failures are reported as on page load.
