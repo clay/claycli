@@ -39,10 +39,29 @@ function builder(yargs) {
           .filter(Boolean);
       },
     })
+    .option('changed', {
+      type: 'array',
+      description: 'With the js step, rebuild only the Vite pass(es) that bundle these files (project-relative paths; comma-separated or repeated)',
+      default: [],
+      coerce: values => {
+        const list = Array.isArray(values) ? values : [values];
+
+        return list
+          .flatMap(v => String(v).split(','))
+          .map(v => v.trim())
+          .filter(Boolean);
+      },
+    })
+    .option('clean', {
+      type: 'boolean',
+      description: 'After the js step, delete files in public/js/chunks and public/js/.clay that the last builds did not write',
+      default: false,
+    })
     .example('$0', 'Build all component scripts and assets with Vite')
     .example('$0 --watch', 'Rebuild on every file change')
     .example('$0 --minify', 'Build and minify for production')
-    .example('$0 --only styles,templates', 'Build only selected asset pipelines');
+    .example('$0 --only styles,templates', 'Build only selected asset pipelines')
+    .example('$0 --only js --changed components/nav/client.js', 'Rebuild only the scripts pass that bundles the changed file');
 }
 
 async function handler(argv) {
@@ -61,6 +80,8 @@ async function handler(argv) {
     minify:       argv.minify,
     extraEntries: argv.entry || [],
     only,
+    changed:      argv.changed || [],
+    clean:        argv.clean,
   };
 
   if (argv.watch) {
